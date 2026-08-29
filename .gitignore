@@ -1,8 +1,25 @@
+# dependencies and build output
 node_modules/
 release/
 src/renderer/dist/
-.DS_Store
 
-# your own manuscripts do not belong in the repo
+# your own manuscripts never belong in the repo
 samples/*.fountain
+samples/*.txt
+samples/*.md
 !samples/README.md
+
+# anything a test or build run might drop
+*.log
+shot-*.png
+screen-*.png
+!docs/screen-*.png
+*.tmp
+.env
+.env.*
+
+# editors and the OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
