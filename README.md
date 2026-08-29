@@ -1,6 +1,10 @@
-# Low Tide
+<p align="center">
+  <img src="build/icon.png" width="140" alt="Low Tide">
+</p>
 
-A novel writing app that keeps you in the room.
+<h1 align="center">Low Tide</h1>
+
+<p align="center">A novel writing app that keeps you in the room.</p>
 
 Writing goes wrong when you leave to look something up. You open a browser for a
 synonym, glance at your outline in another window, put music on — and the thread
@@ -72,9 +76,13 @@ button and resizable by dragging. Start from three-act, Dan Harmon's story
 circle, the hero's journey, seven-point, Freytag, a chapter grid, or blank. Each
 outline belongs to its document and stays open in both the text and pages views.
 
+![The outline open beside the finished pages](docs/screen-outline-pages.png)
+
 **Reference.** Definitions, synonyms and antonyms in the sidebar. Click a
 synonym to swap it into your prose. On macOS the system dictionary is one click
 away and works offline.
+
+![Synonyms in the sidebar](docs/screen-reference.png)
 
 **Music.** Play audio files from your machine, or browse YouTube in a pane,
 scaled down to suit it. Closing the pane hides it rather than stopping it, so
@@ -87,10 +95,14 @@ selected is marked in that colour, and the marks follow the text through later
 edits. Any revision can be hidden, applied (keep the text, drop the colour),
 reverted (delete what it added), or removed.
 
+![Text marked by a revision](docs/screen-revisions.png)
+
 **Goals and stats.** One goal at a time — new words, new pages, total words or
 total pages. Meet it, press Done, and it drops into the history. Alongside it:
 pages, reading time, words, characters, and counts for whatever is selected.
 Sprints run a countdown with an optional word goal.
+
+![The goal ring and document statistics](docs/screen-stats.png)
 
 **Focus.** Focus Mode dims everything but the paragraph or line you are on.
 Typewriter scrolling keeps the caret centred.
@@ -110,6 +122,8 @@ moves a document into Dropbox with its outline, scratchpad and revisions intact.
 **Make it yours.** Nine themes, light and dark. Typeface, size, line spacing,
 column width, page size, margins and print leading are all adjustable, and the
 toolbar buttons can be reordered or switched off.
+
+![Nine themes, light and dark](docs/screen-themes.png)
 
 ## The markup
 

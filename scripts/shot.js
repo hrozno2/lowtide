@@ -176,6 +176,39 @@ app.whenReady().then(async () => {
           'document.querySelector(\'.side-tab[data-tab="reference"]\').click()', true);
         await wait(2500);
         break;
+      case 'music':
+        await win.webContents.executeJavaScript('document.getElementById("btn-music").click()', true);
+        await wait(900);
+        break;
+      case 'revisions-marked':
+        await win.webContents.executeJavaScript(
+          'document.querySelector(\'.side-tab[data-tab="revisions"]\').click()', true);
+        await wait(300);
+        await win.webContents.executeJavaScript('document.getElementById("rev-new").click()', true);
+        await wait(400);
+        await win.webContents.executeJavaScript(
+          '(() => { document.querySelector(".panel input[type=\'text\']").value = "Second Pass"; return true; })()', true);
+        await win.webContents.executeJavaScript(
+          '[...document.querySelectorAll(".panel .btn")].find(b => b.textContent === "Create").click()', true);
+        await wait(500);
+        await win.webContents.executeJavaScript(`(() => {
+          const v = window.__lowTideView;
+          const at = v.state.doc.line(7).to;
+          v.dispatch({ selection: { anchor: at } });
+          v.dispatch({ changes: { from: at, insert: ' She had never named it, and now it was too late to start.' },
+                       selection: { anchor: at + 1 }, userEvent: 'input' });
+          return true; })()`, true);
+        await wait(800);
+        break;
+      case 'lookup':
+        await win.webContents.executeJavaScript(
+          'document.querySelector(\'.side-tab[data-tab="reference"]\').click()', true);
+        await wait(400);
+        await win.webContents.executeJavaScript(
+          '(() => { const i = document.getElementById("ref-input"); i.value = "indifferent"; return true; })()', true);
+        await win.webContents.executeJavaScript('document.getElementById("ref-go").click()', true);
+        await wait(9000);
+        break;
       case 'stats':
         await win.webContents.executeJavaScript('document.querySelector(\'.side-tab[data-tab="stats"]\').click()', true);
         break;
