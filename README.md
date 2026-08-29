@@ -24,16 +24,19 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `Low Tide-1.0.0-mac-arm64.dmg` |
-| macOS, Intel | `Low Tide-1.0.0-mac-x64.dmg` |
-| Windows | `Low Tide-1.0.0-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `Low Tide-1.0.0-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `Low Tide-1.0.0-linux-x64.pacman` |
+| macOS, Apple silicon | `Low.Tide-1.0.0-mac-arm64.dmg` |
+| macOS, Intel | `Low.Tide-1.0.0-mac-x64.dmg` |
+| Windows | `Low.Tide-1.0.0-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `Low.Tide-1.0.0-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `Low.Tide-1.0.0-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U "Low Tide-1.0.0-linux-x64.pacman"`
+- **Arch** — `sudo pacman -U Low.Tide-1.0.0-linux-x64.pacman`
+
+The builds are unsigned, so the first launch needs a nudge: on macOS right-click
+the app and choose Open; on Windows choose More info → Run anyway.
 
 ### Or build it
 

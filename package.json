@@ -42,7 +42,7 @@
     "appId": "com.lowtide.writer",
     "productName": "Low Tide",
     "copyright": "Copyright \u00a9 2026",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "LowTide-${version}-${os}-${arch}.${ext}",
     "directories": {
       "buildResources": "build",
       "output": "release"
