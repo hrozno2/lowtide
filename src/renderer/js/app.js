@@ -551,8 +551,8 @@ function highlightActive(force) {
 
 const RING_C = 2 * Math.PI * 52;
 
-/* A goal is one target at a time, the way Highland does it: set it, work
-   towards it, mark it done, and it drops into the history below. */
+/* A goal is one target at a time: set it, work towards it, mark it done, and
+   it drops into the history below. */
 export const GOAL_TYPES = [
   { id: 'new-words', label: 'new words', unit: 'words', kind: 'new', of: 'words' },
   { id: 'new-pages', label: 'new pages', unit: 'pages', kind: 'new', of: 'pages' },

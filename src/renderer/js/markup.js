@@ -1,4 +1,4 @@
-/* Low Tide markup — a small, Highland-flavoured superset of plain text.
+/* Low Tide markup — a small superset of plain text.
  *
  *   # Chapter One            headings, levels 1–4
  *   > centered text <        centered
@@ -185,7 +185,7 @@ function isWordChar(code) {
 
 // Apostrophes hold a word together but can never begin one, so "it's" counts
 // once and a leading quote counts not at all. Hyphens deliberately separate,
-// which is how Highland counts: "well-known" is two words.
+// "well-known" counts as two words.
 function isJoiner(code) {
   return code === 39 || code === 0x2019;                   // ' ’
 }

@@ -41,7 +41,7 @@ body.typewriter .cm-editor .cm-content { padding-top: 30vh; padding-bottom: 52vh
 /* ------------------------------------------------------------ block styles */
 
 /* Headings stay at body size in the writing font, tinted with the accent —
-   the document reads as one column of text, exactly like Highland. */
+   the document reads as one column of text. */
 .cm-editor .l-h1, .cm-editor .l-h2, .cm-editor .l-h3, .cm-editor .l-h4 {
   color: var(--primary);
   font-weight: 700;

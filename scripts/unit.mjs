@@ -71,7 +71,7 @@ eq('heading marker not counted', M.countWords('# Chapter One'), 2);
 eq('contractions are one word', M.countWords("it's fine"), 2);
 eq('accents count', M.countWords('café niño'), 2);
 eq('em dash splits', M.countWords('one—two'), 2);
-eq('hyphen separates, as Highland counts it', M.countWords('well-known'), 2);
+eq('a hyphen separates two words', M.countWords('well-known'), 2);
 eq('list dash is not a word', M.countWords('- item\n- other'), 2);
 eq('contraction is one word', M.countWords("don't stop"), 2);
 eq('leading apostrophe does not start a word', M.countWords("'tis done"), 2);

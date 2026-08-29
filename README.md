@@ -1,7 +1,7 @@
 # Low Tide
 
 A fast, minimal novel writing app for macOS, Windows and Linux — built to feel
-like Highland 2. Plain text in, manuscript out.
+that stays out of the way. Plain text in, manuscript out.
 
 Your document is always a plain `.fountain` / `.txt` / `.md` file. Nothing is
 locked in a database, and the markup stays readable in any other editor.
@@ -230,10 +230,9 @@ carries the full text:
   with `src/renderer/fonts/OFL.txt` alongside it. The OFL applies to the font
   only, not to this software.
 
-Low Tide is an independent app inspired by Highland 2. It is not affiliated
-with, endorsed by, or derived from Highland's code, and it ships none of its
-assets — every icon, style and string here was written for this project. The
-Fountain markup it reads is an open syntax.
+Every icon, style and string in Low Tide was written for this project; it is
+not derived from any other application's code or assets. The Fountain markup it
+reads is an open syntax.
 
 ## Notes and limitations
 
@@ -248,8 +247,8 @@ Fountain markup it reads is an open syntax.
 - Revision marks and scratchpads are stored beside the document in the app's
   own data, keyed by file path, so the manuscript file stays plain text. Moving
   a document leaves them behind.
-- Word counting follows Highland: hyphenated words count as two, contractions
-  as one, and notes, comments and title-page metadata are excluded.
+- Word counting treats hyphenated words as two and contractions as one, and
+  excludes notes, comments and title-page metadata.
 - The dictionary and thesaurus query dictionaryapi.dev and datamuse.com. Only
   the single word is sent, the request is made by the main process rather than
   the editor, and the whole feature can be switched off in Preferences.

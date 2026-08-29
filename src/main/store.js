@@ -22,8 +22,8 @@ const DEFAULTS = {
   youtubeEnabled: true,
   statusBar: true,
   readingSpeed: 275,
-  // Print template. Defaults approximate Highland's Novel layout so page
-  // counts line up; every value is adjustable in Preferences.
+  // Print template. The defaults describe a typical printed novel page;
+  // every value is adjustable in Preferences.
   pageSize: 'letter',        // 'letter' | 'a4'
   printFontSize: 12,         // pt
   printLeading: 1.8,         // multiple of the font size
