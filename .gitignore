@@ -1,0 +1,8 @@
+node_modules/
+release/
+src/renderer/dist/
+.DS_Store
+
+# your own manuscripts do not belong in the repo
+samples/*.fountain
+!samples/README.md

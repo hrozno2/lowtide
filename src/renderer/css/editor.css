@@ -1,0 +1,169 @@
+/* CodeMirror ships a namespaced base theme (.ͼo .cm-scroller), so every
+   override here keeps an ancestor selector to match its specificity. */
+
+.cm-editor { height: 100%; background: transparent; }
+.cm-editor.cm-focused { outline: none !important; }
+
+.cm-editor .cm-scroller {
+  justify-content: center;          /* centres the writing column */
+  overflow-y: auto;
+  font-family: var(--doc-font);
+  font-size: var(--doc-size);
+  line-height: var(--doc-lh);
+}
+
+.cm-editor .cm-content {
+  width: 100%;
+  max-width: var(--doc-width);
+  padding: 46px 26px 24vh;
+  caret-color: transparent;   /* the drawn .cm-cursor is the only caret */
+  color: var(--text);
+  font-family: var(--doc-font);
+  -webkit-font-smoothing: antialiased;
+}
+body.typewriter .cm-editor .cm-content { padding-top: 30vh; padding-bottom: 52vh; }
+
+.cm-editor .cm-line { padding: 0; }
+
+.cm-editor .cm-cursor, .cm-editor .cm-dropCursor {
+  border-left: 2px solid var(--caret);
+  margin-left: -1px;
+}
+.cm-editor:not(.cm-focused) .cm-cursor { display: none; }
+
+.cm-editor .cm-selectionLayer .cm-selectionBackground { background: var(--selection-off) !important; }
+.cm-editor.cm-focused .cm-selectionLayer .cm-selectionBackground { background: var(--selection) !important; }
+.cm-editor .cm-selectionMatch { background: rgba(79, 214, 196, .10); border-radius: 2px; }
+
+.cm-editor .cm-searchMatch { background: rgba(224, 180, 76, .20); border-radius: 2px; }
+.cm-editor .cm-searchMatch.cm-searchMatch-selected { background: rgba(224, 180, 76, .42); }
+
+/* ------------------------------------------------------------ block styles */
+
+/* Headings stay at body size in the writing font, tinted with the accent —
+   the document reads as one column of text, exactly like Highland. */
+.cm-editor .l-h1, .cm-editor .l-h2, .cm-editor .l-h3, .cm-editor .l-h4 {
+  color: var(--primary);
+  font-weight: 700;
+}
+.cm-editor .l-h1 { padding: 1.9em 0 .34em; }
+.cm-editor .l-h2 { padding: 1.45em 0 .3em; }
+.cm-editor .l-h3 { padding: 1.1em 0 .26em; color: var(--primary-2); }
+.cm-editor .l-h4 { padding: .95em 0 .22em; color: var(--primary-2); font-weight: 400; }
+.cm-editor .cm-line.l-h1:first-child,
+.cm-editor .cm-line.l-h2:first-child { padding-top: .1em; }
+
+.cm-editor .l-h1 .m-marker, .cm-editor .l-h2 .m-marker,
+.cm-editor .l-h3 .m-marker, .cm-editor .l-h4 .m-marker {
+  color: rgba(78, 199, 184, .42);
+  font-weight: 700;
+}
+
+.cm-editor .l-meta { color: var(--text-3); }
+.cm-editor .m-meta-key { color: var(--primary-2); }
+
+.cm-editor .l-center { text-align: center; }
+.cm-editor .l-right  { text-align: right; }
+
+.cm-editor .l-list .m-marker { color: var(--primary-2); font-weight: 400; }
+.cm-editor .l-hang-2 { padding-left: 2ch; text-indent: -2ch; }
+.cm-editor .l-hang-3 { padding-left: 3ch; text-indent: -3ch; }
+.cm-editor .l-hang-4 { padding-left: 4ch; text-indent: -4ch; }
+.cm-editor .l-hang-5 { padding-left: 5ch; text-indent: -5ch; }
+.cm-editor .l-hang-6 { padding-left: 6ch; text-indent: -6ch; }
+
+.cm-editor .l-divider {
+  text-align: center;
+  color: var(--text-4);
+  letter-spacing: .55em;
+  padding: .6em 0;
+}
+
+/* --- and === draw a rule across the column with the marks sitting on it. */
+.cm-editor .l-pagebreak {
+  text-align: center;
+  position: relative;
+  padding: .95em 0;
+}
+.cm-editor .l-pagebreak::before {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 50%;
+  border-top: 1px solid var(--outline);
+}
+.cm-editor .m-rule {
+  position: relative;
+  background: var(--bg);
+  padding: 0 14px;
+  color: var(--rule);
+  letter-spacing: .1em;
+}
+
+.cm-editor .l-body.l-indent { text-indent: 1.45em; }
+.cm-editor .l-body.l-spaced { padding-top: .62em; }
+
+/* ----------------------------------------------------------- inline styles */
+
+.cm-editor .m-marker      { color: var(--text-4); font-weight: 400; font-style: normal; }
+.cm-editor .m-bold        { font-weight: 700; }
+.cm-editor .m-italic      { font-style: italic; }
+.cm-editor .m-bolditalic  { font-weight: 700; font-style: italic; }
+.cm-editor .m-underline   { text-decoration: underline; text-underline-offset: 3px;
+                            text-decoration-thickness: 1px; text-decoration-color: var(--text-3); }
+.cm-editor .m-strike      { text-decoration: line-through; color: var(--text-3); }
+.cm-editor .m-note        { color: var(--note); background: var(--note-ghost);
+                            border-radius: 3px; padding: .5px 0; }
+.cm-editor .m-note-marker { color: rgba(224, 180, 76, .45); }
+.cm-editor .m-comment     { color: var(--text-4); font-style: italic; }
+
+/* revision marks */
+.cm-editor .m-rev {
+  border-bottom: 2px solid var(--rev, transparent);
+  background: color-mix(in srgb, var(--rev) 13%, transparent);
+  border-radius: 2px 2px 0 0;
+}
+.cm-editor .m-rev-blue   { --rev: #5aa9e6; }
+.cm-editor .m-rev-pink   { --rev: #f27eb2; }
+.cm-editor .m-rev-yellow { --rev: #e0b44c; }
+.cm-editor .m-rev-green  { --rev: #7fc96b; }
+.cm-editor .m-rev-orange { --rev: #e8934a; }
+.cm-editor .m-rev-purple { --rev: #b08ae0; }
+.cm-editor .m-rev-red    { --rev: #e8695f; }
+.cm-editor .m-rev-teal   { --rev: #4ec7b8; }
+body.hide-revisions .cm-editor .m-rev,
+.cm-editor .m-rev.is-hidden { border-bottom-color: transparent; background: none; }
+
+/* -------------------------------------------------------------- focus mode */
+
+body.focus-mode .cm-editor .cm-line {
+  opacity: .26;
+  transition: opacity 170ms var(--ease);
+}
+body.focus-mode .cm-editor .cm-line.in-focus { opacity: 1; }
+
+/* ---------------------------------------------------------------- panels */
+
+.cm-editor .cm-panels { background: var(--surface-2); color: var(--text-2); border-color: var(--outline); }
+.cm-editor .cm-panels.cm-panels-top { border-bottom: 1px solid var(--outline); }
+.cm-editor .cm-panel.cm-search {
+  padding: 9px 12px; font-family: var(--font-ui); font-size: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+}
+.cm-editor .cm-panel.cm-search br { display: none; }
+.cm-editor .cm-panel.cm-search input[name="search"],
+.cm-editor .cm-panel.cm-search input[name="replace"] { min-width: 200px; }
+.cm-editor .cm-panel.cm-search label { color: var(--text-3); font-size: 11.5px; }
+.cm-editor .cm-textfield {
+  background: var(--surface-4); color: var(--text);
+  border: 1px solid var(--outline); border-radius: var(--radius-sm);
+  padding: 4px 7px; font-size: 12px; outline: none;
+}
+.cm-editor .cm-textfield:focus { border-color: var(--primary-dim); box-shadow: 0 0 0 2px var(--primary-ghost); }
+.cm-editor .cm-button {
+  background: var(--surface-4); background-image: none;
+  color: var(--text-2); border: 1px solid var(--outline);
+  border-radius: var(--radius-sm); padding: 3px 9px; font-size: 12px;
+}
+.cm-editor .cm-button:hover { background: var(--outline); color: var(--text); }
+.cm-editor .cm-panel.cm-search [name="close"] { color: var(--text-3); font-size: 18px; padding: 0 6px; }
+.cm-tooltip { background: var(--surface-3) !important; border: 1px solid var(--outline) !important;
+              border-radius: var(--radius-sm); }

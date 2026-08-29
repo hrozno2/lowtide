@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;">
+<title>Low Tide</title>
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/home.css">
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8"/></symbol>
+  <symbol id="i-book" viewBox="0 0 16 16"><path d="M2.6 3.2h4.2c.7 0 1.2.5 1.2 1.2v8.4c0-.7-.5-1.2-1.2-1.2H2.6zM13.4 3.2H9.2c-.7 0-1.2.5-1.2 1.2v8.4c0-.7.5-1.2 1.2-1.2h4.2z"/></symbol>
+  <symbol id="i-page" viewBox="0 0 16 16"><path d="M3.6 1.8h5.6l3.2 3.2v9.2H3.6z"/><path d="M9.2 1.9v3.2h3.1"/></symbol>
+  <symbol id="i-list" viewBox="0 0 16 16"><path d="M2.6 4h10.8M2.6 8h10.8M2.6 12h7"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 16 16"><path d="M3.4 1.8h6l3.2 3.2v9.2H3.4z"/><path d="M9.2 1.9v3.2h3.1M5.6 8.4h4.8M5.6 11h3.2"/></symbol>
+</svg>
+
+<div class="home">
+  <aside class="home-side">
+    <button class="home-close" id="home-close" title="Close"><svg><use href="#i-close"/></svg></button>
+
+    <div class="brand">
+      <svg class="brand-mark" viewBox="258 302 474 430" aria-hidden="true">
+        <defs>
+          <filter id="lt-glow" x="-35%" y="-35%" width="170%" height="170%">
+            <feGaussianBlur stdDeviation="11" result="soft"/>
+            <feMerge><feMergeNode in="soft"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g fill="none" stroke="var(--primary)" stroke-width="30" stroke-linecap="round"
+           stroke-linejoin="round" filter="url(#lt-glow)">
+          <path d="M300 400 c 43 -34, 87 -34, 130 0 s 87 34, 130 0 s 87 -34, 130 0"/>
+          <path d="M300 518 c 43 -34, 87 -34, 130 0 s 87 34, 130 0 s 87 -34, 130 0"/>
+          <path d="M300 636 c 43 -34, 87 -34, 130 0 s 87 34, 130 0 s 87 -34, 130 0"/>
+          <path d="M690 352 L690 684"/>
+        </g>
+      </svg>
+      <h1>Low Tide</h1>
+      <p class="brand-sub" id="brand-version"></p>
+    </div>
+
+    <div class="starters" id="starters"></div>
+
+    <p class="brand-foot" id="brand-foot"></p>
+  </aside>
+
+  <main class="home-main">
+    <div class="home-tabs" id="home-tabs">
+      <button class="home-tab on" data-view="recent">Recent</button>
+      <button class="home-tab" data-view="templates">Templates</button>
+      <button class="home-tab" data-view="samples">Sample Documents</button>
+    </div>
+
+    <div class="home-list" id="home-list"></div>
+
+    <div class="home-foot">
+      <button class="btn primary" id="home-new">New <span class="kbd-inline" id="new-key">⌘N</span></button>
+      <span class="spacer"></span>
+      <button class="btn" id="home-browse">Browse Documents</button>
+      <button class="btn" id="home-open" disabled>Open</button>
+    </div>
+  </main>
+</div>
+
+<script src="dist/home.js"></script>
+</body>
+</html>

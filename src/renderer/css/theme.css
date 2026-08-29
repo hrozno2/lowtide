@@ -1,0 +1,77 @@
+/* Courier Prime — SIL Open Font License 1.1, see fonts/OFL.txt */
+@font-face {
+  font-family: 'Courier Prime'; font-style: normal; font-weight: 400;
+  src: url('../fonts/cp-400.woff2') format('woff2'); font-display: block;
+}
+@font-face {
+  font-family: 'Courier Prime'; font-style: normal; font-weight: 700;
+  src: url('../fonts/cp-700.woff2') format('woff2'); font-display: block;
+}
+@font-face {
+  font-family: 'Courier Prime'; font-style: italic; font-weight: 400;
+  src: url('../fonts/cp-italic-400.woff2') format('woff2'); font-display: block;
+}
+@font-face {
+  font-family: 'Courier Prime'; font-style: italic; font-weight: 700;
+  src: url('../fonts/cp-italic-700.woff2') format('woff2'); font-display: block;
+}
+
+/* Material dark-teal: a slate-teal surface ladder with a single teal accent. */
+:root {
+  color-scheme: dark;
+
+  --bg:            #26302f;
+  --surface:       #222b2b;
+  --surface-2:     #2b3635;
+  --surface-3:     #334040;
+  --surface-4:     #3b4a49;
+  --outline:       #3f4f4e;
+  --outline-soft:  #2f3b3a;
+
+  --text:          #cbd6d2;
+  --text-2:        #a3b1ad;
+  --text-3:        #7e8d8a;
+  --text-4:        #5d6c6a;
+
+  --primary:       #4ec7b8;
+  --primary-2:     #3aa99c;
+  --primary-dim:   #2b6a63;
+  --primary-ghost: rgba(78, 199, 184, .12);
+  --primary-glow:  rgba(78, 199, 184, .26);
+  --stat:          #8ecdbe;
+
+  --note:          #e0b44c;
+  --note-ghost:    rgba(224, 180, 76, .13);
+  --rule:          #e0897b;
+  --caret:         #e0897b;
+  --danger:        #ff7a70;
+
+  --selection:     rgba(78, 199, 184, .22);
+  --selection-off: rgba(150, 175, 172, .14);
+
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .35);
+  --shadow-2: 0 14px 36px rgba(0, 0, 0, .48), 0 3px 10px rgba(0, 0, 0, .34);
+
+  --radius:    12px;
+  --radius-sm: 7px;
+  --ease:      cubic-bezier(.2, .85, .25, 1);
+  --dur:       130ms;
+
+  --font-ui:    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+                Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+                Georgia, "Noto Serif", "Liberation Serif", serif;
+  --font-sans:  var(--font-ui);
+  --font-mono:  "Courier Prime", "Courier New", "Nimbus Mono PS", ui-monospace,
+                "SF Mono", Menlo, Consolas, monospace;
+
+  /* Document typography — driven from preferences at runtime. */
+  --doc-font:   var(--font-mono);
+  --doc-size:   16px;
+  --doc-lh:     1.6;
+  --doc-width:  650px;
+
+  --titlebar-h: 40px;
+  --status-h:   28px;
+  --nav-w:      264px;
+}
