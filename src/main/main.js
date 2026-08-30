@@ -12,6 +12,15 @@ const { TEMPLATES, SAMPLES, templateBody } = require('./templates');
 const APP_VERSION = require('../../package.json').version;
 
 const isMac = process.platform === 'darwin';
+const isLinux = process.platform === 'linux';
+
+// Linux window managers take the dock icon from the window itself; without
+// this they fall back to matching WM_CLASS and show a blank tile. The file is
+// copied outside the asar so the OS can read it directly.
+const LINUX_ICON = app.isPackaged
+  ? path.join(process.resourcesPath, 'icon.png')
+  : path.join(__dirname, '..', '..', 'build', 'icon.png');
+const windowIcon = () => (isLinux && fs.existsSync(LINUX_ICON) ? LINUX_ICON : undefined);
 const HARNESS = !!process.env.LOWTIDE_HARNESS;
 
 /** Report a problem without blocking an automated run behind a modal. */
@@ -62,6 +71,7 @@ function createWindow(opts = {}) {
     y: Number.isFinite(bounds.y) ? bounds.y + offset : undefined,
     minWidth: 520,
     minHeight: 420,
+    icon: windowIcon(),
     backgroundColor: BG,
     show: false,
     title: 'Untitled',
@@ -337,6 +347,7 @@ function createHomeWindow() {
     fullscreenable: false,
     title: 'Low Tide',
     frame: false,
+    icon: windowIcon(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,

@@ -46,7 +46,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
 .tb-right { margin-left: auto; }
 
 body.mac .tb-left { padding-left: 70px; }
-body:not(.win) .win-only { display: none; }
+body.mac .win-only { display: none; }   /* macOS keeps its native traffic lights */
 
 .tb-title {
   position: absolute;
@@ -516,6 +516,8 @@ body:not(.status-on) .statusbar { display: none; }
 .sb-left, .sb-right { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; }
 .sb-right { text-align: right; }
 .sb-center { flex: 0 0 auto; display: flex; gap: 26px; }
+#save-state { cursor: default; }
+#save-state:hover { color: var(--text-2); }
 #save-state.saving { color: var(--primary-2); }
 #sprint-status { color: var(--primary); letter-spacing: .02em; }
 #sprint-status.done { color: var(--note); }

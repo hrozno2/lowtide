@@ -104,6 +104,7 @@ const debounce = (fn, ms) => {
   window.__pages = () => state.pages;
   window.__parseYouTube = parseYouTube;
   window.__setPref = (k, v) => setPrefs({ [k]: v });
+  window.__forcePaginate = () => repaginate.flush();
 })();
 
 /* ---------------------------------------------------------------- prefs */
@@ -1545,6 +1546,9 @@ function wireChrome() {
   $('view-text').onclick = () => togglePreview(false);
   wireViewSwitch();
   $('btn-prefs').onclick = () => ui.showPreferences(ctx());
+  $('btn-home').onclick = () => api.home.show();
+  $('save-state').onclick = () => save(false);
+  $('save-state').title = 'Save now';
   $('btn-outline').onclick = () => dockToggle('outline');
   $('dock-close').onclick = () => dockClose();
   wireReferencePanel();

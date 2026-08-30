@@ -116,7 +116,7 @@
       "category": "Office",
       "synopsis": "A fast, minimal novel writing app",
       "desktop": {
-        "StartupWMClass": "Low Tide",
+        "StartupWMClass": "low-tide",
         "Categories": "Office;WordProcessor;"
       },
       "target": [
@@ -154,7 +154,13 @@
         "nss",
         "alsa-lib"
       ]
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ]
   },
   "repository": {
     "type": "git",

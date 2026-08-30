@@ -782,6 +782,52 @@ app.whenReady().then(async () => {
     await wait(250);
   });
 
+  /* ===================================================== window chrome === */
+  group = 'Window chrome';
+
+  await test('every platform can reach its menus, windowing and Home', async () => {
+    const chrome = async (platform) => {
+      await js(`(() => { document.body.classList.remove('mac','linux','win');
+                         document.body.classList.add('${platform}'); return true; })()`);
+      await wait(150);
+      return js(`(() => {
+        const shown = (id) => { const el = document.getElementById(id);
+          return !!el && el.offsetParent !== null && el.getBoundingClientRect().width > 0; };
+        return { menu: shown('btn-appmenu'), home: shown('btn-home'),
+                 min: shown('wc-min'), close: shown('wc-close') };
+      })()`);
+    };
+
+    const linux = await chrome('linux');
+    ok('linux has a menu button', linux.menu);
+    ok('linux can minimise', linux.min);
+    ok('linux can close', linux.close);
+
+    const win = await chrome('win');
+    ok('windows has a menu button', win.menu);
+    ok('windows can close', win.close);
+
+    const mac = await chrome('mac');
+    ok('macOS hides them in favour of its own', !mac.menu && !mac.min && !mac.close);
+
+    ok('every platform has a Home button', linux.home && win.home && mac.home);
+    await js(`(() => { document.body.classList.remove('mac','linux','win');
+                       document.body.classList.add(window.api.platform === 'darwin' ? 'mac' : 'linux');
+                       return true; })()`);
+  });
+
+  await test('the document can be saved without a keyboard shortcut', async () => {
+    const file = path.join(WORK, 'button-save.fountain');
+    fs.writeFileSync(file, 'start', 'utf8');
+    await load('start', file);
+    await select(5, 5);
+    await type(' more');
+    await wait(300);
+    await click('#save-state');
+    await wait(1200);
+    eq('clicking the status bar saved it', fs.readFileSync(file, 'utf8'), 'start more');
+  });
+
   /* ============================================================= home === */
   group = 'Home window';
 
