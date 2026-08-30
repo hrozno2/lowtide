@@ -248,6 +248,9 @@ export function showPreferences(ctx) {
     row('YouTube in the music pane', 'Off means no browser view at all',
       toggle(p.youtubeEnabled !== false, (v) => set({ youtubeEnabled: v }))),
 
+    row('Check for updates on launch', 'Asks GitHub for the newest release; installs nothing',
+      toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))),
+
     row('Look up words online', 'Sends only the word, to dictionaryapi.dev and datamuse.com',
       toggle(p.onlineLookup !== false, (v) => set({ onlineLookup: v }))),
 

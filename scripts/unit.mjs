@@ -155,6 +155,20 @@ ok('docx ships styles', asText.includes('word/styles.xml'));
 ok('docx escapes markup characters', asText.includes('&lt; &amp; &gt;'));
 ok('docx carries the title page', asText.includes('>T<'));
 
+/* -------------------------------------------------------------- updates */
+const U = require_('../src/main/updates.js');
+eq('a newer patch wins', U.compareVersions('1.0.1', '1.0.0'), 1);
+eq('equal versions tie', U.compareVersions('1.0.0', '1.0.0'), 0);
+eq('an older version loses', U.compareVersions('0.9.9', '1.0.0'), -1);
+eq('a leading v is ignored', U.compareVersions('v1.2.0', '1.1.9'), 1);
+eq('a release beats its own pre-release', U.compareVersions('1.0.0', '1.0.0-beta'), 1);
+eq('a pre-release loses to the release', U.compareVersions('1.0.0-beta', '1.0.0'), -1);
+eq('missing parts count as zero', U.compareVersions('1.0', '1.0.0'), 0);
+eq('major beats minor', U.compareVersions('2.0.0', '1.9.9'), 1);
+eq('nonsense is treated as equal', U.compareVersions('not-a-version', '1.0.0'), 0);
+eq('the repository is found', U.repoSlug({ repository: { url: 'https://github.com/hrozno2/lowtide.git' } }), 'hrozno2/lowtide');
+eq('a missing repository is null', U.repoSlug({}), null);
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log('\n' + failures.map((f) => 'FAIL  ' + f).join('\n\n') + '\n');

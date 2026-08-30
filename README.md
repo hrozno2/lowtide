@@ -119,6 +119,10 @@ typing. Every save keeps a version, and `File ▸ Revert to Backup` opens any of
 them in a new window. Unsaved drafts survive a restart. `File ▸ Move to Dropbox`
 moves a document into Dropbox with its outline, scratchpad and revisions intact.
 
+**Updates.** On launch it asks GitHub whether a newer release exists and, if so,
+shows a dismissible notice with a download link. It never installs anything by
+itself, and the check can be switched off in Preferences.
+
 **Make it yours.** Nine themes, light and dark. Typeface, size, line spacing,
 column width, page size, margins and print leading are all adjustable, and the
 toolbar buttons can be reordered or switched off.
@@ -183,7 +187,7 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 
 ```bash
 npm run watch       # rebuild the renderer as you edit
-npm test            # 93 unit and 171 end-to-end checks
+npm test            # 104 unit and 188 end-to-end checks
 npm run pack        # unpacked build, the quickest packaging check
 ```
 

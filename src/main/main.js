@@ -7,6 +7,7 @@ const { getPrefs, getSession, docEntry, setDocEntry, addRecent } = require('./st
 const { buildMenu } = require('./menu');
 const backups = require('./backups');
 const { buildDocx } = require('./docx');
+const { checkForUpdate } = require('./updates');
 const { TEMPLATES, SAMPLES, templateBody } = require('./templates');
 // app.getVersion() reports Electron's version when running unpackaged.
 const APP_VERSION = require('../../package.json').version;
@@ -741,6 +742,30 @@ ipcMain.handle('spell:set-languages', (e, languages) => {
     console.error('[low-tide] could not set spellchecker languages:', err.message);
   }
   return { managedByOS: false, current: ses.getSpellCheckerLanguages() };
+});
+
+ipcMain.handle('update:check', async (e, opts) => {
+  // A harness can inject a result so the notice can be tested offline.
+  if (process.env.LOWTIDE_FAKE_UPDATE) {
+    return { checked: true, available: true, version: process.env.LOWTIDE_FAKE_UPDATE,
+             current: app.getVersion(), url: 'https://github.com/hrozno2/lowtide/releases',
+             notes: 'Test release.' };
+  }
+  try {
+    return await checkForUpdate({
+      currentVersion: app.getVersion(),
+      pkg: require('../../package.json'),
+      prefs: getPrefs(),
+      force: !!(opts && opts.force)
+    });
+  } catch (err) {
+    return { checked: false, reason: err.message };
+  }
+});
+
+ipcMain.handle('update:open', (e, url) => {
+  if (/^https:\/\/github\.com\//i.test(url || '')) { shell.openExternal(url); return true; }
+  return false;
 });
 
 ipcMain.handle('app:dropbox', () => ({ root: dropboxRoot() }));

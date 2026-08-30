@@ -104,6 +104,10 @@ const debounce = (fn, ms) => {
   window.__pages = () => state.pages;
   window.__parseYouTube = parseYouTube;
   window.__setPref = (k, v) => setPrefs({ [k]: v });
+  window.__checkUpdate = checkForUpdate;
+
+  // after the editor is up, never before
+  setTimeout(() => checkForUpdate(), 3000);
   window.__forcePaginate = () => repaginate.flush();
 })();
 
@@ -1537,6 +1541,40 @@ function paintViewSwitch() {
   $('view-switch').classList.toggle('pinned', state.previewOpen);
 }
 
+/* ------------------------------------------------------------------ updates */
+
+/* Nothing is installed automatically. If GitHub has a newer release we say so
+   once, quietly, and let the download happen in a browser. */
+async function checkForUpdate({ force = false } = {}) {
+  let info;
+  try {
+    info = await api.update.check({ force });
+  } catch {
+    return;
+  }
+  if (!info || !info.available) {
+    if (force) ui.toast(info && info.checked ? 'Low Tide is up to date' : 'Could not reach GitHub');
+    return;
+  }
+  if (!force && state.prefs.updateDismissed === info.version) return;   // already waved away
+  showUpdateBar(info);
+}
+
+function showUpdateBar(info) {
+  const bar = $('update-bar');
+  const text = $('update-text');
+  text.textContent = '';
+  text.append(document.createTextNode('Low Tide '),
+              ui.h('b', {}, info.version),
+              document.createTextNode(` is available. You have ${info.current}.`));
+  $('update-get').onclick = () => api.update.open(info.url);
+  $('update-dismiss').onclick = () => {
+    bar.hidden = true;
+    setPrefs({ updateDismissed: info.version });
+  };
+  bar.hidden = false;
+}
+
 /* ---------------------------------------------------------------- chrome */
 
 function wireChrome() {
@@ -1703,6 +1741,7 @@ function wireMenu() {
     'tools:scratch': () => setSidebarTab('scratch'),
     'tools:revision': () => { setSidebarTab('revisions'); ui.showNewRevision(ctx()); },
 
+    'help:updates': () => checkForUpdate({ force: true }),
     'help:markup': () => ui.showHelp(),
     'help:about': () => api.app.info().then((i) =>
       ui.toast(`Low Tide ${i.version} · Electron ${i.electron}`, 4000))

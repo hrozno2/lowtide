@@ -135,6 +135,7 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
       label: '&Help',
       submenu: [
         { label: 'Markup Cheat Sheet', accelerator: 'F1', click: send('help:markup') },
+        { label: 'Check for Updates…', click: send('help:updates') },
         ...(isMac ? [] : [{ type: 'separator' }, { label: 'About Low Tide', click: send('help:about') }])
       ]
     }

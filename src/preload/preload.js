@@ -45,6 +45,11 @@ contextBridge.exposeInMainWorld('api', {
     show: () => ipcRenderer.invoke('win:home')
   },
 
+  update: {
+    check: (opts) => ipcRenderer.invoke('update:check', opts),
+    open: (url) => ipcRenderer.invoke('update:open', url)
+  },
+
   lookup: {
     word: (w) => ipcRenderer.invoke('lookup:word', w),
     native: () => ipcRenderer.invoke('lookup:native')

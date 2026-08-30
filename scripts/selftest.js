@@ -782,6 +782,49 @@ app.whenReady().then(async () => {
     await wait(250);
   });
 
+  /* ========================================================== updates === */
+  group = 'Updates';
+
+  await test('a newer release shows a notice that can be dismissed', async () => {
+    // the launch check may already have fired; start from a known state
+    await js(`window.__setPref('updateDismissed', '')`);
+    await js(`document.getElementById('update-bar').hidden = true`);
+    await wait(300);
+    eq('starts hidden', await js(`document.getElementById('update-bar').hidden`), true);
+
+    // the main process injects a fake result when LOWTIDE_FAKE_UPDATE is set
+    await js(`window.__checkUpdate({ force: true })`);
+    await wait(1200);
+    eq('the notice appears', await js(`document.getElementById('update-bar').hidden`), false);
+
+    const text = await js(`document.getElementById('update-text').textContent`);
+    ok('it names the new version', text.includes('9.9.9'));
+    // running from source, app.getVersion() is Electron's own version, so
+    // compare against whatever the check actually reported
+    const current = await js(`(async () => (await window.api.update.check({force:true})).current)()`);
+    ok('it names the version you have', text.includes(current));
+
+    await click('#update-dismiss');
+    await wait(500);
+    eq('dismissing hides it', await js(`document.getElementById('update-bar').hidden`), true);
+    eq('the dismissal is remembered',
+      await js(`(async () => (await window.api.prefs.get()).updateDismissed)()`), '9.9.9');
+
+    // and it stays away on a normal (non-forced) check
+    await js(`window.__checkUpdate()`);
+    await wait(1000);
+    eq('it does not nag again', await js(`document.getElementById('update-bar').hidden`), true);
+
+    await js(`window.__setPref('updateDismissed', '')`);
+  });
+
+  await test('the download button only opens GitHub', async () => {
+    const ok1 = await js(`window.api.update.open('https://github.com/hrozno2/lowtide/releases')`);
+    const ok2 = await js(`window.api.update.open('https://evil.example.com/x')`);
+    eq('a GitHub link is allowed', ok1, true);
+    eq('anything else is refused', ok2, false);
+  });
+
   /* ===================================================== window chrome === */
   group = 'Window chrome';
 
