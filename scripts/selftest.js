@@ -13,6 +13,9 @@ app.setPath('userData', PROFILE);
 fs.mkdirSync(WORK, { recursive: true });
 
 process.env.LOWTIDE_HARNESS = '1';
+// Run from source, app.getVersion() reports Electron's own version, which beats
+// every real release — so the update notice needs a fixed answer to test against.
+process.env.LOWTIDE_FAKE_UPDATE = '9.9.9';
 require(path.join(base, 'src', 'main', 'main.js'));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
