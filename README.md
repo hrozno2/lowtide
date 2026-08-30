@@ -28,19 +28,20 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.1-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.1-mac-x64.dmg` |
-| Windows | `LowTide-1.0.1-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.1-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.1-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-1.0.2-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-1.0.2-mac-x64.dmg` |
+| Windows | `LowTide-1.0.2-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `LowTide-1.0.2-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-1.0.2-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.1-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-1.0.2-linux-x64.pacman`
 
-The builds are unsigned, so the first launch needs a nudge: on macOS right-click
-the app and choose Open; on Windows choose More info → Run anyway.
+The builds are not notarised, so the first launch needs a nudge: on macOS
+right-click the app and choose **Open** (double-clicking will refuse); on
+Windows choose **More info → Run anyway**.
 
 ### Or build it
 
