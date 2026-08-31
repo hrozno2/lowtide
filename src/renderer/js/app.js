@@ -9,6 +9,7 @@ import { OUTLINE_TEMPLATES, templateById } from './outlines.js';
 import { countWords, stripMarkup } from './markup.js';
 import * as ui from './panels.js';
 import { THEMES, swatches, applyTheme } from './themes.js';
+import { AMBIENCES, createAmbiencePlayer, measureAmbience } from './ambience.js';
 import { REVISION_COLOURS, colourById, applyRevisions, restoreMarks,
          dropRevision, serialiseMarks, revisionCounts,
          revertRevision, applyRevision, rangesOf, keepMarks } from './revisions.js';
@@ -54,6 +55,13 @@ const debounce = (fn, ms) => {
   wrapped.cancel = () => clearTimeout(t);
   return wrapped;
 };
+
+/* Set when the music pane exists, so a theme change can repaint the guest.
+   Declared up here because applyPrefs reads it on the very first paint. */
+let repaintMusic = null;
+
+/* Built once and kept: closing the music pane should not stop the sound. */
+const ambience = createAmbiencePlayer();
 
 /* ------------------------------------------------------------------ boot */
 
@@ -105,6 +113,10 @@ const debounce = (fn, ms) => {
   window.__checkUpdate = checkForUpdate;
   window.__moveSection = (i, slot) => moveSection(i, slot);
   window.__sectionRange = (i) => sectionRange(i);
+  window.__musicThemeCss = musicThemeCss;
+  window.__ambience = ambience;
+  window.__measureAmbience = measureAmbience;
+  window.__ambienceIds = () => AMBIENCES.map((a) => a.id);
 
   // after the editor is up, never before
   setTimeout(() => checkForUpdate(), 3000);
@@ -123,7 +135,10 @@ function applyPrefs(p, prev) {
   const css = document.documentElement.style;
   const changed = (k) => !prev || prev[k] !== p[k];
 
-  if (changed('theme')) applyTheme(p.theme || 'material');
+  if (changed('theme')) {
+    applyTheme(p.theme || 'material');
+    if (repaintMusic) repaintMusic();     // the music pane follows the theme too
+  }
   if (changed('fontFamily')) css.setProperty('--doc-font', docFont(p.fontFamily));
   if (changed('fontSize')) css.setProperty('--doc-size', `${p.fontSize}px`);
   if (changed('lineHeight')) css.setProperty('--doc-lh', String(p.lineHeight));
@@ -1455,6 +1470,7 @@ function showMusicPane(mode) {
 function renderMusicFiles(body) {
   const player = ui.h('audio', { controls: true, class: 'music-player' });
   const list = ui.h('div', { class: 'music-list' });
+  const amb = renderAmbience();
   let tracks = state.tracks || [];
   let index = 0;
 
@@ -1498,9 +1514,97 @@ function renderMusicFiles(body) {
         class: 'text-btn',
         onclick: () => { tracks = []; state.tracks = []; player.pause(); player.removeAttribute('src'); paint(); }
       }, 'Clear')),
-    player, list);
+    player, amb, list);
 
   paint();
+}
+
+/* The site's own palette is a bright slab in the middle of a quiet editor, and
+   in a narrow pane the red is the loudest thing on screen. Repaint it from the
+   current theme instead. This overrides the site's design tokens rather than
+   its class names: the tokens are the stable part, and one sheet then covers
+   every page rather than chasing markup that changes weekly. */
+function musicThemeCss() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
+  const bg = v('--surface', '#2c3635');
+  const raised = v('--surface-2', '#323c3b');
+  const chip = v('--surface-3', '#3b4644');
+  const line = v('--outline-soft', '#384241');
+  const text = v('--text', '#cbd6d2');
+  const dim = v('--text-3', '#8fa09b');
+  const primary = v('--primary', '#4ec7b8');
+
+  return `
+    html, body { background: ${bg} !important; }
+    html {
+      color-scheme: dark;
+      --yt-spec-base-background: ${bg} !important;
+      --yt-spec-raised-background: ${raised} !important;
+      --yt-spec-menu-background: ${raised} !important;
+      --yt-spec-general-background-a: ${bg} !important;
+      --yt-spec-general-background-b: ${bg} !important;
+      --yt-spec-general-background-c: ${raised} !important;
+      --yt-spec-brand-background-solid: ${bg} !important;
+      --yt-spec-brand-background-primary: ${bg} !important;
+      --yt-spec-text-primary: ${text} !important;
+      --yt-spec-text-secondary: ${dim} !important;
+      --yt-spec-icon-inactive: ${dim} !important;
+      --yt-spec-icon-active-other: ${dim} !important;
+      --yt-spec-badge-chip-background: ${chip} !important;
+      --yt-spec-10-percent-layer: ${chip} !important;
+      --yt-spec-outline: ${line} !important;
+      --yt-spec-call-to-action: ${primary} !important;
+      --yt-spec-themed-blue: ${primary} !important;
+      --yt-spec-static-brand-red: ${primary} !important;
+      --yt-spec-brand-link-text: ${primary} !important;
+    }
+    /* Thumbnails and avatars are the rest of the noise. Take the edge off
+       without touching the video itself, which stays as it is. */
+    img, ytm-thumbnail-cover, .video-thumbnail-img { filter: saturate(.8) brightness(.93); }
+    video, video ~ * img { filter: none; }
+  `;
+}
+
+/* The bundled focus sounds. They are generated rather than played back, so
+   there is no file to run out — see ambience.js. */
+function renderAmbience() {
+  const wrap = ui.h('div', { class: 'amb' });
+  const rows = ui.h('div', { class: 'amb-list' });
+
+  const paint = () => {
+    rows.querySelectorAll('.amb-btn').forEach((b) => {
+      b.classList.toggle('on', b.dataset.amb === ambience.playing);
+    });
+    stopBtn.hidden = !ambience.playing;
+  };
+
+  const stopBtn = ui.h('button', {
+    class: 'text-btn', onclick: () => { ambience.stop(); paint(); }
+  }, 'Stop');
+
+  for (const a of AMBIENCES) {
+    rows.append(ui.h('button', {
+      class: 'amb-btn', 'data-amb': a.id, title: a.hint,
+      onclick: () => { ambience.play(a.id); paint(); }
+    }, a.name));
+  }
+
+  const vol = ui.h('input', {
+    type: 'range', min: 0, max: 100, value: String(Math.round(ambience.volume * 100)),
+    class: 'amb-vol', title: 'Focus sound volume',
+    oninput: (e) => ambience.setVolume(Number(e.target.value) / 100)
+  });
+
+  wrap.append(
+    ui.h('div', { class: 'amb-head' },
+      ui.h('span', { class: 'amb-title' }, 'Focus sounds'),
+      stopBtn),
+    rows,
+    ui.h('div', { class: 'amb-foot' }, vol));
+
+  paint();
+  return wrap;
 }
 
 /**
@@ -1573,12 +1677,27 @@ function renderMusicWeb(body, service) {
   const status = ui.h('div', { class: 'yt-note' },
     `${service.name}\u2019s own site, in a browser view. Search above, tap a result to play it.`);
 
-  web.addEventListener('dom-ready', applyZoom);
+  /* Injected on every page, and again whenever the theme changes. The old
+     sheet is removed first so switching themes does not stack them up. */
+  let sheetKey = null;
+  const paintGuest = () => {
+    if (!web.insertCSS) return;
+    if (sheetKey) { try { web.removeInsertedCSS(sheetKey); } catch {} sheetKey = null; }
+    try {
+      // The site keeps its dark styling behind this attribute.
+      web.executeJavaScript(`document.documentElement.setAttribute('dark', '')`)
+        .catch(() => {});
+      web.insertCSS(musicThemeCss()).then((k) => { sheetKey = k; }).catch(() => {});
+    } catch {}
+  };
+  repaintMusic = paintGuest;
+
+  web.addEventListener('dom-ready', () => { applyZoom(); paintGuest(); });
   web.addEventListener('did-fail-load', (e) => {
     if (e.errorCode === -3) return;   // aborted by a redirect, not a failure
     status.textContent = `Could not load ${service.name} (${e.errorDescription || e.errorCode}).`;
   });
-  web.addEventListener('did-navigate', () => { remember(web.getURL()); applyZoom(); });
+  web.addEventListener('did-navigate', () => { remember(web.getURL()); applyZoom(); paintGuest(); });
   web.addEventListener('did-navigate-in-page', () => remember(web.getURL()));
 
   // Leaving the site opens the real browser instead of wandering off in here.

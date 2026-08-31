@@ -32,6 +32,8 @@ export const THEMES = [
     bg: '#272822', text: '#f3f2e7', primary: '#a6e22e', rule: '#fd971f', note: '#e6db74' },
   { id: 'solarized-dark', name: 'Solarized Dark', dark: true,
     bg: '#002b36', text: '#c3ccc7', primary: '#2aa198', rule: '#cb4b16', note: '#b58900' },
+  { id: 'nord', name: 'Nord', dark: true,
+    bg: '#2e3440', text: '#d8dee9', primary: '#88c0d0', rule: '#bf616a', note: '#ebcb8b' },
   { id: 'paper', name: 'Paper', dark: false,
     bg: '#f6f3ec', text: '#22201c', primary: '#0f766e', rule: '#b4462f', note: '#9a6b12' },
   { id: 'clean', name: 'Clean', dark: false,

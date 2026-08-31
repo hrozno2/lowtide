@@ -7,6 +7,12 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
+  /* Explicit and unitless, never `normal`. The UI font stack resolves to a
+     different face on each platform, and `normal` takes its line box from
+     that face's own metrics — so rows that pin a line-height keep their size
+     while everything around them grows or shrinks. Pinning it here makes the
+     interface measure the same everywhere. */
+  line-height: 1.2;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -20,6 +26,13 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 svg.mini { width: 13px; height: 13px; }
 
 button { font: inherit; color: inherit; background: none; border: 0; cursor: default; }
+/* Form controls do not inherit line-height from body, so they would sit at
+   the font's own `normal` and drift between platforms like everything else.
+   <select> is not in this list because Chromium's own stylesheet pins it to
+   normal and will not take an override; its box comes from the platform
+   control rather than from a line of text. */
+input, textarea { line-height: 1.2; }
+input[type="range"], input[type="checkbox"], input[type="radio"] { line-height: 1; }
 
 /* The hidden attribute must win over the display rules below. */
 [hidden] { display: none !important; }
@@ -42,6 +55,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
 }
 
 .tb-side { display: flex; align-items: center; gap: 2px; -webkit-app-region: no-drag; }
+
+/* Keeps the app menu from reading as one of the document buttons next to it. */
+.tb-sep {
+  width: 1px; height: 15px; margin: 0 5px;
+  background: var(--outline);
+  flex: 0 0 auto;
+}
 .tb-buttons { display: flex; align-items: center; gap: 2px; }
 .tb-right { margin-left: auto; }
 
@@ -466,13 +486,13 @@ body:not(.nav-open) .sidebar { margin-left: calc(-1 * var(--nav-w)); opacity: 0;
 
 .ref-section {
   margin: 14px 0 7px;
-  font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  font-size: 10px; line-height: 1.15; font-weight: 600; letter-spacing: .14em;
   text-transform: uppercase; color: var(--text-4);
 }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   padding: 4px 9px; border-radius: 13px;
-  font-size: 12.5px; color: var(--text-2);
+  font-size: 12.5px; line-height: 1.2; color: var(--text-2);
   background: var(--surface-2); border: 1px solid var(--outline-soft);
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
@@ -485,6 +505,27 @@ body:not(.nav-open) .sidebar { margin-left: calc(-1 * var(--nav-w)); opacity: 0;
   font-size: 10.5px; font-style: italic; color: var(--primary-2);
 }
 .def .eg { margin-top: 3px; font-size: 12px; color: var(--text-4); font-style: italic; }
+
+/* --------------------------------------------------------- focus sounds */
+
+.amb { flex: 0 0 auto; padding: 2px 12px 10px; border-bottom: 1px solid var(--outline-soft); }
+.amb-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 0 7px; }
+.amb-title {
+  font-size: 10px; line-height: 1.4; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-4);
+}
+.amb-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.amb-btn {
+  padding: 6px 4px; border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--outline-soft);
+  color: var(--text-3);
+  font-size: 11.5px; line-height: 1.25; text-align: center;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.amb-btn:hover { background: var(--surface-3); color: var(--text); }
+.amb-btn.on { background: var(--primary-dim); border-color: var(--primary-dim); color: var(--text); }
+.amb-foot { padding-top: 8px; }
+.amb-vol { width: 100%; line-height: 1; }
 
 /* ------------------------------------------------------------- music pane */
 

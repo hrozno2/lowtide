@@ -73,7 +73,10 @@ app.whenReady().then(async () => {
     const home = BrowserWindow.getAllWindows()
       .find((w) => w.webContents.getURL().includes('home.html'));
     if (home) {
-      home.webContents.executeJavaScript(`window.api.home.create('blank')`, true).catch(() => {});
+      // The bundled sample, not a blank page: the pictures are of a document
+      // with something in it, and several steps address particular lines.
+      const starter = arg('starter', 'lighthouse');
+      home.webContents.executeJavaScript(`window.api.home.create('${starter}')`, true).catch(() => {});
       await wait(2000);
     }
   }

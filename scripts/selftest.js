@@ -489,6 +489,240 @@ app.whenReady().then(async () => {
       await js(`document.querySelector('.nav-item').getAttribute('draggable')`), 'true');
   });
 
+  await test('the music pane is painted from the theme', async () => {
+    const token = (n) => js(`getComputedStyle(document.documentElement).getPropertyValue('${n}').trim()`);
+
+    await js(`window.__applyTheme('material')`);
+    await wait(300);
+    const surface = await token('--surface');
+    const primary = await token('--primary');
+    const material = await js(`window.__musicThemeCss()`);
+
+    ok('the sheet carries the theme surface', material.includes(surface));
+    ok('the site background is overridden', material.includes('--yt-spec-base-background'));
+    ok('the brand red is replaced by the theme accent',
+      new RegExp('--yt-spec-static-brand-red:\\s*' + primary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(material));
+    ok('the guest is told to use its dark styling', material.includes('color-scheme: dark'));
+
+    await js(`window.__applyTheme('nord')`);
+    await wait(300);
+    const nordSurface = await token('--surface');
+    const nord = await js(`window.__musicThemeCss()`);
+    ok('a different theme gives a different sheet', nord !== material);
+    ok('and carries the new surface', nord.includes(nordSurface));
+    ok('the old surface is gone', !nord.includes(surface));
+
+    await js(`window.__applyTheme('material')`);
+    await wait(250);
+  });
+
+  /* ==================================================== focus sounds ==== */
+  group = 'Focus sounds';
+
+  await test('every sound renders, and none of them is silent or clipped', async () => {
+    const ids = await js(`window.__ambienceIds()`);
+    eq('nine of them are offered', ids.length, 9);
+
+    const levels = [];
+    for (const id of ids) {
+      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 2)`);
+      ok(`${id} renders`, !!m);
+      if (!m) continue;
+      ok(`${id} makes a sound`, m.rms > 0.02);
+      eq(`${id} has no broken samples`, m.nonFinite, 0);
+      ok(`${id} does not clip`, m.peak < 1);
+      levels.push(m.rms);
+    }
+    // Switching between them should not be a jolt.
+    const loudest = Math.max(...levels);
+    const quietest = Math.min(...levels);
+    ok('they sit within about twice each other', loudest / quietest < 2.2);
+  });
+
+  await test('the focus sounds play, swap and stop', async () => {
+    await click('#btn-music');
+    await wait(800);
+    eq('the buttons are there', await js(`document.querySelectorAll('.amb-btn').length`), 9);
+    eq('nothing plays to begin with', await js(`window.__ambience.playing`), null);
+    ok('the stop button is put away', await js(`document.querySelector('.amb .text-btn').hidden`));
+
+    await js(`document.querySelector('.amb-btn[data-amb="rain"]').click()`);
+    await wait(600);
+    eq('rain starts', await js(`window.__ambience.playing`), 'rain');
+    eq('and is the one marked', await js(`document.querySelector('.amb-btn.on').dataset.amb`), 'rain');
+
+    await js(`document.querySelector('.amb-btn[data-amb="cafe"]').click()`);
+    await wait(600);
+    eq('picking another swaps to it', await js(`window.__ambience.playing`), 'cafe');
+    eq('only one is marked', await js(`document.querySelectorAll('.amb-btn.on').length`), 1);
+
+    await js(`document.querySelector('.amb-btn[data-amb="cafe"]').click()`);
+    await wait(600);
+    eq('picking the same one stops it', await js(`window.__ambience.playing`), null);
+    eq('nothing is marked', await js(`document.querySelectorAll('.amb-btn.on').length`), 0);
+
+    await js(`window.__ambience.setVolume(0.3)`);
+    await wait(200);
+    eq('the volume can be set', await js(`window.__ambience.volume`), 0.3);
+    await js(`window.__ambience.setVolume(5)`);
+    eq('and is held inside its range', await js(`window.__ambience.volume`), 1);
+    await js(`window.__ambience.setVolume(0.6)`);
+  });
+
+  /* ==================================================== line heights ==== */
+  group = 'Line heights';
+
+  const boxes = () => js(`(() => [...document.querySelectorAll('.cm-content .cm-line')].map((el) => {
+    const cs = getComputedStyle(el);
+    return { h: +el.getBoundingClientRect().height.toFixed(2),
+             cls: el.className.replace('cm-line', '').trim(),
+             lh: cs.lineHeight, text: el.textContent.slice(0, 20) };
+  }))()`);
+
+  const HEIGHT_DOC = [
+    'Body line one, plain and ordinary.', 'Body line two, also plain.', '',
+    '# Chapter', '', 'After a chapter.', '',
+    '## Section', '', 'After a section.', '',
+    '### Sub', '', 'After a sub.', '',
+    '#### Fourth', '', 'After a fourth.', '',
+    '- a list item', '', '> centered <', '',
+    'Body with **bold** and *italic* inline.',
+    'Body with a [[note]] inline in it.',
+    'Body with /* a comment */ inline.',
+    'Plain tail.'
+  ].join('\n');
+
+  await test('every ordinary line is exactly the same height', async () => {
+    await load(HEIGHT_DOC);
+    await wait(700);
+    const rows = await boxes();
+    const plain = rows.filter((r) => r.cls === 'l-body');
+    ok('there are body lines to compare', plain.length >= 6);
+    const distinct = [...new Set(plain.map((r) => r.h))];
+    eq('body lines share one height', distinct.length, 1);
+
+    // Inline markup must not change the line box — bold, notes and comments
+    // are painted, not resized.
+    const inline = plain.filter((r) => /\*\*|\[\[|\/\*/.test(r.text));
+    ok('inline markup was in the sample', inline.length >= 1);
+    ok('inline markup does not change the line box',
+      inline.every((r) => r.h === plain[0].h));
+
+    const blanks = rows.filter((r) => r.cls === 'l-blank');
+    ok('blank lines match body lines', blanks.every((r) => r.h === plain[0].h));
+
+    const list = rows.filter((r) => r.cls.startsWith('l-list'));
+    const centred = rows.filter((r) => r.cls === 'l-center');
+    ok('list lines match body lines', list.every((r) => r.h === plain[0].h));
+    ok('centred lines match body lines', centred.every((r) => r.h === plain[0].h));
+  });
+
+  await test('headings stand apart, in order, by a fixed amount', async () => {
+    await load(HEIGHT_DOC);
+    await wait(700);
+    const rows = await boxes();
+    const one = (cls) => rows.find((r) => r.cls === cls);
+    const body = rows.find((r) => r.cls === 'l-body').h;
+    const h1 = one('l-h1').h, h2 = one('l-h2').h, h3 = one('l-h3').h, h4 = one('l-h4').h;
+
+    ok('a chapter is the tallest', h1 > h2);
+    ok('a section is taller than a sub-section', h2 > h3);
+    ok('a sub-section is taller than a fourth level', h3 > h4);
+    ok('every heading is taller than body text', h4 > body);
+
+    // Ratios rather than pixels, so the check survives a different font.
+    const r = (x) => Math.round((x / body) * 100) / 100;
+    eq('chapter ratio', r(h1), 2.4);
+    eq('section ratio', r(h2), 2.09);
+    eq('sub-section ratio', r(h3), 1.85);
+    eq('fourth-level ratio', r(h4), 1.73);
+  });
+
+  await test('a heading returns to body height when it is removed', async () => {
+    await load('Body before.\nA line.\nBody after.');
+    await wait(600);
+    const before = (await boxes())[1].h;
+
+    await select(14, 14);
+    await menu('format:h2');
+    await wait(400);
+    const asHeading = (await boxes())[1].h;
+    ok('making it a heading changes the box', asHeading !== before);
+
+    await menu('format:h2');
+    await wait(400);
+    const after = (await boxes())[1].h;
+    eq('and taking it back gives exactly the old height', after, before);
+  });
+
+  await test('editing one heading leaves every other line alone', async () => {
+    await load(HEIGHT_DOC);
+    await wait(700);
+    const before = await boxes();
+
+    // Retype the title of the section heading, character by character.
+    const line = await js(`window.__lowTideView.state.doc.line(8).from`);
+    await select(line + 3, line + 10);
+    await type('Scene');
+    await wait(600);
+
+    const after = await boxes();
+    const bodyBefore = [...new Set(before.filter((r) => r.cls === 'l-body').map((r) => r.h))];
+    const bodyAfter = [...new Set(after.filter((r) => r.cls === 'l-body').map((r) => r.h))];
+    eq('body lines are untouched', bodyAfter, bodyBefore);
+    eq('the section is still a section', after.filter((r) => r.cls === 'l-h2').length, 1);
+  });
+
+  await test('nothing in the interface takes its line box from the font', async () => {
+    // `line-height: normal` measures from the font's own metrics, and the UI
+    // stack resolves to a different face on each platform — so a row that
+    // pins its line-height sits at odds with its neighbours on Linux while
+    // looking right on macOS.
+    for (const tab of ['navigator', 'stats', 'scratch', 'revisions', 'reference']) {
+      await click(`.side-tab[data-tab="${tab}"]`);
+      await wait(150);
+    }
+    // Preferences is where most of the form controls live.
+    await menu('tools:prefs');
+    await wait(400);
+    await js(`(() => { const host = document.getElementById('ref-results');
+      host.innerHTML = '<div class="ref-section">Synonyms</div><div class="chips">' +
+        ['apathetic','inert','moderate'].map(w => '<button class="chip">' + w + '</button>').join('') +
+        '</div><div class="def"><span class="part">adjective</span>Having no interest.' +
+        '<div class="eg">an example</div></div>'; return true; })()`);
+    await wait(300);
+
+    const bad = await js(`(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('body *')) {
+        if (el.closest('.sprite') || el.tagName === 'svg' || el.tagName === 'use') continue;
+        if (!el.offsetParent) continue;
+        // Chromium pins <select> to normal in its own stylesheet and ignores
+        // any override; that control is sized by the platform, not by a line
+        // of text, so it is not what this check is looking for.
+        if (el.tagName === 'SELECT') continue;
+        if (getComputedStyle(el).lineHeight === 'normal') {
+          out.push(el.tagName.toLowerCase() +
+            (typeof el.className === 'string' && el.className.trim()
+              ? '.' + el.className.trim().split(/\s+/)[0] : ''));
+        }
+      }
+      return [...new Set(out)]; })()`);
+    eq('every laid-out row has a pinned line-height', bad, []);
+
+    const chips = await js(`JSON.stringify([...new Set(
+      [...document.querySelectorAll('.chip')].map(c => +c.getBoundingClientRect().height.toFixed(2)))])`);
+    eq('the thesaurus chips are all one height', JSON.parse(chips).length, 1);
+
+    await js(`(() => { const b = [...document.querySelectorAll('.panel .btn, .panel .text-btn')]
+      .find(x => /done|close/i.test(x.textContent)); if (b) b.click(); return true; })()`);
+    await wait(300);
+    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    await wait(250);
+    await click('.side-tab[data-tab="navigator"]');
+    await wait(150);
+  });
+
   /* ========================================================= pagination == */
   group = 'Pagination';
 
@@ -553,7 +787,7 @@ app.whenReady().then(async () => {
 
   await test('every theme applies', async () => {
     const ids = await js(`window.__themeIds()`);
-    eq('nine themes offered', ids.length, 9);
+    eq('ten themes offered', ids.length, 10);
     for (const id of ids) {
       await js(`window.api.prefs.set({theme:'${id}'})`);
       await js(`window.__applyTheme('${id}')`);

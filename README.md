@@ -28,16 +28,16 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.3-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.3-mac-x64.dmg` |
-| Windows | `LowTide-1.0.3-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.3-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.3-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-1.0.4-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-1.0.4-mac-x64.dmg` |
+| Windows | `LowTide-1.0.4-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `LowTide-1.0.4-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-1.0.4-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.3-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-1.0.4-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
 right-click the app and choose **Open** (double-clicking will refuse); on
@@ -87,8 +87,12 @@ away and works offline.
 
 ![Synonyms in the sidebar](docs/screen-reference.png)
 
-**Music.** Play audio files from your machine, or browse YouTube in a pane,
-scaled down to suit it. Closing the pane hides it rather than stopping it, so
+**Sound.** Nine focus sounds are built in — rain, thunder, wind, night, a
+coffee shop, waves, and white, pink and brown noise. They are synthesised as
+they play rather than looped from a recording, so they run for as long as you
+leave them and never come back round to the same place. You can also play audio
+files from your machine, or browse YouTube in a pane, repainted in your theme so
+it stops shouting. Closing the pane hides it rather than stopping it, so
 whatever is playing keeps playing. YouTube can be switched off entirely.
 
 **Scratchpad.** Notes about the document, kept with it, never printed or counted.
@@ -126,11 +130,11 @@ moves a document into Dropbox with its outline, scratchpad and revisions intact.
 shows a dismissible notice with a download link. It never installs anything by
 itself, and the check can be switched off in Preferences.
 
-**Make it yours.** Nine themes, light and dark. Typeface, size, line spacing,
+**Make it yours.** Ten themes, light and dark. Typeface, size, line spacing,
 column width, page size, margins and print leading are all adjustable, and the
 toolbar buttons can be reordered or switched off.
 
-![Nine themes, light and dark](docs/screen-themes.png)
+![Ten themes, light and dark](docs/screen-themes.png)
 
 ## The markup
 
@@ -181,16 +185,21 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 - The dictionary queries dictionaryapi.dev and datamuse.com. Only the single
   word is sent, the request comes from the main process rather than the editor,
   and the feature can be switched off.
-- The music pane shows YouTube's own site. Taking only the audio is against
-  their terms, so it is not done; use local files if you want sound with nothing
-  to look at. There is no Spotify tab — its web player needs DRM that Electron
-  does not ship.
+- The focus sounds are generated from noise and filters, not played back from
+  files. That is why they can run indefinitely without repeating and add
+  nothing to the download, and it means there is no third-party audio in here
+  and no licence to pass on.
+- The music pane shows YouTube's own site, with its palette overridden to match
+  the current theme. Taking only the audio is against their terms, so it is not
+  done; use local files or a focus sound if you want sound with nothing to look
+  at. There is no Spotify tab — its web player needs DRM that Electron does not
+  ship.
 
 ## Development
 
 ```bash
 npm run watch       # rebuild the renderer as you edit
-npm test            # 108 unit and 241 end-to-end checks
+npm test            # 108 unit and 320 end-to-end checks
 npm run pack        # unpacked build, the quickest packaging check
 ```
 
