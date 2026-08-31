@@ -25,6 +25,11 @@ export const LINE = {
 };
 
 const RE_HEADING = /^(#{1,4})([ \t]+)(.*)$/;
+/* A line of nothing but hashes is a heading with its title not typed yet.
+   Without this it counts as body text, so editing the hashes of an existing
+   heading collapses the line to body height and springs it back — the text
+   jumps under the caret while you are working on it. */
+const RE_HEADING_BARE = /^(#{1,4})([ \t]*)$/;
 const RE_CENTER = /^(>)([ \t]*)(.*?)([ \t]*)(<)[ \t]*$/;
 const RE_RIGHT = /^(>)([ \t]+)(\S.*?)[ \t]*$/;
 const RE_PAGEBREAK = /^(?:={3,}|-{3,})[ \t]*$/;
@@ -35,14 +40,14 @@ const RE_LIST = /^([ \t]*)([-+*\u2022\u2013\u2014]|\d{1,3}[.)])([ \t]+)(.*)$/;
 export function classifyLine(text) {
   if (!text.trim()) return { type: LINE.blank, level: 0, markerTo: 0, contentFrom: 0 };
 
-  let m = RE_HEADING.exec(text);
+  let m = RE_HEADING.exec(text) || RE_HEADING_BARE.exec(text);
   if (m) {
     return {
       type: LINE.heading,
       level: m[1].length,
       markerTo: m[1].length + m[2].length,
       contentFrom: m[1].length + m[2].length,
-      title: m[3].trim()
+      title: (m[3] || '').trim()
     };
   }
   if (RE_PAGEBREAK.test(text)) return { type: LINE.pagebreak, level: 0, markerTo: 0, contentFrom: 0 };

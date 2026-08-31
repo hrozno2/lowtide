@@ -149,6 +149,65 @@ app.whenReady().then(async () => {
     eq('every selected line gets a marker', await content(), '## one\n## two');
   });
 
+  await test('changing a heading leaves the caret in the words', async () => {
+    // A caret on or inside the "## " marker has nowhere obvious to go when the
+    // marker is rewritten; it used to be stranded in front of the new hashes.
+    const at = () => js(`window.__lowTideView.state.selection.main.head`);
+
+    await load('Plain line');
+    await select(0, 0);
+    await menu('format:h1');
+    eq('from the very start of a plain line', await at(), 2);
+
+    await load('# Heading');
+    await select(0, 0);
+    await menu('format:h2');
+    eq('from the start of an existing heading', await at(), 3);
+
+    await load('# Heading');
+    await select(1, 1);
+    await menu('format:h2');
+    eq('from between the hashes and the space', await at(), 3);
+
+    await load('# Heading');
+    await select(5, 5);
+    await menu('format:h2');
+    eq('from inside the words', await at(), 6);
+
+    await load('## Heading');
+    await select(6, 6);
+    await menu('format:h1');
+    eq('shortening the marker keeps the place', await at(), 5);
+
+    await load('# Heading');
+    await select(4, 4);
+    await menu('format:h1');
+    eq('toggling the heading off keeps the place', await at(), 2);
+  });
+
+  await test('a half-typed heading is still a heading', async () => {
+    // Without this the line collapses to body height the moment the title is
+    // deleted and springs back as it is retyped, so the text jumps about while
+    // the hashes are being edited.
+    const cls = () => js(`(() => {
+      const v = window.__lowTideView;
+      let n = v.domAtPos(v.state.doc.line(1).from).node;
+      n = n.nodeType === 1 ? n : n.parentElement;
+      while (n && !n.classList.contains('cm-line')) n = n.parentElement;
+      return n ? n.className.replace('cm-line', '').trim() : ''; })()`);
+
+    await load('## A section');
+    eq('a full heading', await cls(), 'l-h2');
+    await load('##');
+    eq('hashes with no title yet', await cls(), 'l-h2');
+    await load('# ');
+    eq('a hash and a space', await cls(), 'l-h1');
+    await load('#tag');
+    eq('a hash run into a word is not a heading', await cls(), 'l-body');
+    await load('# 3');
+    eq('a numbered title is a heading', await cls(), 'l-h1');
+  });
+
   await test('centering and notes', async () => {
     await load('Centre me');
     await select(0, 0);
@@ -280,6 +339,154 @@ app.whenReady().then(async () => {
     await wait(700);
     const thirdTop = await scrollTop();
     ok('coming back to it lands in the same place', Math.abs(thirdTop - firstTop) <= 2);
+  });
+
+  await test('nesting is drawn with one rule per level', async () => {
+    await load('# One\n\nx\n\n## Two\n\ny\n\n### Three\n\nz\n\n#### Four\n\nq');
+    await wait(700);
+    eq('a chapter has no rules',
+      await js(`document.querySelectorAll('.nav-item')[0].querySelectorAll('.guide').length`), 0);
+    eq('a section has one', 
+      await js(`document.querySelectorAll('.nav-item')[1].querySelectorAll('.guide').length`), 1);
+    eq('a sub-section has two',
+      await js(`document.querySelectorAll('.nav-item')[2].querySelectorAll('.guide').length`), 2);
+    eq('a fourth level has three',
+      await js(`document.querySelectorAll('.nav-item')[3].querySelectorAll('.guide').length`), 3);
+    eq('each level indents further', await js(`JSON.stringify(
+      [...document.querySelectorAll('.nav-item')].map(b => getComputedStyle(b).paddingLeft))`),
+      JSON.stringify(['9px', '23px', '37px', '51px']));
+  });
+
+  /* ================================================ reordering chapters == */
+  group = 'Reordering';
+
+  const DOC3 = '# One\n\nAlpha.\n\n# Two\n\nBeta.\n\n# Three\n\nGamma.';
+  const headings = async () =>
+    (await content()).split('\n').filter((l) => /^#/.test(l));
+
+  await test('a heading owns everything beneath it', async () => {
+    await load('# Act\n\nx\n\n## Scene\n\ny\n\n### Beat\n\nz\n\n# Next\n\nq');
+    await wait(700);
+    eq('a chapter takes its scenes with it',
+      await js(`(() => { const r = window.__sectionRange(0);
+        return window.__lowTideView.state.doc.sliceString(r.from, r.to); })()`),
+      '# Act\n\nx\n\n## Scene\n\ny\n\n### Beat\n\nz\n\n');
+    eq('a scene takes only its beats',
+      await js(`(() => { const r = window.__sectionRange(1);
+        return window.__lowTideView.state.doc.sliceString(r.from, r.to); })()`),
+      '## Scene\n\ny\n\n### Beat\n\nz\n\n');
+  });
+
+  await test('a chapter can be moved to the front, middle and end', async () => {
+    await load(DOC3); await wait(700);
+    ok('moved', await js(`window.__moveSection(2, 0)`));
+    await wait(400);
+    eq('to the front', await content(), '# Three\n\nGamma.\n\n# One\n\nAlpha.\n\n# Two\n\nBeta.');
+
+    await load(DOC3); await wait(700);
+    ok('moved', await js(`window.__moveSection(0, 3)`));
+    await wait(400);
+    eq('to the end', await content(), '# Two\n\nBeta.\n\n# Three\n\nGamma.\n\n# One\n\nAlpha.');
+
+    await load(DOC3); await wait(700);
+    ok('moved', await js(`window.__moveSection(2, 1)`));
+    await wait(400);
+    eq('into the middle', await content(), '# One\n\nAlpha.\n\n# Three\n\nGamma.\n\n# Two\n\nBeta.');
+  });
+
+  await test('moving keeps the spacing and loses no words', async () => {
+    for (const [i, slot] of [[0, 3], [2, 0], [1, 0], [0, 2]]) {
+      await load(DOC3); await wait(600);
+      await js(`window.__moveSection(${i}, ${slot})`);
+      await wait(350);
+      const after = await content();
+      ok(`${i}->${slot} keeps every word`,
+        after.split(/\s+/).filter(Boolean).sort().join(' ') ===
+        DOC3.split(/\s+/).filter(Boolean).sort().join(' '));
+      ok(`${i}->${slot} leaves one blank line between chapters`, !/\n{3,}/.test(after));
+      ok(`${i}->${slot} leaves no blank line at the end`, !/\n\s*$/.test(after));
+    }
+  });
+
+  await test('a chapter carries its scenes', async () => {
+    await load('# One\n\na\n\n## Scene A\n\nb\n\n# Two\n\nc');
+    await wait(700);
+    await js(`window.__moveSection(2, 0)`);
+    await wait(400);
+    eq('the scene stays under its chapter', await headings(), ['# Two', '# One', '## Scene A']);
+  });
+
+  await test('dropping a chapter on itself changes nothing', async () => {
+    await load(DOC3); await wait(700);
+    eq('onto its own slot', await js(`window.__moveSection(1, 1)`), false);
+    eq('into its own body', await js(`window.__moveSection(0, 0)`), false);
+    eq('the document is untouched', await content(), DOC3);
+  });
+
+  await test('the caret follows the moved chapter', async () => {
+    await load(DOC3); await wait(700);
+    await js(`window.__moveSection(2, 0)`);
+    await wait(400);
+    eq('the caret sits on the heading it moved', await js(`(() => { const v = window.__lowTideView;
+      return v.state.doc.lineAt(v.state.selection.main.head).text; })()`), '# Three');
+  });
+
+  await test('dragging a row actually moves the chapter', async () => {
+    // The handlers, not just the move underneath them: dragstart marks the row,
+    // dragover puts the drop line in the right place, drop does the work.
+    const drag = (from, onto, bottomHalf) => js(`(() => {
+      const rows = [...document.querySelectorAll('.nav-item')];
+      const src = rows[${from}], dst = rows[${onto}];
+      if (!src || !dst) return null;
+      const dt = new DataTransfer();
+      const fire = (el, type, y) => el.dispatchEvent(new DragEvent(type, {
+        bubbles: true, cancelable: true, dataTransfer: dt, clientY: y }));
+      const r = dst.getBoundingClientRect();
+      const y = r.top + r.height * (${bottomHalf} ? 0.75 : 0.25);
+      fire(src, 'dragstart', 0);
+      const dragging = src.classList.contains('dragging');
+      fire(dst, 'dragover', y);
+      const marker = document.querySelector('.nav-drop');
+      const shown = !!marker && !marker.hidden;
+      fire(dst, 'drop', y);
+      fire(src, 'dragend', 0);
+      return { dragging, shown };
+    })()`);
+
+    await load(DOC3); await wait(700);
+    const onto = await drag(2, 0, false);
+    eq('the row is marked while dragging', onto && onto.dragging, true);
+    eq('a drop line is shown', onto && onto.shown, true);
+    await wait(500);
+    eq('dropping on the top half puts it above',
+      await content(), '# Three\n\nGamma.\n\n# One\n\nAlpha.\n\n# Two\n\nBeta.');
+
+    await load(DOC3); await wait(700);
+    await drag(0, 2, true);
+    await wait(500);
+    eq('dropping on the bottom half puts it below',
+      await content(), '# Two\n\nBeta.\n\n# Three\n\nGamma.\n\n# One\n\nAlpha.');
+
+    eq('the drop line is put away afterwards',
+      await js(`(() => { const m = document.querySelector('.nav-drop'); return !m || m.hidden; })()`), true);
+    eq('no row is left mid-drag',
+      await js(`document.querySelectorAll('.nav-item.dragging').length`), 0);
+  });
+
+  await test('reordering waits for a clear filter', async () => {
+    await load(DOC3); await wait(700);
+    eq('draggable by default',
+      await js(`document.querySelector('.nav-item').getAttribute('draggable')`), 'true');
+    await js(`(() => { const f = document.getElementById('nav-filter');
+      f.value = 'one'; f.dispatchEvent(new Event('input')); return true; })()`);
+    await wait(300);
+    eq('not while filtering',
+      await js(`document.querySelector('.nav-item').getAttribute('draggable')`), 'false');
+    await js(`(() => { const f = document.getElementById('nav-filter');
+      f.value = ''; f.dispatchEvent(new Event('input')); return true; })()`);
+    await wait(300);
+    eq('draggable again once cleared',
+      await js(`document.querySelector('.nav-item').getAttribute('draggable')`), 'true');
   });
 
   /* ========================================================= pagination == */
@@ -418,6 +625,35 @@ app.whenReady().then(async () => {
     await wait(400);
     eq('deleting removes the marks', await js(`document.querySelectorAll('.cm-content .m-rev').length`), 0);
     eq('deleting removes the entry', await js(`document.querySelectorAll('.rev-item').length`), 0);
+  });
+
+  await test('marks survive a chapter being reordered', async () => {
+    await load('# One\n\nAlpha.\n\n# Two\n\nBeta.');
+    await click('.side-tab[data-tab="revisions"]');
+    await wait(200);
+    await click('#rev-new');
+    await wait(300);
+    await js(`(() => { document.querySelector('.panel input[type="text"]').value = 'Pass'; return true; })()`);
+    await js(`[...document.querySelectorAll('.panel .btn')].find(b => b.textContent === 'Create').click()`);
+    await wait(400);
+
+    // Type inside the second chapter so the mark rides along when it moves.
+    await select(27, 27);
+    await type('X');
+    await wait(300);
+    const before = await js(`[...document.querySelectorAll('.cm-content .m-rev')].map(e => e.textContent).join('')`);
+    eq('the mark is there to begin with', before.trim(), 'X');
+
+    await js(`window.__moveSection(1, 0)`);
+    await wait(600);
+    const after = await js(`[...document.querySelectorAll('.cm-content .m-rev')].map(e => e.textContent).join('')`);
+    eq('and is still there after the move', after.trim(), 'X');
+    ok('still on the right chapter', (await content()).startsWith('# Two'));
+
+    await js(`document.querySelector('.rev-item .more').click()`);
+    await wait(300);
+    await js(`[...document.querySelectorAll('.menu-item')].find(b => b.textContent.startsWith('Delete revision')).click()`);
+    await wait(400);
   });
 
   await test('apply keeps the text, revert removes it', async () => {

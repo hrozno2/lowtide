@@ -28,16 +28,16 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.2-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.2-mac-x64.dmg` |
-| Windows | `LowTide-1.0.2-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.2-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.2-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-1.0.3-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-1.0.3-mac-x64.dmg` |
+| Windows | `LowTide-1.0.3-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `LowTide-1.0.3-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-1.0.3-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.2-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-1.0.3-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
 right-click the app and choose **Open** (double-clicking will refuse); on
@@ -70,7 +70,9 @@ page never reflows under your hands. Smart quotes, em dashes and ellipses.
 Spellcheck with right-click corrections; choose your dictionaries in Preferences.
 
 **Structure.** The Navigator lists every chapter and section with its word
-count, filters as you type, and jumps you there.
+count, filters as you type, and jumps you there. Nesting is drawn with one rule
+per level, and dragging a chapter reorders the manuscript — the text goes with
+it, scenes and all.
 
 **Outline.** A second editor beside the manuscript, opened and closed with one
 button and resizable by dragging. Start from three-act, Dan Harmon's story
@@ -188,7 +190,7 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 
 ```bash
 npm run watch       # rebuild the renderer as you edit
-npm test            # 104 unit and 188 end-to-end checks
+npm test            # 108 unit and 241 end-to-end checks
 npm run pack        # unpacked build, the quickest packaging check
 ```
 

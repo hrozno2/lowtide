@@ -11,7 +11,7 @@ import * as ui from './panels.js';
 import { THEMES, swatches, applyTheme } from './themes.js';
 import { REVISION_COLOURS, colourById, applyRevisions, restoreMarks,
          dropRevision, serialiseMarks, revisionCounts,
-         revertRevision, applyRevision, rangesOf } from './revisions.js';
+         revertRevision, applyRevision, rangesOf, keepMarks } from './revisions.js';
 
 const api = window.api;
 const $ = (id) => document.getElementById(id);
@@ -88,8 +88,6 @@ const debounce = (fn, ms) => {
   setDirty(false);
   view.focus();
 
-  // Small automation surface: the main process reads the live buffer through
-  // this when confirming an unsaved close, and scripts/selftest.js drives it.
   // Automation surface. The main process reads the live buffer through
   // __lowTideContent when confirming an unsaved close; the rest exists so
   // scripts/selftest.js can drive the app the way a person would.
@@ -105,6 +103,8 @@ const debounce = (fn, ms) => {
   window.__parseYouTube = parseYouTube;
   window.__setPref = (k, v) => setPrefs({ [k]: v });
   window.__checkUpdate = checkForUpdate;
+  window.__moveSection = (i, slot) => moveSection(i, slot);
+  window.__sectionRange = (i) => sectionRange(i);
 
   // after the editor is up, never before
   setTimeout(() => checkForUpdate(), 3000);
@@ -492,6 +492,147 @@ function removeRevision(rev) {
 
 /* ------------------------------------------------------------- navigator */
 
+/** The text a heading owns: the heading line plus everything under it, up to
+    the next heading at the same level or shallower. */
+function sectionRange(index) {
+  const items = state.outline;
+  const item = items[index];
+  if (!item) return null;
+  let to = view.state.doc.length;
+  for (let j = index + 1; j < items.length; j++) {
+    if (items[j].level <= item.level) { to = items[j].from; break; }
+  }
+  return { from: item.from, to };
+}
+
+/* Reordering moves the heading with everything beneath it, so dragging a
+   chapter carries its scenes along. `slot` is the outline index the block
+   should come to sit in front of; outline.length means the end. */
+function moveSection(index, slot) {
+  const items = state.outline;
+  const src = sectionRange(index);
+  if (!src) return false;
+  const doc = view.state.doc;
+  const at = slot >= items.length ? doc.length : items[slot].from;
+  if (at >= src.from && at <= src.to) return false;   // dropped into itself
+
+  const isNl = (i) => i >= 0 && i < doc.length && doc.sliceString(i, i + 1) === '\n';
+
+  // The block itself, without whatever blank line happens to trail it.
+  let end = src.to;
+  while (end > src.from && isNl(end - 1)) end--;
+  const block = doc.sliceString(src.from, end);
+
+  /* Cut the block along with the blank line that separated it from what came
+     after. The last section in a document has nothing after it, so it takes
+     the blank line in front of it instead — otherwise the move leaves a gap
+     where the block used to be. */
+  let cutFrom = src.from;
+  let cutTo = src.to;
+  if (cutTo >= doc.length) {
+    while (cutFrom > 0 && isNl(cutFrom - 1)) cutFrom--;
+  }
+  if (at > cutFrom && at < cutTo) return false;
+
+  /* Put it back with exactly one blank line of separation at either end of the
+     document, so a moved chapter is spaced like every other one. */
+  let insert, lead;
+  if (at >= doc.length) {
+    let have = 0;
+    while (have < 2 && isNl(at - 1 - have)) have++;
+    lead = 2 - have;
+    insert = '\n'.repeat(lead) + block;
+  } else {
+    lead = 0;
+    insert = block + '\n\n';
+  }
+
+  const cut = { from: cutFrom, to: cutTo };
+  const paste = { from: at, to: at, insert };
+  const landing = (at < cutFrom ? at : at - (cutTo - cutFrom)) + lead;
+
+  /* Cutting the text throws away the revision marks inside it, so note where
+     they sat relative to the block and put them back at the new address. */
+  const carried = [];
+  for (const m of serialiseMarks(view.state)) {
+    if (m.from >= src.from && m.to <= end) {
+      carried.push({ id: m.id, from: m.from - src.from, to: m.to - src.from });
+    }
+  }
+
+  view.dispatch({
+    changes: at < cutFrom ? [paste, cut] : [cut, paste],
+    selection: { anchor: landing },
+    scrollIntoView: true,
+    userEvent: 'move.section'          // not "input": this must not mark a revision
+  });
+  keepMarks(view, carried.map((m) => ({ id: m.id, from: landing + m.from, to: landing + m.to })));
+  view.focus();
+  return true;
+}
+
+/* ------------------------------------------------------------ nav dragging */
+
+let dragFrom = null;     // outline index being dragged
+let dropSlot = null;     // outline index it would land in front of
+
+function showDrop(slot) {
+  const list = $('nav-list');
+  let el = list.querySelector('.nav-drop');
+  if (!el) { el = ui.h('div', { class: 'nav-drop' }); list.append(el); }
+  const rows = [...list.querySelectorAll('.nav-item')];
+  if (!rows.length) { el.hidden = true; return; }
+  dropSlot = slot;
+  const last = slot >= rows.length;
+  const ref = last ? rows[rows.length - 1] : rows[slot];
+  el.style.top = `${(last ? ref.offsetTop + ref.offsetHeight : ref.offsetTop) - 1}px`;
+  el.hidden = false;
+}
+
+function hideDrop() {
+  const el = $('nav-list').querySelector('.nav-drop');
+  if (el) el.hidden = true;
+  dropSlot = null;
+}
+
+function finishDrag() {
+  const from = dragFrom;
+  const slot = dropSlot;
+  hideDrop();
+  dragFrom = null;
+  $('nav-list').classList.remove('dragging');
+  if (from != null && slot != null) moveSection(from, slot);
+}
+
+function attachDrag(btn, i) {
+  btn.addEventListener('dragstart', (e) => {
+    dragFrom = i;
+    btn.classList.add('dragging');
+    $('nav-list').classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(i));   // a drag needs some payload
+  });
+  btn.addEventListener('dragend', () => {
+    btn.classList.remove('dragging');
+    $('nav-list').classList.remove('dragging');
+    dragFrom = null;
+    hideDrop();
+  });
+  btn.addEventListener('dragover', (e) => {
+    if (dragFrom == null) return;
+    e.preventDefault();
+    e.stopPropagation();               // the list below would claim the end slot
+    e.dataTransfer.dropEffect = 'move';
+    const r = btn.getBoundingClientRect();
+    showDrop(i + (e.clientY > r.top + r.height / 2 ? 1 : 0));
+  });
+  btn.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    finishDrag();
+  });
+}
+
 function renderNavigator() {
   const list = $('nav-list');
   list.textContent = '';
@@ -515,14 +656,28 @@ function renderNavigator() {
     return;
   }
 
+  // Reordering a filtered list would be guesswork, so it waits for a clear filter.
+  const canDrag = !q;
+
   shown.forEach(({ item, i }) => {
-    list.append(ui.h('button', {
+    // One rule per level above this one, so the nesting is visible at a glance.
+    const guides = [];
+    for (let g = 1; g < item.level; g++) {
+      guides.push(ui.h('span', { class: 'guide', style: `left:${g * 14 + 1}px` }));
+    }
+
+    const btn = ui.h('button', {
       class: `nav-item lvl-${item.level}`,
       'data-i': i,
+      draggable: canDrag ? 'true' : 'false',
       onclick: () => { gotoPosition(view, item.from); highlightActive(true); }
     },
+      ...guides,
       ui.h('span', { class: 'label' }, item.title),
-      ui.h('span', { class: 'count' }, item.words ? item.words.toLocaleString() : '')));
+      ui.h('span', { class: 'count' }, item.words ? item.words.toLocaleString() : ''));
+
+    if (canDrag) attachDrag(btn, i);
+    list.append(btn);
   });
 
   const chapters = state.outline.filter((i) => i.level === 1).length;
@@ -1601,6 +1756,19 @@ function wireChrome() {
   $('rev-new').onclick = () => ui.showNewRevision(ctx());
   $('rev-show').onchange = (e) =>
     document.body.classList.toggle('hide-revisions', !e.target.checked);
+
+  // Dropping in the empty space under the last chapter moves it to the end.
+  const navList = $('nav-list');
+  navList.addEventListener('dragover', (e) => {
+    if (dragFrom == null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    showDrop(state.outline.length);
+  });
+  navList.addEventListener('drop', (e) => { e.preventDefault(); finishDrag(); });
+  navList.addEventListener('dragleave', (e) => {
+    if (dragFrom != null && !navList.contains(e.relatedTarget)) hideDrop();
+  });
 
   const filter = $('nav-filter');
   filter.oninput = (e) => { state.navFilter = e.target.value; renderNavigator(); };

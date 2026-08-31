@@ -220,23 +220,44 @@ function wordAt(state, pos) {
 export function setHeading(view, level) {
   const { state } = view;
   const changes = [];
-  const seen = new Set();
+  const markerLen = new Map();          // line number -> length of the old "## "
 
   for (const range of state.selection.ranges) {
     const first = state.doc.lineAt(range.from).number;
     const last = state.doc.lineAt(range.to).number;
     for (let n = first; n <= last; n++) {
-      if (seen.has(n)) continue;
-      seen.add(n);
+      if (markerLen.has(n)) continue;
       const line = state.doc.line(n);
       const m = /^(#{1,4})[ \t]*/.exec(line.text);
       const current = m ? m[1].length : 0;
+      markerLen.set(n, m ? m[0].length : 0);
       const target = current === level ? 0 : level;
       const prefix = target ? '#'.repeat(target) + ' ' : '';
       changes.push({ from: line.from, to: line.from + (m ? m[0].length : 0), insert: prefix });
     }
   }
-  view.dispatch({ changes, userEvent: 'input' });
+  if (!changes.length) { view.focus(); return; }
+
+  /* The marker is rewritten in place, so a caret sitting on or inside it has
+     nowhere obvious to land and CodeMirror leaves it in front of the new
+     hashes. Move it to the end of the old marker first: that is the boundary
+     of the replaced range, so it maps to just after the new one and the caret
+     keeps its place in the words. */
+  const set = state.changes(changes);
+  const keep = (pos) => {
+    const line = state.doc.lineAt(pos);
+    const len = markerLen.get(line.number);
+    return set.mapPos(len == null ? pos : Math.max(pos, line.from + len), 1);
+  };
+  const ranges = state.selection.ranges.map((r) => (r.empty
+    ? EditorSelection.cursor(keep(r.head))
+    : EditorSelection.range(keep(r.anchor), keep(r.head))));
+
+  view.dispatch({
+    changes: set,
+    selection: EditorSelection.create(ranges, state.selection.mainIndex),
+    userEvent: 'input'
+  });
   view.focus();
 }
 

@@ -31,7 +31,14 @@ eq('heading level 1', M.classifyLine('# One').level, 1);
 eq('heading level 4', M.classifyLine('#### Four').level, 4);
 eq('five hashes is not a heading', type('##### Five'), 'body');
 eq('hash without space is body', type('#Nope'), 'body');
-eq('hash alone is body', type('#'), 'body');
+// A line of nothing but hashes is a heading whose title is not typed yet, so
+// that editing the hashes of a heading does not collapse the line to body
+// height and spring it back as the title is retyped.
+eq('hash alone is a heading', type('#'), 'heading');
+eq('two hashes alone is a heading', type('##'), 'heading');
+eq('hashes alone keep their level', M.classifyLine('###').level, 3);
+eq('hashes alone have no title', M.classifyLine('##').title, '');
+eq('five hashes alone is still body', type('#####'), 'body');
 eq('heading title trimmed', M.classifyLine('##   Spaced   ').title, 'Spaced');
 eq('centered', type('> middle <'), 'center');
 eq('right aligned', type('> later'), 'right');

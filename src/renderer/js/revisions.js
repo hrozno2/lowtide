@@ -27,6 +27,7 @@ export const setRevisions = StateEffect.define();   // { list, active }
 export const loadMarks = StateEffect.define();      // [{ id, from, to }]
 export const clearRevision = StateEffect.define();  // revision id
 export const clearAllRevisions = StateEffect.define();
+export const addMarks = StateEffect.define();       // [{ id, from, to }]
 
 const markFor = (rev) => Decoration.mark({
   class: `m-rev m-rev-${rev.colour}`,
@@ -64,6 +65,20 @@ export const revisionState = StateField.define({
         ranges.sort((a, b) => a.from - b.from || a.to - b.to);
         marks = Decoration.set(ranges, true);
       }
+      if (effect.is(addMarks)) {
+        const ranges = [];
+        for (const m of effect.value) {
+          const rev = list.find((r) => r.id === m.id);
+          if (!rev) continue;
+          const from = Math.max(0, Math.min(m.from, tr.state.doc.length));
+          const to = Math.max(from, Math.min(m.to, tr.state.doc.length));
+          if (to > from) ranges.push(markFor(rev).range(from, to));
+        }
+        if (ranges.length) {
+          ranges.sort((a, b) => a.from - b.from || a.to - b.to);
+          marks = marks.update({ add: ranges, sort: true });
+        }
+      }
       if (effect.is(clearRevision)) {
         marks = marks.update({ filter: (f, t, v) => v.spec.revision !== effect.value });
       }
@@ -98,6 +113,11 @@ export function applyRevisions(view, { list, active }) {
 
 export function restoreMarks(view, marks) {
   view.dispatch({ effects: loadMarks.of(marks || []) });
+}
+
+/** Re-apply marks that a wholesale move of text would otherwise discard. */
+export function keepMarks(view, marks) {
+  if (marks && marks.length) view.dispatch({ effects: addMarks.of(marks) });
 }
 
 export function dropRevision(view, id) {
