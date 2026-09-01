@@ -30,11 +30,11 @@
 
   --text:          #cbd6d2;
   --text-2:        #a0aba8;
-  --text-3:        #7c8684;
-  --text-4:        #616c6a;
+  --text-3:        #899391;
+  --text-4:        #818a87;
 
   --primary:       #4ec7b8;
-  --primary-2:     #439d92;
+  --primary-2:     #46a99d;
   --primary-dim:   #376f69;
   --primary-ghost: rgba(78, 199, 184, 0.13);
   --primary-glow:  rgba(78, 199, 184, 0.26);
@@ -75,5 +75,6 @@
 
   --titlebar-h: 40px;
   --status-h:   28px;
+  --panel-w:    360px;
   --nav-w:      264px;
 }

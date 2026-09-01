@@ -499,6 +499,10 @@ app.whenReady().then(async () => {
     const material = await js(`window.__musicThemeCss()`);
 
     ok('the sheet carries the theme surface', material.includes(surface));
+    ok('the distractions are hidden by default', material.includes('ytm-comments-entry-point-header-renderer'));
+    ok('recommendations are hidden', material.includes('ytm-rich-grid-renderer'));
+    ok('the likes are hidden', material.includes('like-button-renderer'));
+    ok('search and the player are kept', material.includes('ytm-search ytm-item-section-renderer'));
     ok('the site background is overridden', material.includes('--yt-spec-base-background'));
     ok('the brand red is replaced by the theme accent',
       new RegExp('--yt-spec-static-brand-red:\\s*' + primary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(material));
@@ -521,7 +525,8 @@ app.whenReady().then(async () => {
 
   await test('every sound renders, and none of them is silent or clipped', async () => {
     const ids = await js(`window.__ambienceIds()`);
-    eq('nine of them are offered', ids.length, 9);
+    eq('ten of them are offered', ids.length, 10);
+    ok('a fireplace among them', ids.includes('fire'));
 
     const levels = [];
     for (const id of ids) {
@@ -539,10 +544,24 @@ app.whenReady().then(async () => {
     ok('they sit within about twice each other', loudest / quietest < 2.2);
   });
 
+  await test('the sounds are not all the same noise', async () => {
+    // Rain against white noise is the test that matters: rain is thousands
+    // of separate drops, so its peak-to-average ratio is far higher even
+    // though both cover the whole spectrum.
+    const rain = await js(`window.__measureAmbience('rain', 4)`);
+    const white = await js(`window.__measureAmbience('white', 4)`);
+    const fire = await js(`window.__measureAmbience('fire', 4)`);
+    const cafe = await js(`window.__measureAmbience('cafe', 4)`);
+    ok('rain is spiky where white noise is flat', rain.crest > white.crest * 1.6);
+    ok('a café has the swing of speech', cafe.crest > white.crest * 1.6);
+    ok('a fire is mostly low', parseInt(fire.bands, 10) > 70);
+    ok('white noise is mostly high', parseInt(white.bands, 10) < 40);
+  });
+
   await test('the focus sounds play, swap and stop', async () => {
     await click('#btn-music');
     await wait(800);
-    eq('the buttons are there', await js(`document.querySelectorAll('.amb-btn').length`), 9);
+    eq('the buttons are there', await js(`document.querySelectorAll('.amb-btn').length`), 10);
     eq('nothing plays to begin with', await js(`window.__ambience.playing`), null);
     ok('the stop button is put away', await js(`document.querySelector('.amb .text-btn').hidden`));
 
@@ -567,6 +586,65 @@ app.whenReady().then(async () => {
     await js(`window.__ambience.setVolume(5)`);
     eq('and is held inside its range', await js(`window.__ambience.volume`), 1);
     await js(`window.__ambience.setVolume(0.6)`);
+  });
+
+  /* ======================================================= side panels == */
+  group = 'Panels';
+
+  await test('a panel sits beside the writing, never over it', async () => {
+    await load('# One\n\nSome words to look at while a panel is open.');
+    await wait(600);
+    await menu('tools:prefs');
+    await wait(500);
+
+    const geom = await js(`(() => {
+      const panel = document.querySelector('.panel');
+      const editor = document.querySelector('.cm-content');
+      if (!panel || !editor) return null;
+      const p = panel.getBoundingClientRect();
+      const e = editor.getBoundingClientRect();
+      return { panelLeft: Math.round(p.left), panelRight: Math.round(p.right),
+               editorRight: Math.round(e.right), width: Math.round(window.innerWidth),
+               marked: document.body.classList.contains('panel-open') }; })()`);
+
+    ok('the panel is open', !!geom);
+    eq('the body is marked while it is open', geom.marked, true);
+    ok('it is anchored to the right edge', geom.panelRight >= geom.width - 2);
+    ok('and the text ends before it starts', geom.editorRight <= geom.panelLeft);
+  });
+
+  await test('clicking back into the text puts the panel away', async () => {
+    await menu('tools:prefs');
+    await wait(400);
+    ok('open to begin with', await js(`!!document.querySelector('.panel')`));
+
+    await js(`(() => { const el = document.querySelector('.cm-content');
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true,
+        clientX: r.left + 20, clientY: r.top + 20 }));
+      return true; })()`);
+    await wait(300);
+    eq('a click in the manuscript closes it', await js(`!!document.querySelector('.panel')`), false);
+    eq('and the mark is cleared', await js(`document.body.classList.contains('panel-open')`), false);
+  });
+
+  await test('every panel opens as a side sheet', async () => {
+    for (const cmd of ['tools:prefs', 'tools:sprint', 'view:theme', 'file:export']) {
+      await menu(cmd);
+      await wait(400);
+      const right = await js(`(() => { const p = document.querySelector('.panel');
+        if (!p) return null;
+        const r = p.getBoundingClientRect();
+        return { anchored: Math.round(r.right) >= Math.round(window.innerWidth) - 2,
+                 tall: r.height > window.innerHeight * 0.5 }; })()`);
+      ok(`${cmd} opens a panel`, !!right);
+      if (right) {
+        ok(`${cmd} is anchored right`, right.anchored);
+        ok(`${cmd} runs down the side`, right.tall);
+      }
+      await js(`(() => { document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); return true; })()`);
+      await wait(250);
+    }
   });
 
   /* ==================================================== line heights ==== */
@@ -988,6 +1066,27 @@ app.whenReady().then(async () => {
       (await js(`document.querySelectorAll('.goal-row').length`)) >= 1);
     ok('history records the target',
       (await js(`document.querySelector('.goal-row').textContent`)).includes('3'));
+  });
+
+  await test('a goal you give up on is not recorded', async () => {
+    await load('one two');
+    await click('#goal-face');
+    await wait(400);
+    await js(`(() => { const p = document.querySelector('.panel');
+      p.querySelector('input[type="number"]').value = '500';
+      p.querySelector('select').value = 'new-words';
+      p.querySelector('select').dispatchEvent(new Event('change'));
+      return true; })()`);
+    await js(`[...document.querySelectorAll('.panel .btn')].find(b => b.textContent === 'Set Goal').click()`);
+    await wait(500);
+    const before = await js(`document.querySelectorAll('.goal-row').length`);
+    eq('the goal is well out of reach', await text('goal-action'), 'Cancel');
+
+    await click('#goal-action');
+    await wait(500);
+    eq('the ring is cleared', await text('goal-count'), 'Set Goal');
+    eq('and nothing was added to the history',
+      await js(`document.querySelectorAll('.goal-row').length`), before);
   });
 
   await test('total-words goals read the document', async () => {

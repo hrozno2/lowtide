@@ -1,4 +1,10 @@
-/* Lightweight panel system: one panel at a time, dismissed by Esc or scrim. */
+/* Lightweight panel system: one panel at a time.
+ *
+ * Panels open as a sheet down the right rather than over the middle of the
+ * window, and the workspace gives up the width to make room, so nothing ever
+ * covers the line being written. They close on Esc, on Done, or on a click
+ * anywhere outside — including back in the text, which is usually what the
+ * next click is for. */
 
 const host = () => document.getElementById('panel-host');
 const scrim = () => document.getElementById('scrim');
@@ -20,10 +26,20 @@ export function h(tag, attrs = {}, ...kids) {
   return el;
 }
 
+let outsideCloser = null;
+
+function stopWatchingOutside() {
+  if (!outsideCloser) return;
+  document.removeEventListener('pointerdown', outsideCloser, true);
+  outsideCloser = null;
+}
+
 export function closePanel() {
   if (!current) return;
+  stopWatchingOutside();
   current.el.remove();
   scrim().hidden = true;
+  document.body.classList.remove('panel-open');
   const after = current.onClose;
   current = null;
   if (after) after();
@@ -32,8 +48,17 @@ export function closePanel() {
 export function openPanel(name, el, { onClose, focus } = {}) {
   closePanel();
   host().append(el);
-  scrim().hidden = false;
+  document.body.classList.add('panel-open');
   current = { name, el, onClose };
+
+  /* Wait a frame before listening, or the very click that opened the panel
+     closes it again. */
+  requestAnimationFrame(() => {
+    if (!current || current.el !== el) return;
+    outsideCloser = (e) => { if (!el.contains(e.target)) closePanel(); };
+    document.addEventListener('pointerdown', outsideCloser, true);
+  });
+
   if (focus) requestAnimationFrame(() => focus.focus());
   return el;
 }
@@ -247,6 +272,8 @@ export function showPreferences(ctx) {
 
     row('YouTube in the music pane', 'Off means no browser view at all',
       toggle(p.youtubeEnabled !== false, (v) => set({ youtubeEnabled: v }))),
+    row('Hide the distractions', 'Comments, likes, recommendations and the shorts bar',
+      toggle(p.youtubeMinimal !== false, (v) => set({ youtubeMinimal: v }))),
 
     row('Check for updates on launch', 'Asks GitHub for the newest release; installs nothing',
       toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))),

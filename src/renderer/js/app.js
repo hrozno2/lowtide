@@ -71,7 +71,8 @@ const ambience = createAmbiencePlayer();
 
   state.prefs = await api.prefs.get();
   state.goal = state.prefs.goal || null;
-  state.goalHistory = state.prefs.goalHistory || [];
+  // Older versions kept the ones that were given up too; drop them on sight.
+  state.goalHistory = (state.prefs.goalHistory || []).filter((e) => e && e.met);
   state.dropbox = (await api.app.dropbox()).root || null;
   state.spelling = await api.spell.languages();
 
@@ -135,9 +136,9 @@ function applyPrefs(p, prev) {
   const css = document.documentElement.style;
   const changed = (k) => !prev || prev[k] !== p[k];
 
-  if (changed('theme')) {
-    applyTheme(p.theme || 'material');
-    if (repaintMusic) repaintMusic();     // the music pane follows the theme too
+  if (changed('theme') || changed('youtubeMinimal')) {
+    if (changed('theme')) applyTheme(p.theme || 'material');
+    if (repaintMusic) repaintMusic();     // the music pane follows both
   }
   if (changed('fontFamily')) css.setProperty('--doc-font', docFont(p.fontFamily));
   if (changed('fontSize')) css.setProperty('--doc-size', `${p.fontSize}px`);
@@ -788,13 +789,19 @@ function finishGoal() {
   const goal = state.goal;
   if (!goal) return;
   const achieved = goalValue();
-  state.goalHistory = [{
-    finishedAt: Date.now(),
-    type: goal.type,
-    target: goal.target,
-    achieved,
-    met: achieved >= goal.target
-  }].concat(state.goalHistory || []).slice(0, 40);
+
+  /* Only goals that were actually met are kept. Giving one up is a decision,
+     not a failure worth a permanent record you are shown every time. */
+  if (achieved >= goal.target) {
+    state.goalHistory = [{
+      finishedAt: Date.now(),
+      type: goal.type,
+      target: goal.target,
+      achieved,
+      met: true
+    }].concat(state.goalHistory || []).slice(0, 40);
+  }
+
   state.goal = null;
   persistGoal.flush();
   renderGoal();
@@ -843,7 +850,7 @@ function renderGoalHistory() {
   list.textContent = '';
   const history = state.goalHistory || [];
   if (!history.length) {
-    list.append(ui.h('div', { class: 'goal-empty' }, 'Finished goals are listed here.'));
+    list.append(ui.h('div', { class: 'goal-empty' }, 'Goals you meet are listed here.'));
     return;
   }
   for (const entry of history.slice(0, 6)) {
@@ -1535,8 +1542,8 @@ function musicThemeCss() {
   const dim = v('--text-3', '#8fa09b');
   const primary = v('--primary', '#4ec7b8');
 
-  return `
-    html, body { background: ${bg} !important; }
+  const palette = `
+    html, body, ytm-app, #app, .page-container { background: ${bg} !important; }
     html {
       color-scheme: dark;
       --yt-spec-base-background: ${bg} !important;
@@ -1559,11 +1566,61 @@ function musicThemeCss() {
       --yt-spec-static-brand-red: ${primary} !important;
       --yt-spec-brand-link-text: ${primary} !important;
     }
+    /* The top bar keeps a solid colour of its own, and the logo is the last
+       piece of red on the screen. Neither belongs in a writing app. */
+    ytm-mobile-topbar-renderer, .mobile-topbar-header, header, #header-bar,
+    ytm-searchbox, .searchbox {
+      background: ${bg} !important;
+      border-color: ${line} !important;
+    }
+    .mobile-topbar-header-content .mobile-topbar-logo,
+    ytm-logo, .topbar-logo, #logo { display: none !important; }
     /* Thumbnails and avatars are the rest of the noise. Take the edge off
        without touching the video itself, which stays as it is. */
-    img, ytm-thumbnail-cover, .video-thumbnail-img { filter: saturate(.8) brightness(.93); }
+    img, ytm-thumbnail-cover, .video-thumbnail-img { filter: saturate(.78) brightness(.9); }
     video, video ~ * img { filter: none; }
   `;
+
+  /* Everything whose job is to send you somewhere else. Hidden by element name
+     wherever possible: the ytm-* tags outlive the class names, which change
+     often enough that a sheet written against them would rot. Switched off in
+     Preferences if you would rather have the whole site. */
+  const minimal = `
+    /* Comments */
+    ytm-comments-entry-point-header-renderer,
+    ytm-comment-section-renderer,
+    ytm-engagement-panel-section-list-renderer,
+    #comments, .comments-entry-point,
+    ytm-item-section-renderer[section-identifier="comment-item-section"] { display: none !important; }
+
+    /* Likes, dislikes, share, save, subscribe */
+    ytm-slim-video-action-bar-renderer,
+    ytm-video-actions-renderer,
+    like-button-renderer, dislike-button-renderer,
+    ytm-subscribe-button-renderer, .subscribe-button,
+    segmented-like-dislike-button-view-model { display: none !important; }
+
+    /* Anything recommending the next thing */
+    ytm-watch-next-secondary-results-renderer,
+    ytm-item-section-renderer[section-identifier="related-items"],
+    ytm-companion-slot, ytm-autonav-toggle-button-renderer,
+    #related, .related-chips-slot,
+    ytm-rich-grid-renderer, ytm-rich-section-renderer,
+    ytm-shelf-renderer, ytm-reel-shelf-renderer,
+    ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2 { display: none !important; }
+
+    /* The bar along the bottom, and the nudges to install the app */
+    ytm-pivot-bar-renderer,
+    ytm-mealbar-promo-renderer, ytm-app-promo-renderer,
+    .mobile-topbar-header-app-promo { display: none !important; }
+
+    /* Search results and the player are what is left, and they stay. */
+    ytm-search ytm-item-section-renderer,
+    ytm-search ytm-video-with-context-renderer,
+    ytm-watch #player, ytm-watch .player-container { display: block !important; }
+  `;
+
+  return state.prefs.youtubeMinimal === false ? palette : palette + minimal;
 }
 
 /* The bundled focus sounds. They are generated rather than played back, so

@@ -1,7 +1,7 @@
 {
   "name": "low-tide",
   "productName": "Low Tide",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A fast, minimal novel writing app.",
   "main": "src/main/main.js",
   "author": "hrozno2",
@@ -22,7 +22,8 @@
     "test": "npm run test:unit && npm run test:app",
     "test:unit": "node scripts/unit.mjs",
     "test:app": "npm run build:renderer && electron scripts/selftest.js",
-    "notices": "node scripts/notices.mjs"
+    "notices": "node scripts/notices.mjs",
+    "contrast": "node scripts/contrast.mjs"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.7.1",

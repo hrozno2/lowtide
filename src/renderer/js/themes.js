@@ -21,6 +21,44 @@ const alpha = (h, a) => {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
+const luminance = (h) => {
+  const [r, g, b] = hexToRgb(h).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/** WCAG contrast ratio between two colours, 1 (identical) to 21 (black/white). */
+export const contrast = (a, b) => {
+  const x = luminance(a);
+  const y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+/**
+ * Lightens or darkens `fg` — whichever way moves it away from `bg` — by the
+ * least amount that reaches `min`, keeping its hue.
+ *
+ * Themes are written as six colours each and the rest is derived, which is
+ * what keeps them consistent; but a derivation that reads well on one
+ * background can be unreadable on another, and the dim tokens especially were
+ * mixed so far toward the background that labels fell below three to one in
+ * every theme. Correcting here rather than by hand means it cannot come back,
+ * and a theme that already passes is left exactly as it was.
+ */
+function ensureContrast(fg, bg, min) {
+  if (contrast(fg, bg) >= min) return fg;
+  const target = luminance(bg) > 0.18 ? '#000000' : '#ffffff';
+  if (contrast(target, bg) < min) return target;   // nothing more to give
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (contrast(mix(fg, target, mid), bg) >= min) hi = mid; else lo = mid;
+  }
+  return mix(fg, target, hi);
+}
+
 export const THEMES = [
   { id: 'material', name: 'Material', dark: true,
     bg: '#26302f', text: '#cbd6d2', primary: '#4ec7b8', rule: '#e0897b', note: '#e0b44c' },
@@ -53,33 +91,48 @@ export function swatches(theme) {
   return [theme.bg, mix(theme.bg, theme.text, 0.18), theme.primary, theme.rule, theme.note];
 }
 
+/** The full palette a theme resolves to. Exported so it can be measured. */
+export function paletteFor(id) {
+  return tokensFor(themeById(id));
+}
+
 function tokensFor(t) {
   const { bg, text, primary, rule, note } = t;
+
+  const surface = mix(bg, text, t.dark ? 0.035 : 0.045);
+  const surface2 = mix(bg, text, 0.075);
+
+  /* Body copy is held to the AA ratio of 4.5; labels and dim metadata to 3.2,
+     a little over the large-text bar, since they support the writing rather
+     than being the thing read. Each is measured against what actually sits
+     behind it. */
+  const fit = ensureContrast;
+
   return {
     '--bg': bg,
-    '--surface': mix(bg, text, t.dark ? 0.035 : 0.045),
-    '--surface-2': mix(bg, text, 0.075),
+    '--surface': surface,
+    '--surface-2': surface2,
     '--surface-3': mix(bg, text, 0.13),
     '--surface-4': mix(bg, text, 0.19),
     '--outline': mix(bg, text, 0.24),
     '--outline-soft': mix(bg, text, 0.11),
 
-    '--text': text,
-    '--text-2': mix(text, bg, 0.26),
-    '--text-3': mix(text, bg, 0.48),
-    '--text-4': mix(text, bg, 0.64),
+    '--text': fit(text, surface, 4.5),
+    '--text-2': fit(mix(text, bg, 0.26), surface2, 4.5),
+    '--text-3': fit(mix(text, bg, 0.44), surface2, 3.6),
+    '--text-4': fit(mix(text, bg, 0.58), surface2, 3.2),
 
-    '--primary': primary,
-    '--primary-2': mix(primary, bg, 0.28),
+    '--primary': fit(primary, bg, 4.5),
+    '--primary-2': fit(mix(primary, bg, 0.2), bg, 4.5),
     '--primary-dim': mix(primary, bg, 0.58),
     '--primary-ghost': alpha(primary, 0.13),
     '--primary-glow': alpha(primary, 0.26),
-    '--stat': mix(primary, text, 0.32),
+    '--stat': fit(mix(primary, text, 0.32), surface, 3.6),
 
-    '--note': note,
+    '--note': fit(note, bg, 4.5),
     '--note-ghost': alpha(note, 0.13),
-    '--rule': rule,
-    '--caret': rule,
+    '--rule': fit(rule, bg, 4.5),
+    '--caret': fit(rule, bg, 3.0),
 
     '--selection': alpha(primary, 0.22),
     '--selection-off': alpha(mix(text, bg, 0.35), 0.2),

@@ -23,6 +23,7 @@ const DEFAULTS = {
   musicZoom: 0.75,
   musicUrls: {},
   youtubeEnabled: true,
+  youtubeMinimal: true,
   statusBar: true,
   readingSpeed: 275,
   // Print template. The defaults describe a typical printed novel page;

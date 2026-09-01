@@ -2,7 +2,7 @@
    node scripts/unit.mjs   (bundles the ESM sources first) */
 import * as esbuild from 'esbuild';
 import { createRequire } from 'module';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -22,6 +22,45 @@ const eq = (name, actual, expected) => {
   else failures.push(`${name}\n    got:  ${a}\n    want: ${b}`);
 };
 const ok = (name, cond) => eq(name, !!cond, true);
+
+/* ---------------------------------------------------------- theme contrast */
+import { THEMES, paletteFor, contrast } from '../src/renderer/js/themes.js';
+
+const CONTRAST_CHECKS = [
+  ['--text', '--bg', 4.5], ['--text', '--surface', 4.5],
+  ['--text-2', '--surface', 4.5], ['--text-2', '--surface-2', 4.5],
+  ['--text-3', '--surface', 3.0], ['--text-3', '--surface-2', 3.0],
+  ['--text-4', '--surface', 3.0], ['--text-4', '--surface-2', 3.0],
+  ['--primary', '--bg', 4.5], ['--primary-2', '--bg', 4.5],
+  ['--note', '--bg', 4.5], ['--rule', '--bg', 4.5],
+  ['--stat', '--surface', 3.0], ['--caret', '--bg', 3.0]
+];
+
+for (const theme of THEMES) {
+  const p = paletteFor(theme.id);
+  const failures = CONTRAST_CHECKS
+    .filter(([fg, bg, min]) => contrast(p[fg], p[bg]) < min)
+    .map(([fg, bg, min]) => `${fg} on ${bg} = ${contrast(p[fg], p[bg]).toFixed(2)} (needs ${min})`);
+  eq(`${theme.name}: every piece of text is readable`, failures, []);
+}
+
+/* The stylesheet paints the first frame before any script runs, so its :root
+   has to agree with what themes.js derives for the default theme. It has
+   drifted twice, and both times the app changed colour the moment somebody
+   picked the theme it was already using. */
+{
+  const css = readFileSync(new URL('../src/renderer/css/theme.css', import.meta.url), 'utf8');
+  const derived = paletteFor('material');
+  const mismatched = [];
+  for (const [name, value] of Object.entries(derived)) {
+    const m = css.match(new RegExp(`${name}\\s*:\\s*([^;]+);`));
+    if (!m) continue;                       // not every token is in the sheet
+    if (m[1].trim() !== String(value).trim()) {
+      mismatched.push(`${name}: sheet ${m[1].trim()} vs derived ${value}`);
+    }
+  }
+  eq('the stylesheet agrees with the derived default palette', mismatched, []);
+}
 
 /* ------------------------------------------------------------- line types */
 const type = (t) => M.classifyLine(t).type;

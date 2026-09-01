@@ -28,16 +28,16 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.4-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.4-mac-x64.dmg` |
-| Windows | `LowTide-1.0.4-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.4-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.4-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-1.0.5-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-1.0.5-mac-x64.dmg` |
+| Windows | `LowTide-1.0.5-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `LowTide-1.0.5-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-1.0.5-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.4-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-1.0.5-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
 right-click the app and choose **Open** (double-clicking will refuse); on
@@ -87,13 +87,15 @@ away and works offline.
 
 ![Synonyms in the sidebar](docs/screen-reference.png)
 
-**Sound.** Nine focus sounds are built in — rain, thunder, wind, night, a
-coffee shop, waves, and white, pink and brown noise. They are synthesised as
-they play rather than looped from a recording, so they run for as long as you
-leave them and never come back round to the same place. You can also play audio
-files from your machine, or browse YouTube in a pane, repainted in your theme so
-it stops shouting. Closing the pane hides it rather than stopping it, so
-whatever is playing keeps playing. YouTube can be switched off entirely.
+**Sound.** Ten focus sounds are built in — rain, thunder, a fireplace, wind,
+night, a coffee shop, waves, and white, pink and brown noise. They are
+synthesised as they play rather than looped from a recording, so they run for
+as long as you leave them and never come back round to the same place. You can
+also play audio files from your machine, or browse YouTube in a pane, repainted
+in your theme with the comments, likes, recommendations and shorts stripped
+out, which leaves the search box and the player. Closing the pane hides it
+rather than stopping it, so whatever is playing keeps playing. YouTube can be
+switched off entirely.
 
 **Scratchpad.** Notes about the document, kept with it, never printed or counted.
 
@@ -129,6 +131,11 @@ moves a document into Dropbox with its outline, scratchpad and revisions intact.
 **Updates.** On launch it asks GitHub whether a newer release exists and, if so,
 shows a dismissible notice with a download link. It never installs anything by
 itself, and the check can be switched off in Preferences.
+
+**Out of the way.** Preferences, export, themes, the sprint timer and the rest
+open as a panel down the right and the text moves over to make room, so nothing
+ever covers the line you are writing. Every theme is checked against WCAG
+contrast ratios, so all of them are readable rather than only most of them.
 
 **Make it yours.** Ten themes, light and dark. Typeface, size, line spacing,
 column width, page size, margins and print leading are all adjustable, and the
@@ -199,7 +206,7 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 
 ```bash
 npm run watch       # rebuild the renderer as you edit
-npm test            # 108 unit and 320 end-to-end checks
+npm test            # 119 unit and 355 end-to-end checks
 npm run pack        # unpacked build, the quickest packaging check
 ```
 

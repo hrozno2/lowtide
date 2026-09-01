@@ -611,20 +611,24 @@ body:not(.status-on) .statusbar { display: none; }
 @keyframes fade { from { opacity: 0 } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.985) } }
 
+/* Panels sit beside the writing rather than over it: a sheet down the right
+   with the workspace giving up the width, so nothing ever covers the line you
+   are working on. */
 .panel {
   position: fixed; z-index: 50;
-  left: 50%; top: 84px;
-  transform: translateX(-50%);
-  width: min(460px, calc(100vw - 48px));
-  max-height: calc(100vh - 160px);
+  top: var(--titlebar-h); right: 0; bottom: 0;
+  width: var(--panel-w);
+  max-width: 92vw;
   display: flex; flex-direction: column;
-  background: var(--surface-2);
-  border: 1px solid var(--outline);
-  border-radius: var(--radius);
+  background: var(--surface);
+  border-left: 1px solid var(--outline-soft);
   box-shadow: var(--shadow-2);
-  animation: rise 160ms var(--ease);
+  animation: slide-in 160ms var(--ease);
   overflow: hidden;
 }
+body.status-on .panel { bottom: var(--status-h); }
+body.panel-open .workspace { padding-right: var(--panel-w); }
+@keyframes slide-in { from { opacity: 0; transform: translateX(14px) } }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px 10px;
