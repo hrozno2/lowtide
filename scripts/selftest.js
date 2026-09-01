@@ -499,9 +499,23 @@ app.whenReady().then(async () => {
     const material = await js(`window.__musicThemeCss()`);
 
     ok('the sheet carries the theme surface', material.includes(surface));
-    ok('the distractions are hidden by default', material.includes('ytm-comments-entry-point-header-renderer'));
-    ok('recommendations are hidden', material.includes('ytm-rich-grid-renderer'));
-    ok('the likes are hidden', material.includes('like-button-renderer'));
+    /* These are the ones that were found on the real site rather than guessed
+       at, and each was visible until it was named. They are pinned here so a
+       tidy-up cannot quietly drop one. */
+    for (const sel of [
+      'ytm-mobile-topbar-renderer',                 // the logo and Open App
+      'comments-entry-point-teaser-view-model',     // the comment under the title
+      'yt-video-metadata-carousel-view-model',      // the carousel holding it
+      'yt-comment-teaser-carousel-item-view-model',
+      '.slim-video-information-like-count',         // "1.5M likes"
+      'ytm-pivot-bar-renderer',                     // the bar along the bottom
+      'ytm-rich-grid-renderer',                     // the home feed
+      'ytm-reel-shelf-renderer',                    // shorts
+      'like-button-renderer',
+      'ytm-watch-next-secondary-results-renderer'   // what to watch next
+    ]) {
+      ok(`${sel} is hidden`, material.includes(sel));
+    }
     ok('search and the player are kept', material.includes('ytm-search ytm-item-section-renderer'));
     ok('the site background is overridden', material.includes('--yt-spec-base-background'));
     ok('the brand red is replaced by the theme accent',

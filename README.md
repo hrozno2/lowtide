@@ -28,16 +28,16 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.5-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.5-mac-x64.dmg` |
-| Windows | `LowTide-1.0.5-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.5-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.5-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-1.0.6-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-1.0.6-mac-x64.dmg` |
+| Windows | `LowTide-1.0.6-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `LowTide-1.0.6-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-1.0.6-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.5-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-1.0.6-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
 right-click the app and choose **Open** (double-clicking will refuse); on
@@ -206,7 +206,7 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 
 ```bash
 npm run watch       # rebuild the renderer as you edit
-npm test            # 119 unit and 355 end-to-end checks
+npm test            # 119 unit and 362 end-to-end checks
 npm run pack        # unpacked build, the quickest packaging check
 ```
 

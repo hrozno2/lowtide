@@ -1609,10 +1609,24 @@ function musicThemeCss() {
     ytm-shelf-renderer, ytm-reel-shelf-renderer,
     ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2 { display: none !important; }
 
+    /* The whole top bar: it carries the logo and the Open App button, and the
+       pane has its own search box and Home button above it. */
+    ytm-mobile-topbar-renderer { display: none !important; }
+
     /* The bar along the bottom, and the nudges to install the app */
     ytm-pivot-bar-renderer,
     ytm-mealbar-promo-renderer, ytm-app-promo-renderer,
     .mobile-topbar-header-app-promo { display: none !important; }
+
+    /* The comment teaser that rides along under the title, and the carousel
+       it sits in. These are view-models rather than ytm- elements, which is
+       how the first pass missed them. */
+    yt-video-metadata-carousel-view-model,
+    comments-entry-point-teaser-view-model,
+    yt-comment-teaser-carousel-item-view-model { display: none !important; }
+
+    /* The like count in the line under the title; the views and the date stay. */
+    .slim-video-information-like-count { display: none !important; }
 
     /* Search results and the player are what is left, and they stay. */
     ytm-search ytm-item-section-renderer,
