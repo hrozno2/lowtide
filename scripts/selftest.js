@@ -929,12 +929,15 @@ app.whenReady().then(async () => {
     ok('a sub-section is taller than a fourth level', h3 > h4);
     ok('every heading is taller than body text', h4 > body);
 
-    // Ratios rather than pixels, so the check survives a different font.
+    /* Ratios rather than pixels, so the check survives a different font. The
+       blank line above a heading in the source already separates it; the
+       padding only has to make the break read as one. */
     const r = (x) => Math.round((x / body) * 100) / 100;
-    eq('chapter ratio', r(h1), 2.4);
-    eq('section ratio', r(h2), 2.09);
-    eq('sub-section ratio', r(h3), 1.85);
-    eq('fourth-level ratio', r(h4), 1.73);
+    eq('chapter ratio', r(h1), 1.71);
+    eq('section ratio', r(h2), 1.54);
+    eq('sub-section ratio', r(h3), 1.43);
+    eq('fourth-level ratio', r(h4), 1.36);
+    ok('no heading is more than twice a line of prose', h1 < body * 2);
   });
 
   await test('a heading returns to body height when it is removed', async () => {

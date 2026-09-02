@@ -46,10 +46,13 @@ body.typewriter .cm-editor .cm-content { padding-top: 30vh; padding-bottom: 52vh
   color: var(--primary);
   font-weight: 700;
 }
-.cm-editor .l-h1 { padding: 1.9em 0 .34em; }
-.cm-editor .l-h2 { padding: 1.45em 0 .3em; }
-.cm-editor .l-h3 { padding: 1.1em 0 .26em; color: var(--primary-2); }
-.cm-editor .l-h4 { padding: .95em 0 .22em; color: var(--primary-2); font-weight: 400; }
+/* Enough air to separate a heading from what came before, and no more. The
+   blank line above it in the source is already doing most of the work; the
+   padding only has to make the break read as a break. */
+.cm-editor .l-h1 { padding: .85em 0 .28em; }
+.cm-editor .l-h2 { padding: .62em 0 .24em; }
+.cm-editor .l-h3 { padding: .48em 0 .2em; color: var(--primary-2); }
+.cm-editor .l-h4 { padding: .4em 0 .18em; color: var(--primary-2); font-weight: 400; }
 .cm-editor .cm-line.l-h1:first-child,
 .cm-editor .cm-line.l-h2:first-child { padding-top: .1em; }
 
