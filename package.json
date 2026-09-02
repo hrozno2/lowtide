@@ -23,6 +23,7 @@
     "test:unit": "node scripts/unit.mjs",
     "test:app": "npm run build:renderer && electron scripts/selftest.js",
     "notices": "node scripts/notices.mjs",
+    "palette": "node scripts/palette.mjs",
     "contrast": "node scripts/contrast.mjs"
   },
   "devDependencies": {

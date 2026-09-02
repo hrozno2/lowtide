@@ -32,7 +32,10 @@ function reportProblem(win, message, detail) {
   }
   return dialog.showMessageBox(win || undefined, { type: 'error', message, detail });
 }
-const BG = '#0d1416';
+/* What the window itself is painted before the page draws into it, and what
+   shows at the edges during a resize. Kept equal to the default theme's --bg
+   so neither moment shows a colour the app never uses. */
+const BG = '#262e30';
 
 /** Per-window document state mirrored from the renderer. */
 const docs = new Map(); // win.id -> {path, dirty, content, cursor, title}

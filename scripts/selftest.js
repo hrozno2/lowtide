@@ -65,21 +65,71 @@ let win, wc, js;
 const content = () => js('window.__lowTideContent()');
 const text = (id) => js(`document.getElementById(${JSON.stringify(id)}).textContent`);
 
+/**
+ * Waits for something to become true rather than for a fixed number of
+ * milliseconds. Faster on a quick machine and steadier on a slow one, which a
+ * hard-coded sleep is neither: it is always the same length, and it is either
+ * wasted time or not quite enough.
+ */
+async function until(check, { timeout = 5000, every = 25, what = 'condition' } = {}) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    let ok = false;
+    try { ok = await check(); } catch { ok = false; }
+    if (ok) return true;
+    if (Date.now() > deadline) {
+      results.push({ group, name: `timed out waiting for ${what}`, ok: false,
+                     actual: `${timeout}ms`, expected: 'the condition to hold' });
+      return false;
+    }
+    await wait(every);
+  }
+}
+
+/* The editor settles on a debounce, so the outline and counts land a moment
+   after the text does. Waiting for the count to agree waits for all of it. */
+async function settled() {
+  await until(() => js(`(() => {
+    const v = window.__lowTideView;
+    return !!v && document.querySelectorAll('.cm-content .cm-line').length > 0;
+  })()`), { what: 'the editor to render' });
+}
+
 async function load(body, filePath) {
   wc.send('doc:load', { path: filePath || null, content: body });
-  await wait(700);
+  await until(async () => (await content()) === body,
+    { what: 'the document to load', timeout: 6000 });
+  await settled();
 }
+
 async function select(from, to) {
   await js(`(() => { const v = window.__lowTideView;
     v.dispatch({selection:{anchor:${from},head:${to}}}); v.focus(); return true; })()`);
-  await wait(80);
+  await until(() => js(`window.__lowTideView.state.selection.main.head === ${to}`),
+    { what: 'the selection to move', timeout: 1500 });
 }
-async function menu(cmd) { wc.send('menu', cmd); await wait(260); }
+
+async function menu(cmd) {
+  const before = await js(`document.querySelectorAll('.panel').length`).catch(() => 0);
+  wc.send('menu', cmd);
+  // Menu commands are one IPC hop; a couple of frames is all they need.
+  await wait(90);
+  await js(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`).catch(() => {});
+  void before;
+}
+
 async function type(str) {
   await js(`document.querySelector('.cm-content').focus()`);
-  await wait(150);
-  for (const ch of str) { wc.sendInputEvent({ type: 'char', keyCode: ch }); await wait(30); }
-  await wait(250);
+  await until(() => js(`(() => { const a = document.activeElement;
+    return !!a && (a.classList.contains('cm-content') || !!a.closest('.cm-content')); })()`),
+    { what: 'the editor to take focus', timeout: 2000 });
+  const before = await content();
+  for (const ch of str) { wc.sendInputEvent({ type: 'char', keyCode: ch }); await wait(8); }
+  /* Not "longer": typing over a selection replaces it, and smart punctuation
+     can swap two characters for one. Any change at all means it arrived. */
+  await until(async () => (await content()) !== before,
+    { what: 'the typing to land', timeout: 3000 });
+  await settled();
 }
 async function click(selector) {
   return js(`(() => { const el = document.querySelector(${JSON.stringify(selector)});
@@ -107,6 +157,10 @@ app.whenReady().then(async () => {
   if (!win) { console.log('no document window'); app.exit(1); return; }
   wc = win.webContents;
   js = (code) => wc.executeJavaScript(code, true);
+
+  /* The focus sounds are real audio out of the speakers, and a test run should
+     not make a noise. Everything they are checked for still holds at zero. */
+  await js(`window.__ambience && window.__ambience.setVolume(0)`);
 
   /* ===================================================== formatting ===== */
   group = 'Formatting';
@@ -605,30 +659,71 @@ app.whenReady().then(async () => {
   /* ======================================================= side panels == */
   group = 'Panels';
 
-  await test('a panel sits beside the writing, never over it', async () => {
+  await test('a panel hangs off the control that opened it', async () => {
     await load('# One\n\nSome words to look at while a panel is open.');
     await wait(600);
-    await menu('tools:prefs');
+    await click('#btn-prefs');
     await wait(500);
 
     const geom = await js(`(() => {
       const panel = document.querySelector('.panel');
-      const editor = document.querySelector('.cm-content');
-      if (!panel || !editor) return null;
+      const btn = document.getElementById('btn-prefs');
+      if (!panel || !btn) return null;
       const p = panel.getBoundingClientRect();
-      const e = editor.getBoundingClientRect();
-      return { panelLeft: Math.round(p.left), panelRight: Math.round(p.right),
-               editorRight: Math.round(e.right), width: Math.round(window.innerWidth),
-               marked: document.body.classList.contains('panel-open') }; })()`);
+      const b = btn.getBoundingClientRect();
+      const cs = getComputedStyle(panel);
+      return {
+        below: p.top >= b.bottom,
+        near: p.top - b.bottom < 24,
+        overlapsButtonSpan: p.left <= b.right && p.right >= b.left,
+        insideWindow: p.left >= 0 && p.right <= window.innerWidth + 1 &&
+                      p.bottom <= window.innerHeight + 1,
+        shorterThanWindow: p.height < window.innerHeight * 0.85,
+        nub: cs.getPropertyValue('--nub-x').trim(),
+        radius: cs.borderTopLeftRadius + ' ' + cs.borderTopRightRadius,
+        marked: document.body.classList.contains('panel-open')
+      }; })()`);
 
     ok('the panel is open', !!geom);
-    eq('the body is marked while it is open', geom.marked, true);
-    ok('it is anchored to the right edge', geom.panelRight >= geom.width - 2);
-    ok('and the text ends before it starts', geom.editorRight <= geom.panelLeft);
+    eq('it hangs below the button', geom.below, true);
+    eq('and close under it', geom.near, true);
+    eq('lined up with the button', geom.overlapsButtonSpan, true);
+    eq('kept inside the window', geom.insideWindow, true);
+    eq('it is a card, not a full-height sheet', geom.shorterThanWindow, true);
+    ok('the nub is placed', geom.nub && geom.nub !== '');
+    eq('the body is no longer marked', geom.marked, false);
+  });
+
+  await test('clicking the same button again closes it', async () => {
+    // The click that dismisses lands before the button's own handler runs, so
+    // without care the panel closes and immediately reopens.
+    await click('#btn-prefs');
+    await wait(400);
+    eq('closed to begin with', await js(`!!document.querySelector('.panel')`), false);
+
+    await click('#btn-prefs');
+    await wait(400);
+    eq('one click opens it', await js(`!!document.querySelector('.panel')`), true);
+
+    await js(`(() => { const b = document.getElementById('btn-prefs');
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      b.click();
+      return true; })()`);
+    await wait(400);
+    eq('and the next click puts it away', await js(`!!document.querySelector('.panel')`), false);
+
+    await js(`(() => { const b = document.getElementById('btn-prefs');
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      b.click();
+      return true; })()`);
+    await wait(400);
+    eq('and the one after opens it again', await js(`!!document.querySelector('.panel')`), true);
+    await js(`(() => { document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); return true; })()`);
+    await wait(250);
   });
 
   await test('clicking back into the text puts the panel away', async () => {
-    await menu('tools:prefs');
+    await click('#btn-prefs');
     await wait(400);
     ok('open to begin with', await js(`!!document.querySelector('.panel')`));
 
@@ -639,22 +734,40 @@ app.whenReady().then(async () => {
       return true; })()`);
     await wait(300);
     eq('a click in the manuscript closes it', await js(`!!document.querySelector('.panel')`), false);
-    eq('and the mark is cleared', await js(`document.body.classList.contains('panel-open')`), false);
   });
 
-  await test('every panel opens as a side sheet', async () => {
-    for (const cmd of ['tools:prefs', 'tools:sprint', 'view:theme', 'file:export']) {
-      await menu(cmd);
-      await wait(400);
-      const right = await js(`(() => { const p = document.querySelector('.panel');
+  await test('a panel takes no width from the page', async () => {
+    await load('# One\n\nWords.');
+    await wait(500);
+    const area = () => js(`Math.round(document.querySelector('.view-area').getBoundingClientRect().width)`);
+    const before = await area();
+    await click('#btn-prefs');
+    await wait(450);
+    eq('the writing area is untouched', await area(), before);
+    await js(`(() => { document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); return true; })()`);
+    await wait(250);
+  });
+
+  await test('every panel opens as a card under its button', async () => {
+    for (const [id, cmd] of [['btn-prefs', null], ['btn-sprint', null],
+                             ['btn-theme', null], ['btn-export', null]]) {
+      const opened = await js(`(() => { const b = document.getElementById('${id}');
+        if (!b) return 'missing'; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        b.click(); return 'clicked'; })()`);
+      if (opened === 'missing') continue;
+      await wait(450);
+      const shape = await js(`(() => { const p = document.querySelector('.panel');
         if (!p) return null;
         const r = p.getBoundingClientRect();
-        return { anchored: Math.round(r.right) >= Math.round(window.innerWidth) - 2,
-                 tall: r.height > window.innerHeight * 0.5 }; })()`);
-      ok(`${cmd} opens a panel`, !!right);
-      if (right) {
-        ok(`${cmd} is anchored right`, right.anchored);
-        ok(`${cmd} runs down the side`, right.tall);
+        const b = document.getElementById('${id}').getBoundingClientRect();
+        return { card: r.height < window.innerHeight * 0.85,
+                 below: r.top >= b.bottom - 1,
+                 inside: r.right <= window.innerWidth + 1 && r.left >= -1 }; })()`);
+      ok(`${id} opens a panel`, !!shape);
+      if (shape) {
+        ok(`${id} is a card`, shape.card);
+        ok(`${id} hangs below its button`, shape.below);
+        ok(`${id} stays in the window`, shape.inside);
       }
       await js(`(() => { document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); return true; })()`);
       await wait(250);

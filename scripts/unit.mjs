@@ -33,7 +33,8 @@ const CONTRAST_CHECKS = [
   ['--text-4', '--surface', 3.0], ['--text-4', '--surface-2', 3.0],
   ['--primary', '--bg', 4.5], ['--primary-2', '--bg', 4.5],
   ['--note', '--bg', 4.5], ['--rule', '--bg', 4.5],
-  ['--stat', '--surface', 3.0], ['--caret', '--bg', 3.0]
+  ['--stat', '--surface', 3.0], ['--caret', '--bg', 3.0],
+  ['--on-primary', '--primary', 4.5]
 ];
 
 for (const theme of THEMES) {
@@ -42,24 +43,6 @@ for (const theme of THEMES) {
     .filter(([fg, bg, min]) => contrast(p[fg], p[bg]) < min)
     .map(([fg, bg, min]) => `${fg} on ${bg} = ${contrast(p[fg], p[bg]).toFixed(2)} (needs ${min})`);
   eq(`${theme.name}: every piece of text is readable`, failures, []);
-}
-
-/* The stylesheet paints the first frame before any script runs, so its :root
-   has to agree with what themes.js derives for the default theme. It has
-   drifted twice, and both times the app changed colour the moment somebody
-   picked the theme it was already using. */
-{
-  const css = readFileSync(new URL('../src/renderer/css/theme.css', import.meta.url), 'utf8');
-  const derived = paletteFor('material');
-  const mismatched = [];
-  for (const [name, value] of Object.entries(derived)) {
-    const m = css.match(new RegExp(`${name}\\s*:\\s*([^;]+);`));
-    if (!m) continue;                       // not every token is in the sheet
-    if (m[1].trim() !== String(value).trim()) {
-      mismatched.push(`${name}: sheet ${m[1].trim()} vs derived ${value}`);
-    }
-  }
-  eq('the stylesheet agrees with the derived default palette', mismatched, []);
 }
 
 /* ------------------------------------------------------------- line types */
@@ -214,6 +197,26 @@ eq('major beats minor', U.compareVersions('2.0.0', '1.9.9'), 1);
 eq('nonsense is treated as equal', U.compareVersions('not-a-version', '1.0.0'), 0);
 eq('the repository is found', U.repoSlug({ repository: { url: 'https://github.com/hrozno2/lowtide.git' } }), 'hrozno2/lowtide');
 eq('a missing repository is null', U.repoSlug({}), null);
+
+/* ------------------------------------------------- the first-paint palette */
+
+/* theme.css paints before any script runs, so its :root has to hold exactly
+   what themes.js derives for the default theme. These two have drifted apart
+   twice, both times showing as a Material that changed colour the moment the
+   picker was opened. `npm run palette` writes the stylesheet from the source
+   of truth; this makes sure someone did. */
+{
+  const css = readFileSync(new URL('../src/renderer/css/theme.css', import.meta.url), 'utf8');
+  const root = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')));
+  const inCss = {};
+  for (const m of root.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)) inCss[m[1]] = m[2].trim();
+
+  const derived = paletteFor('material');
+  const drifted = Object.entries(derived)
+    .filter(([k, v]) => (inCss[k] || '').toLowerCase() !== String(v).toLowerCase())
+    .map(([k, v]) => `${k}: css has ${inCss[k] || '(missing)'}, themes.js derives ${v}`);
+  eq('the stylesheet paints the palette themes.js derives (npm run palette)', drifted, []);
+}
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

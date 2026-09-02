@@ -61,7 +61,8 @@ function ensureContrast(fg, bg, min) {
 
 export const THEMES = [
   { id: 'material', name: 'Material', dark: true,
-    bg: '#26302f', text: '#cbd6d2', primary: '#4ec7b8', rule: '#e0897b', note: '#e0b44c' },
+    // Slate rather than sage: green no longer leads the surface or the text.
+    bg: '#262e30', text: '#ccd4d6', primary: '#4ec5c2', rule: '#e0897b', note: '#e0b44c' },
   { id: 'midnight', name: 'Midnight', dark: true,
     bg: '#12161c', text: '#ccd3de', primary: '#6ea8fe', rule: '#f08c8c', note: '#e3c06a' },
   { id: 'dracula', name: 'Dracula', dark: true,
@@ -108,6 +109,17 @@ function tokensFor(t) {
      behind it. */
   const fit = ensureContrast;
 
+  /* The accent as it will actually be painted. Anything written on top has to
+     be measured against this, not against the theme's raw colour: on
+     Solarized Light the two differ enough to swap which of black and white is
+     the readable one. */
+  const accent = fit(primary, bg, 4.5);
+  const onAccent = (() => {
+    const better = (a, b) => (contrast(a, accent) >= contrast(b, accent) ? a : b);
+    const soft = better('#0b0f0f', '#f7fdfc');
+    return contrast(soft, accent) >= 4.5 ? soft : better('#000000', '#ffffff');
+  })();
+
   return {
     '--bg': bg,
     '--surface': surface,
@@ -122,12 +134,20 @@ function tokensFor(t) {
     '--text-3': fit(mix(text, bg, 0.44), surface2, 3.6),
     '--text-4': fit(mix(text, bg, 0.58), surface2, 3.2),
 
-    '--primary': fit(primary, bg, 4.5),
+    '--primary': accent,
     '--primary-2': fit(mix(primary, bg, 0.2), bg, 4.5),
     '--primary-dim': mix(primary, bg, 0.58),
     '--primary-ghost': alpha(primary, 0.13),
     '--primary-glow': alpha(primary, 0.26),
     '--stat': fit(mix(primary, text, 0.32), surface, 3.6),
+
+    /* What to write on top of the accent: whichever of near-black and
+       near-white actually contrasts better against it, then held to the
+       reading ratio. Picking by the accent's lightness alone gets mid-tone
+       accents wrong, and a mid-tone accent is exactly where it matters. */
+    /* Near-black or near-white, whichever the accent takes; pure only when the
+       accent is an awkward mid-tone and nothing softer will clear the bar. */
+    '--on-primary': onAccent,
 
     '--note': fit(note, bg, 4.5),
     '--note-ghost': alpha(note, 0.13),

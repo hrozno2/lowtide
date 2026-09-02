@@ -559,7 +559,7 @@ body.media-fullscreen .statusbar { display: none; }
   flex: 1 1 auto; min-height: 220px;
   width: 100%;
   border: 0;
-  background: #0f0f0f;
+  background: var(--surface);
 }
 .yt-note { flex: 0 0 auto; padding: 9px 14px 12px; font-size: 11.5px; line-height: 1.55; color: var(--text-4); }
 
@@ -611,31 +611,53 @@ body:not(.status-on) .statusbar { display: none; }
 @keyframes fade { from { opacity: 0 } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.985) } }
 
-/* Panels sit beside the writing rather than over it: a sheet down the right
-   with the workspace giving up the width, so nothing ever covers the line you
-   are working on. */
+/* Panels hang off the control that opened them: a floating card with a nub
+   pointing back at the button, drawn over the page rather than pushing it
+   about. The corner nearest the button is drawn tight and the far corners
+   round, which is what gives it the teardrop lean. */
 .panel {
   position: fixed; z-index: 50;
-  top: var(--titlebar-h); right: 0; bottom: 0;
   width: var(--panel-w);
-  max-width: 92vw;
+  max-width: calc(100vw - 20px);
+  max-height: min(72vh, 640px);
   display: flex; flex-direction: column;
-  background: var(--surface);
-  border-left: 1px solid var(--outline-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--outline);
+  border-radius: 14px;
   box-shadow: var(--shadow-2);
-  animation: slide-in 160ms var(--ease);
-  overflow: hidden;
+  animation: bloom 150ms var(--ease);
+  transform-origin: top center;
+  /* The bump sits outside the top edge, so this cannot clip. */
+  overflow: visible;
 }
-body.status-on .panel { bottom: var(--status-h); }
-body.panel-open .workspace { padding-right: var(--panel-w); }
-@keyframes slide-in { from { opacity: 0; transform: translateX(14px) } }
+.panel .panel-body { border-radius: 0 0 14px 14px; }
+
+.panel-nub {
+  position: absolute; top: -19px; left: var(--nub-x, 50%);
+  width: 56px; height: 20px; margin-left: -28px;
+  overflow: visible; pointer-events: none;
+}
+.panel-nub path { fill: var(--surface-2); stroke: var(--outline); stroke-width: 1; }
+.panel-nub rect { fill: var(--surface-2); stroke: none; }
+
+/* Nothing opened it, so there is nothing to hang off. */
+.panel.centred {
+  left: 50%; top: 84px;
+  transform: translateX(-50%);
+  border-radius: 18px;
+}
+
+@keyframes bloom { from { opacity: 0; transform: scale(.97) translateY(-5px) } }
+.panel.centred { animation: rise 150ms var(--ease); }
 .panel-head {
-  display: flex; align-items: center; justify-content: space-between;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
   padding: 14px 16px 10px;
   font-size: 11px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase;
   color: var(--text-4);
   border-bottom: 1px solid var(--outline-soft);
 }
+.panel-head .text-btn { position: absolute; right: 14px; top: 12px; }
 .panel-body { padding: 6px 16px 16px; overflow-y: auto; }
 .panel-foot {
   display: flex; justify-content: flex-end; gap: 8px;
@@ -698,8 +720,10 @@ input[type="range"]::-webkit-slider-thumb {
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .btn:hover { background: var(--outline); color: var(--text); }
-.btn.primary { background: var(--primary-dim); color: #dffaf5; }
-.btn.primary:hover { background: var(--primary-2); color: #06201d; }
+/* The accent itself, not a version of it mixed halfway into the background:
+   a primary button should read as the theme's colour. */
+.btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.btn.primary:hover { filter: brightness(1.1); }
 
 .text-btn {
   padding: 4px 9px; font-size: 12px; border-radius: 5px; color: var(--text-3);

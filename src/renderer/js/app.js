@@ -1928,7 +1928,6 @@ function wireChrome() {
   $('btn-preview').onclick = () => togglePreview(true);
   $('view-text').onclick = () => togglePreview(false);
   wireViewSwitch();
-  $('btn-prefs').onclick = () => ui.showPreferences(ctx());
   $('btn-home').onclick = () => api.home.show();
   $('save-state').onclick = () => save(false);
   $('save-state').title = 'Save now';
@@ -1936,7 +1935,6 @@ function wireChrome() {
   $('dock-close').onclick = () => dockClose();
   wireReferencePanel();
   wireDockResize();
-  $('btn-sprint').onclick = () => ui.showSprint(ctx());
   $('pv-pdf').onclick = () => exportAs('pdf');
   $('pv-title').onchange = (e) => { setPrefs({ previewTitlePage: e.target.checked }); renderPreview(true); };
   $('pv-notes').onchange = (e) => { setPrefs({ previewNotes: e.target.checked }); renderPreview(true); };

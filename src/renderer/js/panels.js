@@ -28,6 +28,54 @@ export function h(tag, attrs = {}, ...kids) {
 
 let outsideCloser = null;
 
+/* The control the panel came out of, so it can be pointed at and so clicking
+   it again closes rather than reopens. */
+let lastTrigger = null;
+let lastTriggerAt = 0;
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target && e.target.closest
+    ? e.target.closest('.icon-btn, .text-btn, .btn, .goal-face, .side-tab, .vs-btn')
+    : null;
+  if (el) { lastTrigger = el; lastTriggerAt = Date.now(); }
+}, true);
+
+/* A panel opened from the keyboard or the menu bar has no click to hang off,
+   so each one knows the control it belongs to. Without this those panels fall
+   back to the middle of the window, which is the thing we are trying to stop
+   happening. */
+const ANCHOR_BY_NAME = {
+  prefs: 'btn-prefs',
+  sprint: 'btn-sprint',
+  theme: 'btn-theme',
+  export: 'btn-export',
+  goal: 'goal-face',
+  revision: 'rev-new',
+  'revision-menu': 'rev-new',
+  goto: 'btn-navigator',
+  backups: 'btn-home',
+  help: 'btn-prefs'
+};
+
+function anchorFor(name, explicit) {
+  if (explicit && document.contains(explicit)) return explicit;
+
+  // A click from a moment ago is the best answer; an older one is unrelated.
+  if (lastTrigger && document.contains(lastTrigger) && Date.now() - lastTriggerAt < 1500) {
+    return lastTrigger;
+  }
+  const byName = document.getElementById(ANCHOR_BY_NAME[name] || '');
+  if (byName && byName.offsetParent !== null) return byName;
+
+  // Anything else hangs off the toolbar, which keeps it clear of the page.
+  const toolbar = document.getElementById('tb-buttons');
+  return toolbar && toolbar.offsetParent !== null ? toolbar : null;
+}
+
+/* Set when a panel is dismissed by clicking the very control that opened it.
+   Without this the click closes the panel on the way down and the button's own
+   handler opens it again on the way up, so it never appears to toggle. */
+let suppress = null;
+
 function stopWatchingOutside() {
   if (!outsideCloser) return;
   document.removeEventListener('pointerdown', outsideCloser, true);
@@ -45,17 +93,86 @@ export function closePanel() {
   if (after) after();
 }
 
-export function openPanel(name, el, { onClose, focus } = {}) {
+/* Sits the panel under whatever opened it, kept inside the window, with the
+   nub pointing back at the control. */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/* The bump on the top edge, pointing back at the button. Drawn as an open
+   path so the fill closes flat along its base while the stroke follows only
+   the curve; the little rectangle then covers the card's own border where the
+   bump meets it, so the outline reads as one continuous line. */
+function makeNub() {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'panel-nub');
+  svg.setAttribute('viewBox', '0 0 56 20');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', 'M0,19 C13,19 15.5,4 28,4 C40.5,4 43,19 56,19');
+  svg.append(path);
+
+  const cover = document.createElementNS(SVG_NS, 'rect');
+  cover.setAttribute('x', '3');
+  cover.setAttribute('y', '18');
+  cover.setAttribute('width', '50');
+  cover.setAttribute('height', '3');
+  svg.append(cover);
+
+  return svg;
+}
+
+function place(el, anchor) {
+  const gap = 9;
+  const margin = 10;
+  const r = anchor.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+
+  let left = r.right - w;                                  // right edges line up
+  left = Math.max(margin, Math.min(left, window.innerWidth - w - margin));
+
+  let top = r.bottom + gap;
+  if (top + h > window.innerHeight - margin) {
+    top = Math.max(margin, window.innerHeight - h - margin);
+  }
+
+  el.style.left = `${Math.round(left)}px`;
+  el.style.top = `${Math.round(top)}px`;
+
+  // Where the bump sits along the top edge.
+  const centre = Math.min(Math.max(r.left + r.width / 2 - left, 30), w - 30);
+  el.style.setProperty('--nub-x', `${Math.round(centre)}px`);
+  if (!el.querySelector('.panel-nub')) el.append(makeNub());
+}
+
+export function openPanel(name, el, { onClose, focus, anchor } = {}) {
+  // Clicking the button of the panel that is already open just closes it.
+  if (suppress && suppress.name === name && Date.now() - suppress.at < 400) {
+    suppress = null;
+    return null;
+  }
+  suppress = null;
+  if (panelIsOpen(name)) { closePanel(); return null; }
+
   closePanel();
+  const trigger = anchorFor(name, anchor);
   host().append(el);
-  document.body.classList.add('panel-open');
-  current = { name, el, onClose };
+  current = { name, el, onClose, trigger };
+
+  if (trigger) place(el, trigger);
+  else el.classList.add('centred');
 
   /* Wait a frame before listening, or the very click that opened the panel
      closes it again. */
   requestAnimationFrame(() => {
     if (!current || current.el !== el) return;
-    outsideCloser = (e) => { if (!el.contains(e.target)) closePanel(); };
+    outsideCloser = (e) => {
+      if (el.contains(e.target)) return;
+      if (current.trigger && current.trigger.contains(e.target)) {
+        suppress = { name: current.name, at: Date.now() };
+      }
+      closePanel();
+    };
     document.addEventListener('pointerdown', outsideCloser, true);
   });
 
