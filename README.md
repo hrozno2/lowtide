@@ -28,16 +28,16 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.6-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.6-mac-x64.dmg` |
-| Windows | `LowTide-1.0.6-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.6-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.6-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-1.0.7-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-1.0.7-mac-x64.dmg` |
+| Windows | `LowTide-1.0.7-win-x64.exe` (or `-arm64`) |
+| Linux, any distro | `LowTide-1.0.7-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-1.0.7-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.6-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-1.0.7-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
 right-click the app and choose **Open** (double-clicking will refuse); on
@@ -139,7 +139,9 @@ contrast ratios, so all of them are readable rather than only most of them.
 
 **Make it yours.** Ten themes, light and dark. Typeface, size, line spacing,
 column width, page size, margins and print leading are all adjustable, and the
-toolbar buttons can be reordered or switched off.
+toolbar buttons can be reordered or switched off. On Windows and Linux the menu
+is either a button in the title bar or written out along it, whichever you
+prefer — drawn in the theme either way rather than in the system's colours.
 
 ![Ten themes, light and dark](docs/screen-themes.png)
 
@@ -206,7 +208,7 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 
 ```bash
 npm run watch       # rebuild the renderer as you edit
-npm test            # 119 unit and 362 end-to-end checks
+npm test            # 119 unit and 439 end-to-end checks
 npm run pack        # unpacked build, the quickest packaging check
 ```
 
