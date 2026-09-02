@@ -1745,6 +1745,31 @@ function renderMusicWeb(body, service) {
   const zoomOut = ui.h('button', { class: 'text-btn', title: 'Smaller', onclick: () => nudgeZoom(-0.05) }, '\u2212');
   const zoomIn = ui.h('button', { class: 'text-btn', title: 'Larger', onclick: () => nudgeZoom(0.05) }, '+');
 
+  /* The site's own volume control is inside the player, which is fiddly at
+     the size this pane runs at. This sets it on whatever media element is
+     there, and again after every navigation, because the site replaces the
+     element rather than reusing it. */
+  const setGuestVolume = (v) => {
+    if (!web.executeJavaScript) return;
+    web.executeJavaScript(
+      `(() => { for (const m of document.querySelectorAll('video, audio')) {` +
+      ` m.volume = ${v}; m.muted = ${v === 0 ? 'true' : 'false'}; } return true; })()`
+    ).catch(() => {});
+  };
+
+  const volume = ui.h('input', {
+    type: 'range', min: 0, max: 100, class: 'yt-vol',
+    value: String(Math.round((state.prefs.musicVolume != null ? state.prefs.musicVolume : 1) * 100)),
+    title: 'Volume',
+    oninput: (e) => {
+      const v = Number(e.target.value) / 100;
+      setPrefs({ musicVolume: Math.round(v * 100) / 100 });
+      setGuestVolume(v);
+    }
+  });
+  const applyVolume = () =>
+    setGuestVolume(state.prefs.musicVolume != null ? state.prefs.musicVolume : 1);
+
   const status = ui.h('div', { class: 'yt-note' },
     `${service.name}\u2019s own site, in a browser view. Search above, tap a result to play it.`);
 
@@ -1763,13 +1788,16 @@ function renderMusicWeb(body, service) {
   };
   repaintMusic = paintGuest;
 
-  web.addEventListener('dom-ready', () => { applyZoom(); paintGuest(); });
+  web.addEventListener('dom-ready', () => { applyZoom(); paintGuest(); applyVolume(); });
   web.addEventListener('did-fail-load', (e) => {
     if (e.errorCode === -3) return;   // aborted by a redirect, not a failure
     status.textContent = `Could not load ${service.name} (${e.errorDescription || e.errorCode}).`;
   });
-  web.addEventListener('did-navigate', () => { remember(web.getURL()); applyZoom(); paintGuest(); });
-  web.addEventListener('did-navigate-in-page', () => remember(web.getURL()));
+  web.addEventListener('did-navigate', () => {
+    remember(web.getURL()); applyZoom(); paintGuest(); applyVolume();
+  });
+  web.addEventListener('did-navigate-in-page', () => { remember(web.getURL()); applyVolume(); });
+  web.addEventListener('media-started-playing', applyVolume);
 
   // Leaving the site opens the real browser instead of wandering off in here.
   web.addEventListener('will-navigate', (e) => {
@@ -1779,23 +1807,61 @@ function renderMusicWeb(body, service) {
     }
   });
 
-  // Chromium leaves the guest sized for the whole window after HTML fullscreen,
-  // which is what used to swallow the interface. Put everything back by hand.
+  /* Chromium leaves the guest sized for the whole window after HTML
+     fullscreen. Stripping the inline styles is not enough on its own: the
+     sizing lives inside the guest, not on the host element, and on Linux the
+     window manager restores the window a beat after the event arrives — so a
+     single pass on the way out can run before there is anything to correct.
+     This keeps checking for a second and puts the guest back inside its dock
+     whenever it is found outside it. */
+  const reclaim = () => {
+    for (const prop of ['position', 'top', 'left', 'right', 'bottom',
+                        'width', 'height', 'z-index', 'transform', 'inset']) {
+      web.style.removeProperty(prop);
+    }
+    // A one-pixel nudge makes Chromium recompute the guest's bounds. Hiding it
+    // would do the same, but hiding a <webview> stops whatever is playing.
+    const h = web.getBoundingClientRect().height;
+    if (h > 1) {
+      web.style.height = `${Math.round(h) - 1}px`;
+      requestAnimationFrame(() => { web.style.removeProperty('height'); applyZoom(); });
+    } else {
+      requestAnimationFrame(applyZoom);
+    }
+  };
+
+  const escaped = () => {
+    const dock = document.getElementById('side-dock');
+    if (!dock || dock.hidden) return false;
+    const r = web.getBoundingClientRect();
+    const d = dock.getBoundingClientRect();
+    return r.width > d.width + 4 || r.left < d.left - 4 || r.top < d.top - 4;
+  };
+
+  let watchdog = null;
+  const watchFor = (ms) => {
+    clearInterval(watchdog);
+    const until = Date.now() + ms;
+    watchdog = setInterval(() => {
+      if (escaped()) reclaim();
+      if (Date.now() > until) { clearInterval(watchdog); watchdog = null; }
+    }, 120);
+  };
+
   web.addEventListener('enter-html-full-screen', () => document.body.classList.add('media-fullscreen'));
   web.addEventListener('leave-html-full-screen', () => {
     document.body.classList.remove('media-fullscreen');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    for (const prop of ['position', 'top', 'left', 'right', 'bottom', 'width', 'height', 'z-index', 'transform']) {
-      web.style.removeProperty(prop);
-    }
-    web.style.removeProperty('inset');
-    requestAnimationFrame(applyZoom);
+    reclaim();
+    watchFor(1500);
   });
+  // The window itself resizing on the way out of fullscreen is the other half.
+  window.addEventListener('resize', () => { if (escaped()) reclaim(); });
 
   body.append(
     ui.h('div', { class: 'music-bar' }, back, search),
     ui.h('div', { class: 'music-bar tight' }, home, openOut,
-      ui.h('span', { class: 'spacer' }), zoomOut, zoomLabel, zoomIn),
+      ui.h('span', { class: 'spacer' }), volume, zoomOut, zoomLabel, zoomIn),
     web, status);
 
   applyZoom();

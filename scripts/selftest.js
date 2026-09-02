@@ -1707,6 +1707,43 @@ app.whenReady().then(async () => {
     eq('the sidebar is back', after.sidebar, true);
     eq('the player is back inside its pane', after.contained, true);
 
+    /* The window manager can restore the window a beat after the event, so the
+       guest escapes again once the handler has already run. That is the shape
+       of the bug on Linux, and a single pass on the way out cannot catch it. */
+    await js(`(() => { const w = document.querySelector('webview');
+      w.style.position = 'fixed'; w.style.inset = '0';
+      w.style.width = '100%'; w.style.height = '100%'; w.style.zIndex = '9999';
+      window.dispatchEvent(new Event('resize')); return true; })()`);
+    await wait(600);
+    eq('an escape after the event is caught too', await js(`(() => {
+      const r = document.querySelector('webview').getBoundingClientRect();
+      const d = document.getElementById('side-dock').getBoundingClientRect();
+      return r.left >= d.left - 2 && r.right <= d.right + 2; })()`), true);
+
+    await click('#dock-close');
+    await wait(250);
+  });
+
+  await test('the music pane has its own volume', async () => {
+    await js(`window.__setPref('musicMode','youtube')`);
+    if (await js(`document.getElementById('side-dock').hidden`)) {
+      await click('#btn-music');
+      await wait(3000);
+    }
+    const slider = await js(`(() => { const v = document.querySelector('.yt-vol');
+      return v ? { max: v.max, value: v.value } : null; })()`);
+    ok('there is a volume slider', !!slider);
+    eq('it runs to full', slider && slider.max, '100');
+
+    await js(`(() => { const v = document.querySelector('.yt-vol');
+      v.value = '35'; v.dispatchEvent(new Event('input')); return true; })()`);
+    await wait(400);
+    eq('moving it is remembered',
+      await js(`(async () => (await window.api.prefs.get()).musicVolume)()`), 0.35);
+
+    await js(`(() => { const v = document.querySelector('.yt-vol');
+      v.value = '100'; v.dispatchEvent(new Event('input')); return true; })()`);
+    await wait(300);
     await click('#dock-close');
     await wait(250);
   });
