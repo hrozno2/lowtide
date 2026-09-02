@@ -636,6 +636,17 @@ app.whenReady().then(async () => {
     }
   });
 
+  await test('none of them is a point between your ears', async () => {
+    /* Noise that is identical in both channels images as a dot in the middle
+       of your head and is wearing to sit under for an hour. Every sound here
+       is generated separately per channel, so it has no location — which is
+       how weather actually arrives, and much easier to stop hearing. */
+    for (const id of await js(`window.__ambienceIds()`)) {
+      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
+      ok(`${id} is spread across both ears`, Math.abs(m.correlation) < 0.3);
+    }
+  });
+
   await test('each one still sounds like itself', async () => {
     const of = async (id) => js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
     const white = await of('white');

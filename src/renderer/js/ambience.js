@@ -80,9 +80,14 @@ function fillNoise(d, kind) {
   }
 }
 
+/* Two channels, filled independently. Noise that is identical in both ears
+   images as a point between them and is tiring to sit under for hours;
+   decorrelated noise has no location at all, which is what real weather
+   sounds like and what makes it easy to stop hearing. */
 function noiseBuffer(ctx, kind) {
-  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * SECONDS), ctx.sampleRate);
+  const buf = ctx.createBuffer(2, Math.floor(ctx.sampleRate * SECONDS), ctx.sampleRate);
   fillNoise(buf.getChannelData(0), kind);
+  fillNoise(buf.getChannelData(1), kind);
   return buf;
 }
 
@@ -110,13 +115,16 @@ function grainBuffer(ctx, {
 } = {}) {
   const rateHz = ctx.sampleRate;
   const len = Math.floor(rateHz * seconds);
-  const buf = ctx.createBuffer(1, len, rateHz);
-  const d = buf.getChannelData(0);
+  const buf = ctx.createBuffer(2, len, rateHz);
 
   const count = Math.floor(rate * seconds);
   const logLo = Math.log(fLo);
   const span = Math.log(fHi) - logLo;
 
+  // Each ear gets its own rain. Drops are independent events in the world,
+  // so they should be independent in the two channels too.
+  for (let ch = 0; ch < 2; ch++) {
+  const d = buf.getChannelData(ch);
   for (let g = 0; g < count; g++) {
     const start = Math.floor(Math.random() * len);
     const f0 = Math.exp(logLo + Math.random() * span);
@@ -136,8 +144,9 @@ function grainBuffer(ctx, {
       d[start + i] += s * amp;
     }
   }
-
   normalise(d, target);
+  }
+
   return buf;
 }
 
@@ -178,7 +187,10 @@ function filter(ctx, type, freq, q, gainDb) {
  */
 function calm(ctx, out, { top = 6500, cut = -8, floor = 30 } = {}) {
   const hp = filter(ctx, 'highpass', floor, 0.7);
-  const sharp = filter(ctx, 'peaking', 3200, 0.9, cut);
+  /* A shelf rather than a bell: a bell pulls a hole out of the middle of the
+     band and leaves a bump on either side of it, which is its own kind of
+     colour. A shelf takes the whole region down evenly. */
+  const sharp = filter(ctx, 'highshelf', 2200, null, cut);
   const lp = filter(ctx, 'lowpass', top, 0.6);
   hp.connect(sharp).connect(lp).connect(out);
   return hp;
@@ -259,8 +271,11 @@ const RECIPES = {
     /* Crackle as texture: many small resonances a second rather than pops you
        could count. Sparse enough to read as a fire, dense enough not to be a
        sequence of events. */
-    const ticks = grainBuffer(ctx, { rate: 55, fLo: 180, fHi: 1100, decay: 0.020, click: 0.45, target: 0.30 });
-    const crackle = pair(ctx, ticks, head, 0.30, 1, 0.71);
+    /* Crackle dense enough to stop being a sequence. At fifty a second the
+       level still stepped about at a rate the ear follows; at a hundred and
+       sixty it is a surface. */
+    const ticks = grainBuffer(ctx, { rate: 160, fLo: 180, fHi: 1100, decay: 0.016, click: 0.4, target: 0.24 });
+    const crackle = pair(ctx, ticks, head, 0.26, 1, 0.71);
 
     return [burn, hiss, ...crackle,
       drift(ctx, burnG.gain, 0.70, 0.10, 23),
@@ -449,13 +464,25 @@ export async function measureAmbience(id, seconds = 4) {
   if (!OC) return null;
 
   const rate = 44100;
-  const ctx = new OC(1, Math.floor(rate * seconds), rate);
+  const ctx = new OC(2, Math.floor(rate * seconds), rate);
   const master = gain(ctx, 1);
   master.connect(ctx.destination);
   recipe(ctx, master);
 
   const rendered = await ctx.startRendering();
-  const d = rendered.getChannelData(0);
+  const L = rendered.getChannelData(0);
+  const R = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : L;
+
+  /* How alike the two ears are. One means the sound is a point between them,
+     which is the tiring way to hear noise for an hour; near zero means it has
+     no location, which is how weather actually arrives. */
+  let ll = 0, rr = 0, lr = 0;
+  for (let i = 0; i < L.length; i++) { ll += L[i] * L[i]; rr += R[i] * R[i]; lr += L[i] * R[i]; }
+  const correlation = ll && rr ? +(lr / Math.sqrt(ll * rr)).toFixed(4) : 1;
+
+  // Everything below measures the mono sum, which is what a laptop plays.
+  const d = new Float32Array(L.length);
+  for (let i = 0; i < L.length; i++) d[i] = (L[i] + R[i]) * 0.5;
 
   let peak = 0, sum = 0, bad = 0;
   for (let i = 0; i < d.length; i++) {
@@ -525,7 +552,8 @@ export async function measureAmbience(id, seconds = 4) {
     bright: share(bands.bright),
     // Movement at the rate that nags, relative to the mean level.
     fluctuation: mean > 0 ? +(Math.sqrt(fluct / (envN || 1)) / mean).toFixed(4) : 0,
-    fluctShare: envTotal ? +(fluct / envTotal).toFixed(4) : 0
+    fluctShare: envTotal ? +(fluct / envTotal).toFixed(4) : 0,
+    correlation
   };
 }
 
