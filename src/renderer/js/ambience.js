@@ -1,27 +1,47 @@
-/* Focus sounds.
+/* Focus sounds, synthesised.
  *
- * These are synthesised rather than recorded. A bundled recording has to be
- * small enough to ship and long enough not to repeat, and it cannot be both —
- * ten minutes of stereo audio is a hundred megabytes raw, and any loop short
- * enough to bundle starts announcing itself within the hour.
+ * Built to be ignorable. Three findings shape every recipe here:
  *
- * So the texture is built live out of noise and filters, and the detail that
- * makes it feel alive — gusts, thunder, crickets, the clatter of a cup — is
- * scheduled at random intervals as it plays. Nothing repeats, it runs for as
- * long as you leave it, and it adds nothing to the download. It also means
- * every sound here is ours: there is no licence to honour and nothing is
- * fetched from anywhere.
+ * 1. Changing state, not loudness, is what breaks concentration. Sound made of
+ *    distinguishable tokens — syllables, chirps, clinks — disrupts working
+ *    memory; continuous broadband noise barely does at all. So there are no
+ *    events in these. What used to be a cup being put down or a cricket is
+ *    either gone or buried so deep in the texture that it is no longer a
+ *    thing you could count.
+ *
+ * 2. Sharpness — the proportion of energy up at 2–4 kHz — is the main driver
+ *    of how unpleasant a noise is. That band is exactly where filtered hiss
+ *    lives, which is why the first versions of these sounded like static.
+ *    Everything now runs through a shelf that pulls that band down and rolls
+ *    off above 6.5 kHz.
+ *
+ * 3. Fluctuation strength peaks around 4 Hz, and roughness lives between 15
+ *    and 300 Hz. Anything that wobbles in either band draws attention to
+ *    itself. Every modulation here has a period of twelve seconds or longer,
+ *    which is 0.08 Hz — two decades below the band that grates.
+ *
+ * Where a sound has a physical mechanism worth imitating, it is imitated
+ * rather than approximated with a filter. Rain is thousands of small decaying
+ * resonances a second — the bubble each drop entrains, ringing as it shrinks —
+ * not a band of hiss. Fire is a low combustion rumble under a soft hiss. Wind
+ * is broadband air with two slowly wandering resonances, which is what an
+ * edge does to moving air.
+ *
+ * A café is the interesting case. Babble with syllable structure is the worst
+ * thing you could possibly play to someone trying to write, so this is not
+ * that: it is the wash that many overlapping voices converge to at distance,
+ * speech-shaped in the spectrum and steady in time.
  */
 
 export const AMBIENCES = [
-  { id: 'rain',  name: 'Rain',        hint: 'Drops on a window, not a shower head' },
-  { id: 'storm', name: 'Thunder',     hint: 'Heavier rain with a storm rolling through' },
-  { id: 'fire',  name: 'Fireplace',   hint: 'A log fire, popping and settling' },
-  { id: 'wind',  name: 'Wind',        hint: 'Gusts around the building' },
-  { id: 'night', name: 'Night',       hint: 'Crickets, and a road a long way off' },
-  { id: 'cafe',  name: 'Coffee shop', hint: 'Voices, cups, a machine behind it' },
-  { id: 'waves', name: 'Waves',       hint: 'Sets rolling in and breaking' },
-  { id: 'white', name: 'White noise', hint: 'Flat hiss' },
+  { id: 'rain',  name: 'Rain',        hint: 'Steady rain, close and soft' },
+  { id: 'storm', name: 'Thunder',     hint: 'Rain with a storm a long way off' },
+  { id: 'fire',  name: 'Fireplace',   hint: 'A log fire settling' },
+  { id: 'wind',  name: 'Wind',        hint: 'Air moving around the building' },
+  { id: 'night', name: 'Night',       hint: 'Summer night, far from a road' },
+  { id: 'cafe',  name: 'Coffee shop', hint: 'The wash of a room full of people' },
+  { id: 'waves', name: 'Waves',       hint: 'Slow surf' },
+  { id: 'white', name: 'White noise', hint: 'Flat, with the top taken off' },
   { id: 'pink',  name: 'Pink noise',  hint: 'Softer than white' },
   { id: 'brown', name: 'Brown noise', hint: 'Deep, low and dull' }
 ];
@@ -30,14 +50,12 @@ export const ambienceById = (id) => AMBIENCES.find((a) => a.id === id) || null;
 
 const SECONDS = 6;
 
-/* One buffer of noise, filled by the recipe the name asks for. */
-function noiseBuffer(ctx, kind) {
-  const len = Math.floor(ctx.sampleRate * SECONDS);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
+/* ------------------------------------------------------------- primitives */
 
+function fillNoise(d, kind) {
+  const len = d.length;
   if (kind === 'pink') {
-    // Paul Kellet's filter: cheap, and within a fraction of a dB of -3/octave.
+    // Paul Kellet's filter: within a fraction of a dB of -3 dB per octave.
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < len; i++) {
       const w = Math.random() * 2 - 1;
@@ -60,34 +78,116 @@ function noiseBuffer(ctx, kind) {
   } else {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   }
+}
+
+function noiseBuffer(ctx, kind) {
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * SECONDS), ctx.sampleRate);
+  fillNoise(buf.getChannelData(0), kind);
   return buf;
 }
 
-/* A looping noise source. Two of these at different rates never line up
-   again, which is what keeps the loop from being audible as one. */
-function noise(ctx, kind, rate = 1) {
+function normalise(d, target) {
+  let sum = 0;
+  for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+  const rms = Math.sqrt(sum / d.length) || 1;
+  const g = target / rms;
+  for (let i = 0; i < d.length; i++) d[i] *= g;
+}
+
+/**
+ * A buffer packed with small decaying resonances — the grain that rain and
+ * fire are actually made of. Each one rings and dies inside a few
+ * milliseconds; thousands a second stop being events and become a texture,
+ * which is the whole point.
+ *
+ * `chirp` rises the pitch across the grain's life. A raindrop's sound is the
+ * air bubble it traps ringing as it shrinks, and a shrinking bubble rings
+ * higher, so the rise is what makes it read as water rather than as clicks.
+ */
+function grainBuffer(ctx, {
+  rate = 1200, fLo = 350, fHi = 2000, decay = 0.011, chirp = 1.3,
+  click = 0.3, seconds = SECONDS, target = 0.2
+} = {}) {
+  const rateHz = ctx.sampleRate;
+  const len = Math.floor(rateHz * seconds);
+  const buf = ctx.createBuffer(1, len, rateHz);
+  const d = buf.getChannelData(0);
+
+  const count = Math.floor(rate * seconds);
+  const logLo = Math.log(fLo);
+  const span = Math.log(fHi) - logLo;
+
+  for (let g = 0; g < count; g++) {
+    const start = Math.floor(Math.random() * len);
+    const f0 = Math.exp(logLo + Math.random() * span);
+    const life = decay * (0.5 + Math.random());
+    const n = Math.min(Math.floor(life * 4 * rateHz), len - start);
+    if (n <= 2) continue;
+
+    const amp = 0.4 + Math.random() * 0.6;
+    let phase = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / rateHz;
+      const env = Math.exp(-t / life);
+      // Frequency climbs as the bubble shrinks.
+      phase += (2 * Math.PI * (f0 * (1 + chirp * (1 - env)))) / rateHz;
+      let s = Math.sin(phase) * env;
+      if (i < 6) s += (Math.random() * 2 - 1) * click * env;   // the impact itself
+      d[start + i] += s * amp;
+    }
+  }
+
+  normalise(d, target);
+  return buf;
+}
+
+function source(ctx, buffer, rate = 1) {
   const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx, kind);
+  src.buffer = buffer;
   src.loop = true;
   src.playbackRate.value = rate;
   src.start();
   return src;
 }
 
+/* Two copies at different rates never line up again, so a six-second buffer
+   stops sounding like a six-second buffer. */
+function pair(ctx, buffer, out, level, rateA = 1, rateB = 0.83) {
+  const g = gain(ctx, level);
+  const a = source(ctx, buffer, rateA);
+  const b = source(ctx, buffer, rateB);
+  a.connect(g); b.connect(g); g.connect(out);
+  return [a, b];
+}
+
 const gain = (ctx, v) => { const g = ctx.createGain(); g.gain.value = v; return g; };
 
-function filter(ctx, type, freq, q) {
+function filter(ctx, type, freq, q, gainDb) {
   const f = ctx.createBiquadFilter();
   f.type = type;
   f.frequency.value = freq;
   if (q != null) f.Q.value = q;
+  if (gainDb != null) f.gain.value = gainDb;
   return f;
 }
 
-/* A slow sine that wanders a parameter about, for swells and gusts. */
+/**
+ * The shared voicing. Pulls down the 2–5 kHz band that drives sharpness, rolls
+ * the top off above 6.5 kHz, and takes out the sub-30 Hz rumble that eats
+ * headroom without being heard. Every recipe ends here.
+ */
+function calm(ctx, out, { top = 6500, cut = -8, floor = 30 } = {}) {
+  const hp = filter(ctx, 'highpass', floor, 0.7);
+  const sharp = filter(ctx, 'peaking', 3200, 0.9, cut);
+  const lp = filter(ctx, 'lowpass', top, 0.6);
+  hp.connect(sharp).connect(lp).connect(out);
+  return hp;
+}
+
+/** A wander so slow it is texture rather than movement: 0.08 Hz and below. */
 function drift(ctx, param, centre, depth, period) {
   const lfo = ctx.createOscillator();
-  lfo.frequency.value = 1 / period;
+  lfo.frequency.value = 1 / Math.max(12, period);
   const amt = gain(ctx, depth);
   param.value = centre;
   lfo.connect(amt).connect(param);
@@ -95,390 +195,254 @@ function drift(ctx, param, centre, depth, period) {
   return lfo;
 }
 
-/* Calls `fn` again and again at a random interval inside [min, max]. */
-function every(min, max, fn) {
-  let timer = null;
-  const tick = () => {
-    fn();
-    timer = setTimeout(tick, (min + Math.random() * (max - min)) * 1000);
-  };
-  timer = setTimeout(tick, (min + Math.random() * (max - min)) * 1000);
-  return () => clearTimeout(timer);
-}
-
-/* A one-shot burst of filtered noise with an envelope: thunder, a cup, a
-   cricket, depending on what is asked for. */
-function burst(ctx, out, { kind = 'white', type = 'bandpass', freq, q = 1,
-                           attack = 0.005, decay = 0.3, level = 0.4 }) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx, kind);
-  src.loop = true;
-  const f = filter(ctx, type, freq, q);
-  const g = gain(ctx, 0);
-  const now = ctx.currentTime;
-  g.gain.setValueAtTime(0, now);
-  g.gain.linearRampToValueAtTime(level, now + attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, now + attack + decay);
-  src.connect(f).connect(g).connect(out);
-  src.start(now);
-  src.stop(now + attack + decay + 0.05);
-}
-
-/**
- * A buffer full of little decaying impulses.
- *
- * This is what separates rain from a hiss and a fire from a rumble: the sound
- * of both is thousands of separate small events, and no amount of filtering
- * turns a continuous noise into them. Density is events per second, and the
- * lengths are in milliseconds. `sharp` biases the sizes — above 1 most events
- * are small and a few are large, which is what fire does and rain does not.
- */
-function grainBuffer(ctx, seconds, { density, minMs, maxMs, sharp = 1 }) {
-  const sr = ctx.sampleRate;
-  const len = Math.floor(sr * seconds);
-  const buf = ctx.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
-  const count = Math.max(1, Math.round(density * seconds));
-
-  for (let n = 0; n < count; n++) {
-    const at = Math.floor(Math.random() * len);
-    const ms = minMs + Math.random() * (maxMs - minMs);
-    const dur = Math.max(2, Math.floor((sr * ms) / 1000));
-    const amp = Math.pow(Math.random(), sharp);
-    const end = Math.min(len, at + dur);
-    for (let i = at; i < end; i++) {
-      d[i] += (Math.random() * 2 - 1) * Math.exp((-5 * (i - at)) / dur) * amp;
-    }
-  }
-
-  let peak = 0;
-  for (let i = 0; i < len; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; }
-  if (peak > 0) { const k = 0.9 / peak; for (let i = 0; i < len; i++) d[i] *= k; }
-  return buf;
-}
-
-/** A looping source over one of those grain buffers. */
-function grains(ctx, seconds, opts, rate = 1) {
-  const src = ctx.createBufferSource();
-  src.buffer = grainBuffer(ctx, seconds, opts);
-  src.loop = true;
-  src.playbackRate.value = rate;
-  src.start();
-  return src;
-}
-
-/**
- * Speech, heard from too far away to make out: three formants moving about
- * over a noise source, gated into syllables with pauses between them. The
- * envelope is scheduled a few seconds ahead and topped up as it runs, because
- * an LFO gives a regular pulse and people do not talk in one.
- */
-function babble(ctx, out, { level = 1, rate = 1 } = {}) {
-  const src = noise(ctx, 'pink', rate);
-  const voiced = gain(ctx, 0);
-  const formants = [
-    { f: 500, q: 6, g: 1.0 },
-    { f: 1200, q: 8, g: 0.55 },
-    { f: 2600, q: 9, g: 0.25 }
-  ].map(({ f, q, g }) => {
-    const bp = filter(ctx, 'bandpass', f, q);
-    const amt = gain(ctx, g * level);
-    src.connect(bp).connect(amt).connect(voiced);
-    // The vowel wanders, so it never sits on one note.
-    drift(ctx, bp.frequency, f, f * 0.16, 5 + Math.random() * 6);
-    return bp;
-  });
-  voiced.connect(out);
-
-  let filled = 0;
-  const schedule = () => {
-    const now = ctx.currentTime;
-    let t = Math.max(filled, now + 0.05);
-    const until = now + 4;
-    while (t < until) {
-      // A run of syllables, then a gap where somebody else is talking.
-      const syllables = 2 + Math.floor(Math.random() * 6);
-      for (let i = 0; i < syllables; i++) {
-        const dur = 0.09 + Math.random() * 0.13;
-        const peak = 0.25 + Math.random() * 0.75;
-        voiced.gain.linearRampToValueAtTime(peak, t + dur * 0.35);
-        voiced.gain.linearRampToValueAtTime(0.08 + Math.random() * 0.1, t + dur);
-        t += dur;
-      }
-      voiced.gain.linearRampToValueAtTime(0.04, t + 0.12);
-      t += 0.25 + Math.random() * 0.9;
-    }
-    filled = t;
-  };
-  schedule();
-  const timer = setInterval(schedule, 2500);
-  return { src, formants, stop: () => clearInterval(timer) };
-}
-
 /* --------------------------------------------------------------- recipes */
 
 const RECIPES = {
   rain: (ctx, out) => {
-    // Thousands of separate drops, not a hiss: the grains are the rain, and
-    // the bed underneath is only the room it is falling into.
-    const drops = grains(ctx, 5, { density: 900, minMs: 1.5, maxMs: 9, sharp: 1.7 }, 1);
-    const dropF = filter(ctx, 'bandpass', 1900, 0.55);
-    const dropG = gain(ctx, 1.5);
-    drops.connect(dropF).connect(dropG).connect(out);
+    const head = calm(ctx, out);
+    const drops = grainBuffer(ctx, { rate: 1500, fLo: 300, fHi: 1900, decay: 0.010, target: 0.22 });
+    const fine = grainBuffer(ctx, { rate: 3000, fLo: 900, fHi: 2600, decay: 0.005, click: 0.5, target: 0.12 });
 
-    // A second, slower layer of heavier drops off the eaves.
-    const heavy = grains(ctx, 7, { density: 40, minMs: 6, maxMs: 26, sharp: 2.4 }, 0.9);
-    heavy.connect(filter(ctx, 'bandpass', 700, 1.2)).connect(gain(ctx, 0.72)).connect(out);
+    const body = pair(ctx, drops, head, 0.60);
+    const mist = pair(ctx, fine, head, 0.17, 1, 0.77);
 
-    const bed = noise(ctx, 'brown', 0.8);
-    bed.connect(filter(ctx, 'lowpass', 500)).connect(gain(ctx, 0.3)).connect(out);
+    // A little air underneath so it sits in a room rather than in a vacuum.
+    const bed = source(ctx, noiseBuffer(ctx, 'brown'), 0.9);
+    const bedG = gain(ctx, 0.15);
+    bed.connect(filter(ctx, 'lowpass', 500, 0.7)).connect(bedG).connect(head);
 
-    const l1 = drift(ctx, dropF.frequency, 1900, 500, 29);
-    const l2 = drift(ctx, dropG.gain, 1.5, 0.3, 41);
-    return [drops, heavy, bed, l1, l2];
+    return [...body, ...mist, bed, drift(ctx, bedG.gain, 0.15, 0.04, 31)];
   },
 
   storm: (ctx, out) => {
-    // Heavier than plain rain to begin with, so the two are not the same
-    // sound with an event bolted on.
-    const drops = grains(ctx, 5, { density: 1500, minMs: 1.5, maxMs: 12, sharp: 1.5 }, 1);
-    const dropF = filter(ctx, 'bandpass', 1500, 0.5);
-    drops.connect(dropF).connect(gain(ctx, 1.0)).connect(out);
+    const parts = RECIPES.rain(ctx, out);
+    /* Thunder is the one event kept, because without it this is just rain.
+       It is held to a slow swell well under 150 Hz rather than a crack: no
+       sharp onset, nothing to flinch at, and far enough down the spectrum
+       that it reads as weather rather than as a noise in the room. */
+    const head = calm(ctx, out, { top: 320, cut: 0 });
+    const rumble = source(ctx, noiseBuffer(ctx, 'brown'), 0.6);
+    const shape = filter(ctx, 'lowpass', 120, 0.9);
+    const g = gain(ctx, 0.0001);
+    rumble.connect(shape).connect(g).connect(head);
 
-    const heavy = grains(ctx, 7, { density: 90, minMs: 8, maxMs: 34, sharp: 2.2 }, 0.85);
-    heavy.connect(filter(ctx, 'bandpass', 550, 1.0)).connect(gain(ctx, 0.6)).connect(out);
-
-    const bed = noise(ctx, 'brown', 0.75);
-    bed.connect(filter(ctx, 'lowpass', 320)).connect(gain(ctx, 0.4)).connect(out);
-    const l1 = drift(ctx, dropF.frequency, 1500, 420, 23);
-
-    /* Thunder proper: a sub-bass swell that sweeps downward with a long tail,
-       plus a rumbling body. Loud and slow enough that it cannot be mistaken
-       for the rain it sits on. */
-    const strike = () => {
-      const near = Math.random() < 0.35;
-      const t0 = ctx.currentTime;
-      const dur = near ? 4.5 : 7.5;
-
-      const rumble = ctx.createBufferSource();
-      rumble.buffer = noiseBuffer(ctx, 'brown');
-      rumble.loop = true;
-      const lp = filter(ctx, 'lowpass', near ? 320 : 150);
-      lp.frequency.setValueAtTime(near ? 420 : 200, t0);
-      lp.frequency.exponentialRampToValueAtTime(near ? 90 : 55, t0 + dur);
-      const g = gain(ctx, 0);
-      g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(near ? 1.5 : 0.75, t0 + (near ? 0.05 : 0.7));
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      rumble.connect(lp).connect(g).connect(out);
-      rumble.start(t0);
-      rumble.stop(t0 + dur + 0.1);
-
-      if (near) {
-        // The crack at the front of a close strike.
-        burst(ctx, out, { kind: 'white', type: 'lowpass', freq: 2200,
-                          attack: 0.004, decay: 0.5, level: 0.5 });
-      }
+    const roll = () => {
+      const now = ctx.currentTime;
+      const rise = 2.5 + Math.random() * 2.5;
+      const fall = 6 + Math.random() * 6;
+      g.gain.cancelScheduledValues(now);
+      g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), now);
+      g.gain.linearRampToValueAtTime(0.5 + Math.random() * 0.35, now + rise);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + rise + fall);
     };
-    const stop = every(16, 52, strike);
-    return [drops, heavy, bed, l1, { stop }];
+    let timer = setTimeout(function again() {
+      roll();
+      timer = setTimeout(again, (22 + Math.random() * 38) * 1000);
+    }, 6000);
+
+    return [...parts, rumble, { stop: () => clearTimeout(timer) }];
   },
 
   fire: (ctx, out) => {
-    // The bed is the draw of the chimney; the fire itself is all crackle.
-    const draw = noise(ctx, 'brown', 0.7);
-    const drawF = filter(ctx, 'lowpass', 420);
-    const drawG = gain(ctx, 0.40);
-    draw.connect(drawF).connect(drawG).connect(out);
+    const head = calm(ctx, out, { top: 5200 });
 
-    const hiss = noise(ctx, 'pink', 1);
-    const hissG = gain(ctx, 0.1);
-    hiss.connect(filter(ctx, 'bandpass', 2600, 0.6)).connect(hissG).connect(out);
+    // The burn: low, steady, and the bulk of what you hear.
+    const burn = source(ctx, noiseBuffer(ctx, 'brown'), 1);
+    const burnG = gain(ctx, 0.70);
+    burn.connect(filter(ctx, 'lowpass', 260, 0.8)).connect(burnG).connect(head);
 
-    // Small ticks constantly, larger pops now and then.
-    const ticks = grains(ctx, 6, { density: 26, minMs: 1, maxMs: 7, sharp: 2.2 }, 1);
-    ticks.connect(filter(ctx, 'bandpass', 3200, 1.4)).connect(gain(ctx, 0.62)).connect(out);
+    // Combustion hiss, kept below the band that grates.
+    const hiss = source(ctx, noiseBuffer(ctx, 'pink'), 0.88);
+    const hissG = gain(ctx, 0.10);
+    hiss.connect(filter(ctx, 'bandpass', 900, 0.5)).connect(hissG).connect(head);
 
-    const l1 = drift(ctx, drawG.gain, 0.40, 0.13, 13);
-    const l2 = drift(ctx, hissG.gain, 0.1, 0.05, 8);
+    /* Crackle as texture: many small resonances a second rather than pops you
+       could count. Sparse enough to read as a fire, dense enough not to be a
+       sequence of events. */
+    const ticks = grainBuffer(ctx, { rate: 55, fLo: 180, fHi: 1100, decay: 0.020, click: 0.45, target: 0.30 });
+    const crackle = pair(ctx, ticks, head, 0.30, 1, 0.71);
 
-    const pops = every(0.6, 3.4, () => {
-      const n = 1 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < n; i++) {
-        setTimeout(() => {
-          burst(ctx, out, { kind: 'white', type: 'bandpass',
-                            freq: 900 + Math.random() * 2600, q: 3 + Math.random() * 6,
-                            attack: 0.001, decay: 0.02 + Math.random() * 0.12,
-                            level: 0.18 + Math.random() * 0.4 });
-        }, i * (20 + Math.random() * 90));
-      }
-    });
-    // The occasional shift as a log settles.
-    const settle = every(20, 70, () => {
-      burst(ctx, out, { kind: 'brown', type: 'lowpass', freq: 500,
-                        attack: 0.02, decay: 0.8 + Math.random() * 0.8, level: 0.35 });
-    });
-    return [draw, hiss, ticks, l1, l2, { stop: pops }, { stop: settle }];
+    return [burn, hiss, ...crackle,
+      drift(ctx, burnG.gain, 0.70, 0.10, 23),
+      drift(ctx, hissG.gain, 0.10, 0.03, 37)];
   },
 
   wind: (ctx, out) => {
-    const n = noise(ctx, 'brown', 1);
-    const f = filter(ctx, 'bandpass', 420, 1.1);
-    const g = gain(ctx, 0.92);
-    n.connect(f).connect(g).connect(out);
+    const head = calm(ctx, out, { top: 4200 });
 
-    const air = noise(ctx, 'pink', 0.91);
-    const airF = filter(ctx, 'highpass', 1800);
-    const airG = gain(ctx, 0.1);
-    air.connect(airF).connect(airG).connect(out);
+    const air = source(ctx, noiseBuffer(ctx, 'brown'), 1);
+    const airG = gain(ctx, 0.82);
+    air.connect(filter(ctx, 'lowpass', 700, 0.7)).connect(airG).connect(head);
 
-    const l1 = drift(ctx, f.frequency, 420, 260, 17);
-    const l2 = drift(ctx, g.gain, 0.92, 0.34, 11);
-    const l3 = drift(ctx, airG.gain, 0.12, 0.09, 7);
-    const stop = every(9, 26, () => {
-      const now = ctx.currentTime;
-      g.gain.cancelScheduledValues(now);
-      g.gain.setValueAtTime(g.gain.value, now);
-      g.gain.linearRampToValueAtTime(1.45, now + 1.6 + Math.random());
-      g.gain.linearRampToValueAtTime(0.92, now + 5 + Math.random() * 3);
-    });
-    return [n, air, l1, l2, l3, { stop }];
+    /* Air past an edge sheds vortices and the edge rings — two resonances,
+       wandering slowly, is enough to say "wind" without whistling. */
+    const voice = (freq, q, level, period) => {
+      const n = source(ctx, noiseBuffer(ctx, 'pink'), 0.93);
+      const f = filter(ctx, 'bandpass', freq, q);
+      const g = gain(ctx, level);
+      n.connect(f).connect(g).connect(head);
+      return [n, drift(ctx, f.frequency, freq, freq * 0.35, period)];
+    };
+
+    return [air, airG,
+      drift(ctx, airG.gain, 0.82, 0.20, 19),
+      ...voice(320, 2.2, 0.09, 27),
+      ...voice(560, 3.0, 0.05, 41)];
   },
 
   night: (ctx, out) => {
-    // Almost no hiss: night is quiet, and the crickets should be the sound
-    // rather than something laid over a wash of noise.
-    const far = noise(ctx, 'brown', 0.7);
-    far.connect(filter(ctx, 'lowpass', 240)).connect(gain(ctx, 0.5)).connect(out);
+    const head = calm(ctx, out, { top: 5600 });
 
-    const air = noise(ctx, 'pink');
-    air.connect(filter(ctx, 'bandpass', 900, 0.7)).connect(gain(ctx, 0.02)).connect(out);
+    // Barely anything: a still night is mostly the absence of sound.
+    const air = source(ctx, noiseBuffer(ctx, 'brown'), 0.7);
+    air.connect(filter(ctx, 'lowpass', 260, 0.7)).connect(gain(ctx, 0.72)).connect(head);
 
-    const cricket = (freq, chirps) => every(1.6, 5.5, () => {
-      const t0 = ctx.currentTime;
-      for (let i = 0; i < chirps; i++) {
-        const at = t0 + i * 0.055;
-        const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.value = freq * (0.99 + Math.random() * 0.02);
-        const g = gain(ctx, 0);
-        g.gain.setValueAtTime(0, at);
-        g.gain.linearRampToValueAtTime(0.075, at + 0.006);
-        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.032);
-        osc.connect(g).connect(out);
-        osc.start(at);
-        osc.stop(at + 0.04);
-      }
-    });
-    const stops = [cricket(4600, 4), cricket(5200, 3), cricket(3900, 5), cricket(4900, 4)];
-    return [far, air, { stop: () => stops.forEach((s) => s()) }];
+    /* A cricket you can pick out is an event, and events are what break
+       concentration. A field of them is a texture. This is the field: grains
+       dense enough that no single chirp is a thing you could follow. */
+    const chorus = grainBuffer(ctx, { rate: 240, fLo: 3200, fHi: 4600, decay: 0.006, click: 0.15, target: 0.16 });
+    const chorusG = gain(ctx, 0.11);
+    const a = source(ctx, chorus, 1);
+    const b = source(ctx, chorus, 0.79);
+    a.connect(chorusG); b.connect(chorusG);
+    chorusG.connect(filter(ctx, 'bandpass', 3400, 1.2)).connect(head);
+
+    return [air, a, b, drift(ctx, chorusG.gain, 0.11, 0.03, 29)];
   },
 
   cafe: (ctx, out) => {
-    // Voices first — that is what a café is. Two conversations at different
-    // distances, neither of them close enough to follow.
-    const near = babble(ctx, out, { level: 5.4, rate: 1 });
-    const farther = babble(ctx, out, { level: 3.0, rate: 0.82 });
+    const head = calm(ctx, out, { top: 4000, cut: -10 });
 
-    const room = noise(ctx, 'pink', 0.88);
-    room.connect(filter(ctx, 'lowpass', 1400)).connect(gain(ctx, 0.16)).connect(out);
+    /* Not babble. Speech broken into syllables is the single most disruptive
+       thing you can put behind someone writing, so this is the other end of
+       it: the steady wash that a roomful of voices becomes once there are too
+       many to follow. Speech-shaped in the spectrum, flat in time. */
+    const room = source(ctx, noiseBuffer(ctx, 'brown'), 1);
+    const shape = filter(ctx, 'bandpass', 480, 0.42);
+    const roomG = gain(ctx, 1.18);
+    room.connect(shape).connect(roomG).connect(head);
 
-    const clinks = every(3.5, 13, () => {
-      burst(ctx, out, { kind: 'white', type: 'bandpass',
-                        freq: 2400 + Math.random() * 2600, q: 9,
-                        attack: 0.002, decay: 0.10 + Math.random() * 0.18,
-                        level: 0.10 + Math.random() * 0.10 });
-    });
-    const machine = every(22, 70, () => {
-      burst(ctx, out, { kind: 'white', type: 'bandpass', freq: 1500, q: 1.2,
-                        attack: 0.25, decay: 1.6 + Math.random(), level: 0.16 });
-    });
-    return [near.src, farther.src, room,
-            { stop: near.stop }, { stop: farther.stop },
-            { stop: clinks }, { stop: machine }];
+    const upper = source(ctx, noiseBuffer(ctx, 'pink'), 0.86);
+    const upperG = gain(ctx, 0.10);
+    upper.connect(filter(ctx, 'bandpass', 1150, 0.6)).connect(upperG).connect(head);
+
+    // The room itself: air handling, the low hum of a full space.
+    const hum = source(ctx, noiseBuffer(ctx, 'brown'), 0.71);
+    hum.connect(filter(ctx, 'lowpass', 180, 0.7)).connect(gain(ctx, 0.35)).connect(head);
+
+    return [room, upper, hum,
+      drift(ctx, roomG.gain, 1.18, 0.16, 26),
+      drift(ctx, upperG.gain, 0.10, 0.03, 43)];
   },
 
   waves: (ctx, out) => {
-    /* A set has a shape: a low swell building, a bright break at the top, then
-       a long drain back out. Modulating one filter does not give that, so the
-       break is its own layer with its own envelope. */
-    const deep = noise(ctx, 'brown', 0.85);
-    const deepG = gain(ctx, 0.3);
-    deep.connect(filter(ctx, 'lowpass', 260)).connect(deepG).connect(out);
+    const head = calm(ctx, out, { top: 5200 });
 
-    const swell = noise(ctx, 'brown', 1);
-    const swellF = filter(ctx, 'lowpass', 500);
-    const swellG = gain(ctx, 0.05);
-    swell.connect(swellF).connect(swellG).connect(out);
+    const body = source(ctx, noiseBuffer(ctx, 'brown'), 1);
+    const bodyG = gain(ctx, 0.88);
+    body.connect(filter(ctx, 'lowpass', 420, 0.7)).connect(bodyG).connect(head);
 
-    const breakUp = grains(ctx, 5, { density: 1200, minMs: 1, maxMs: 7, sharp: 1.6 }, 1);
-    const breakF = filter(ctx, 'bandpass', 1800, 0.5);
-    const breakG = gain(ctx, 0);
-    breakUp.connect(breakF).connect(breakG).connect(out);
+    /* The swell is the one movement worth keeping: a set every ten seconds or
+       so is 0.1 Hz, far below the rate at which movement starts to nag. The
+       break is a slow rise in the upper band, not a transient. */
+    const surf = source(ctx, noiseBuffer(ctx, 'pink'), 0.94);
+    const surfF = filter(ctx, 'bandpass', 900, 0.5);
+    const surfG = gain(ctx, 0.02);
+    surf.connect(surfF).connect(surfG).connect(head);
 
     const roll = () => {
-      const t = ctx.currentTime;
-      const rise = 3.0 + Math.random() * 2.0;
-      const hold = 0.4 + Math.random() * 0.6;
-      const fall = 4.0 + Math.random() * 2.5;
-      const size = 0.7 + Math.random() * 0.6;
-
-      swellG.gain.cancelScheduledValues(t);
-      swellG.gain.setValueAtTime(Math.max(0.0001, swellG.gain.value), t);
-      swellG.gain.linearRampToValueAtTime(0.5 * size, t + rise);
-      swellG.gain.exponentialRampToValueAtTime(0.03, t + rise + hold + fall);
-
-      swellF.frequency.cancelScheduledValues(t);
-      swellF.frequency.setValueAtTime(320, t);
-      swellF.frequency.linearRampToValueAtTime(900, t + rise);
-      swellF.frequency.linearRampToValueAtTime(300, t + rise + hold + fall);
-
-      // The break comes in at the crest and hisses away down the beach.
-      breakG.gain.cancelScheduledValues(t);
-      breakG.gain.setValueAtTime(Math.max(0.0001, breakG.gain.value), t);
-      breakG.gain.linearRampToValueAtTime(0.0001, t + rise * 0.8);
-      breakG.gain.linearRampToValueAtTime(0.42 * size, t + rise + hold * 0.5);
-      breakG.gain.exponentialRampToValueAtTime(0.002, t + rise + hold + fall * 0.9);
-
-      breakF.frequency.cancelScheduledValues(t);
-      breakF.frequency.setValueAtTime(2400, t + rise);
-      breakF.frequency.exponentialRampToValueAtTime(700, t + rise + hold + fall);
+      const now = ctx.currentTime;
+      const rise = 3.4 + Math.random() * 1.8;
+      const fall = 5.5 + Math.random() * 3;
+      surfG.gain.cancelScheduledValues(now);
+      surfG.gain.setValueAtTime(Math.max(0.001, surfG.gain.value), now);
+      surfG.gain.linearRampToValueAtTime(0.30 + Math.random() * 0.10, now + rise);
+      surfG.gain.exponentialRampToValueAtTime(0.02, now + rise + fall);
     };
     roll();
-    const stop = every(9, 15, roll);
-    const l1 = drift(ctx, deepG.gain, 0.3, 0.08, 19);
-    return [deep, swell, breakUp, l1, { stop }];
+    let timer = setInterval(roll, 11000);
+
+    return [body, surf,
+      drift(ctx, bodyG.gain, 0.88, 0.14, 21),
+      { stop: () => clearInterval(timer) }];
   },
 
+  /* The three noises are definitions rather than imitations, so they keep
+     their shape. Only the very top is taken off, which is comfort rather than
+     colour: nothing above 9 kHz survives a laptop speaker anyway, and it is
+     the part that makes long listening tiring. */
   white: (ctx, out) => {
-    const n = noise(ctx, 'white');
-    n.connect(filter(ctx, 'lowpass', 11000)).connect(gain(ctx, 0.25)).connect(out);
+    const head = calm(ctx, out, { top: 9000, cut: -3 });
+    const n = source(ctx, noiseBuffer(ctx, 'white'), 1);
+    n.connect(gain(ctx, 0.42)).connect(head);
     return [n];
   },
 
   pink: (ctx, out) => {
-    const n = noise(ctx, 'pink');
-    n.connect(filter(ctx, 'lowpass', 9000)).connect(gain(ctx, 0.58)).connect(out);
+    const head = calm(ctx, out, { top: 9000, cut: -3 });
+    const n = source(ctx, noiseBuffer(ctx, 'pink'), 1);
+    n.connect(gain(ctx, 0.98)).connect(head);
     return [n];
   },
 
   brown: (ctx, out) => {
-    const n = noise(ctx, 'brown');
-    n.connect(filter(ctx, 'lowpass', 1400)).connect(gain(ctx, 0.52)).connect(out);
+    const head = calm(ctx, out, { top: 9000, cut: 0 });
+    const n = source(ctx, noiseBuffer(ctx, 'brown'), 1);
+    n.connect(gain(ctx, 0.80)).connect(head);
     return [n];
   }
 };
 
 /* ----------------------------------------------------------------- tests */
 
+/* A small radix-2 FFT, enough to measure what the recipes are actually
+   putting out. In-place, real input, magnitudes returned. */
+function spectrum(samples) {
+  const n = 1 << Math.floor(Math.log2(samples.length));
+  const re = new Float64Array(n);
+  const im = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    // Hann window, so the bins mean something.
+    re[i] = samples[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1)));
+  }
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wr = Math.cos(ang);
+    const wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const ur = re[i + k], ui = im[i + k];
+        const vr = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci;
+        const vi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr;
+        re[i + k] = ur + vr; im[i + k] = ui + vi;
+        re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
+        const ncr = cr * wr - ci * wi;
+        ci = cr * wi + ci * wr; cr = ncr;
+      }
+    }
+  }
+  const mag = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) mag[i] = Math.hypot(re[i], im[i]);
+  return mag;
+}
+
 /**
- * Renders one recipe offline and reports what came out. Used by the test
- * suite: it needs no sound hardware and runs faster than real time, so the
- * steady bed of each sound can be checked for being present, finite and not
- * clipped. The random events are on timers and do not fire in an offline
- * render, which is why this measures the bed rather than the detail.
+ * Renders a recipe offline and measures the things the design is trying to
+ * control: how much of it sits in the band that grates, how brittle the top
+ * end is, and how much the level moves at the rate that draws the ear.
+ *
+ * Not a substitute for listening, but it does catch the two mistakes that
+ * made the first versions sound like static — energy piled into 2–5 kHz, and
+ * movement in the seconds-and-under range.
  */
-export async function measureAmbience(id, seconds = 2) {
+export async function measureAmbience(id, seconds = 4) {
   const recipe = RECIPES[id];
   if (!recipe) return null;
   const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -492,6 +456,7 @@ export async function measureAmbience(id, seconds = 2) {
 
   const rendered = await ctx.startRendering();
   const d = rendered.getChannelData(0);
+
   let peak = 0, sum = 0, bad = 0;
   for (let i = 0; i < d.length; i++) {
     const v = d[i];
@@ -500,31 +465,67 @@ export async function measureAmbience(id, seconds = 2) {
     if (a > peak) peak = a;
     sum += v * v;
   }
-  /* A rough three-band balance, so two sounds can be compared as numbers
-     rather than by ear alone: one-pole filters are plenty for this. */
-  let lo = 0, hi = 0, lp = 0, prev = 0, hp = 0;
-  const aLo = Math.exp(-2 * Math.PI * 300 / rate);
-  const aHi = Math.exp(-2 * Math.PI * 2000 / rate);
-  for (let i = 0; i < d.length; i++) {
-    const v = Number.isFinite(d[i]) ? d[i] : 0;
-    lp = aLo * lp + (1 - aLo) * v;
-    lo += lp * lp;
-    hp = aHi * (hp + v - prev);
-    prev = v;
-    hi += hp * hp;
-  }
   const rms = Math.sqrt(sum / d.length);
-  const loR = Math.sqrt(lo / d.length);
-  const hiR = Math.sqrt(hi / d.length);
-  const total = loR + hiR || 1;
+
+  // Spectrum, averaged over the second half so start-up ramps are excluded.
+  const from = Math.floor(d.length / 2);
+  const win = 1 << 14;
+  const bands = { low: 0, mid: 0, sharp: 0, bright: 0, total: 0 };
+  let frames = 0;
+  for (let off = from; off + win < d.length; off += win) {
+    const mag = spectrum(d.subarray(off, off + win));
+    const hz = rate / win;
+    for (let i = 1; i < mag.length; i++) {
+      const f = i * hz;
+      const e = mag[i] * mag[i];
+      bands.total += e;
+      if (f < 300) bands.low += e;
+      else if (f < 2000) bands.mid += e;
+      else if (f < 5000) bands.sharp += e;      // the band that drives annoyance
+      else bands.bright += e;
+    }
+    frames++;
+  }
+  const share = (x) => (bands.total ? +(x / bands.total).toFixed(4) : 0);
+
+  /* How much the level moves between 0.5 and 8 Hz — the rate at which
+     fluctuation is most noticeable, and the rate a focus sound should not
+     have. Envelope sampled at 100 Hz, then its own spectrum. */
+  const frameLen = Math.floor(rate / 100);
+  const envN = 1 << Math.floor(Math.log2(Math.floor(d.length / frameLen)));
+  const env = new Float64Array(envN);
+  for (let i = 0; i < envN; i++) {
+    let s = 0;
+    for (let k = 0; k < frameLen; k++) s += d[i * frameLen + k] ** 2;
+    env[i] = Math.sqrt(s / frameLen);
+  }
+  let mean = 0;
+  for (let i = 0; i < envN; i++) mean += env[i];
+  mean /= envN || 1;
+  for (let i = 0; i < envN; i++) env[i] -= mean;
+
+  const envMag = spectrum(env);
+  const envHz = 100 / envN;
+  let fluct = 0, envTotal = 0;
+  for (let i = 1; i < envMag.length; i++) {
+    const f = i * envHz;
+    const e = envMag[i] * envMag[i];
+    envTotal += e;
+    if (f >= 0.5 && f <= 8) fluct += e;
+  }
 
   return {
-    peak: +peak.toFixed(4),
     rms: +rms.toFixed(4),
-    crest: +(rms > 0 ? peak / rms : 0).toFixed(2),
-    bands: `${Math.round((loR / total) * 100)}% low / ${Math.round((hiR / total) * 100)}% high`,
+    peak: +peak.toFixed(4),
     nonFinite: bad,
-    samples: d.length
+    frames,
+    low: share(bands.low),
+    mid: share(bands.mid),
+    sharp: share(bands.sharp),
+    bright: share(bands.bright),
+    // Movement at the rate that nags, relative to the mean level.
+    fluctuation: mean > 0 ? +(Math.sqrt(fluct / (envN || 1)) / mean).toFixed(4) : 0,
+    fluctShare: envTotal ? +(fluct / envTotal).toFixed(4) : 0
   };
 }
 
@@ -542,12 +543,11 @@ export function createAmbiencePlayer() {
   let current = null;
   let level = 0.6;
 
-  const teardown = () => {
-    for (const n of nodes) {
+  const teardown = (list) => {
+    for (const n of list) {
       try { if (typeof n.stop === 'function') n.stop(); } catch {}
       try { if (typeof n.disconnect === 'function') n.disconnect(); } catch {}
     }
-    nodes = [];
   };
 
   return {
@@ -556,7 +556,7 @@ export function createAmbiencePlayer() {
 
     setVolume(v) {
       level = Math.max(0, Math.min(1, v));
-      if (master) master.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
+      if (master && ctx) master.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
     },
 
     stop() {
@@ -570,12 +570,7 @@ export function createAmbiencePlayer() {
       }
       const dying = nodes;
       nodes = [];
-      setTimeout(() => {
-        for (const n of dying) {
-          try { if (typeof n.stop === 'function') n.stop(); } catch {}
-          try { if (typeof n.disconnect === 'function') n.disconnect(); } catch {}
-        }
-      }, 500);
+      setTimeout(() => teardown(dying), 500);
     },
 
     play(id) {
@@ -591,19 +586,20 @@ export function createAmbiencePlayer() {
       if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
       this.stop();
-      teardown();
 
       master = gain(ctx, 0.0001);
       master.connect(ctx.destination);
       nodes = recipe(ctx, master).filter(Boolean);
-      master.gain.linearRampToValueAtTime(level, ctx.currentTime + 0.8);
+      // Longer than a fade needs to be, so arriving is not itself an event.
+      master.gain.linearRampToValueAtTime(level, ctx.currentTime + 1.6);
       current = id;
       return true;
     },
 
     dispose() {
       this.stop();
-      teardown();
+      teardown(nodes);
+      nodes = [];
       if (ctx) { try { ctx.close(); } catch {} ctx = null; }
     }
   };

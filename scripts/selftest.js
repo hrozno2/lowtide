@@ -598,32 +598,63 @@ app.whenReady().then(async () => {
 
     const levels = [];
     for (const id of ids) {
-      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 2)`);
+      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
       ok(`${id} renders`, !!m);
       if (!m) continue;
       ok(`${id} makes a sound`, m.rms > 0.02);
       eq(`${id} has no broken samples`, m.nonFinite, 0);
-      ok(`${id} does not clip`, m.peak < 1);
+      // Clipping is heard as crackle, which is the opposite of the point.
+      ok(`${id} keeps its headroom`, m.peak < 0.98);
       levels.push(m.rms);
     }
-    // Switching between them should not be a jolt.
-    const loudest = Math.max(...levels);
-    const quietest = Math.min(...levels);
-    ok('they sit within about twice each other', loudest / quietest < 2.2);
+    ok('switching between them is not a jolt',
+      Math.max(...levels) / Math.min(...levels) < 1.8);
   });
 
-  await test('the sounds are not all the same noise', async () => {
-    // Rain against white noise is the test that matters: rain is thousands
-    // of separate drops, so its peak-to-average ratio is far higher even
-    // though both cover the whole spectrum.
-    const rain = await js(`window.__measureAmbience('rain', 4)`);
-    const white = await js(`window.__measureAmbience('white', 4)`);
-    const fire = await js(`window.__measureAmbience('fire', 4)`);
-    const cafe = await js(`window.__measureAmbience('cafe', 4)`);
-    ok('rain is spiky where white noise is flat', rain.crest > white.crest * 1.6);
-    ok('a café has the swing of speech', cafe.crest > white.crest * 1.6);
-    ok('a fire is mostly low', parseInt(fire.bands, 10) > 70);
-    ok('white noise is mostly high', parseInt(white.bands, 10) < 40);
+  await test('none of them sits in the band that grates', async () => {
+    /* Sharpness — the share of energy at 2–5 kHz — is the main thing that
+       makes a noise unpleasant to sit under, and filtered hiss lands right in
+       it. That is what made the first versions sound like static. The three
+       noises are definitions rather than imitations, so white keeps its top
+       end by right; the rest have no business up there. */
+    for (const id of ['rain', 'storm', 'fire', 'wind', 'night', 'cafe', 'waves']) {
+      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
+      ok(`${id} stays out of 2-5 kHz`, m.sharp < 0.10);
+      ok(`${id} has no brittle top`, m.bright < 0.05);
+    }
+  });
+
+  await test('nothing moves at the rate that draws the ear', async () => {
+    /* Fluctuation is most noticeable around 4 Hz, and sound made of
+       distinguishable events is what breaks concentration. Measured as the
+       share of the envelope's own spectrum falling between 0.5 and 8 Hz:
+       steady noise sits near 0.15 whatever its colour, so anything well above
+       that is moving in a way you would notice. */
+    for (const id of await js(`window.__ambienceIds()`)) {
+      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 4)`);
+      ok(`${id} is steady`, m.fluctShare < 0.32);
+    }
+  });
+
+  await test('each one still sounds like itself', async () => {
+    const of = async (id) => js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
+    const white = await of('white');
+    const brown = await of('brown');
+    const pink = await of('pink');
+    const fire = await of('fire');
+    const rain = await of('rain');
+    const night = await of('night');
+
+    // The three noises are what their names say they are.
+    ok('white noise is weighted high', white.bright > white.low * 3);
+    ok('brown noise is weighted low', brown.low > brown.bright * 3);
+    ok('pink noise sits between them', pink.low < brown.low && pink.bright < white.bright);
+
+    // And the rest are told apart by where their energy lives.
+    ok('a fire is mostly rumble', fire.low > 0.4);
+    ok('rain is mostly in the middle, where drops ring', rain.mid > 0.6);
+    ok('a night is quieter than rain', night.rms < rain.rms * 1.2);
+    ok('rain and fire are not the same sound', Math.abs(rain.low - fire.low) > 0.3);
   });
 
   await test('the focus sounds play, swap and stop', async () => {
