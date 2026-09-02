@@ -8,6 +8,7 @@ import { paginate, geometryFor } from './pagination.js';
 import { OUTLINE_TEMPLATES, templateById } from './outlines.js';
 import { countWords, stripMarkup } from './markup.js';
 import * as ui from './panels.js';
+import { showAppMenu, renderMenuBar, forgetMenu, closeMenu } from './appmenu.js';
 import { THEMES, swatches, applyTheme } from './themes.js';
 import { AMBIENCES, createAmbiencePlayer, measureAmbience } from './ambience.js';
 import { REVISION_COLOURS, colourById, applyRevisions, restoreMarks,
@@ -144,6 +145,13 @@ function applyPrefs(p, prev) {
   if (changed('fontSize')) css.setProperty('--doc-size', `${p.fontSize}px`);
   if (changed('lineHeight')) css.setProperty('--doc-lh', String(p.lineHeight));
   if (changed('pageWidth')) css.setProperty('--doc-width', `${p.pageWidth}px`);
+
+  if (changed('menuStyle')) {
+    const bar = p.menuStyle === 'bar';
+    document.body.classList.toggle('menu-bar', bar);
+    closeMenu();
+    if (bar) renderMenuBar();
+  }
 
   document.body.classList.toggle('nav-open', p.navigatorOpen !== false);
   document.body.classList.toggle('status-on', p.statusBar !== false);
@@ -1481,13 +1489,37 @@ function renderMusicFiles(body) {
   let tracks = state.tracks || [];
   let index = 0;
 
+  const trouble = ui.h('div', { class: 'music-error', hidden: true });
+
   const play = (i) => {
     if (!tracks[i]) return;
     index = i;
-    player.src = `file://${encodeURI(tracks[i].path).replace(/#/g, '%23')}`;
-    player.play().catch(() => {});
+    trouble.hidden = true;
+    // Built in the main process, where the escaping can be done properly.
+    player.src = tracks[i].url || `file://${encodeURI(tracks[i].path).replace(/#/g, '%23')}`;
+    player.play().catch((err) => {
+      trouble.textContent = `Could not play ${tracks[i].name}: ${err && err.message ? err.message : err}`;
+      trouble.hidden = false;
+    });
     paint();
   };
+
+  /* Failures used to be swallowed, so a file that would not play looked like
+     an app that did nothing. Whatever the reason — a codec this build does not
+     carry, a path it cannot reach — say so. */
+  const REASON = {
+    1: 'loading was aborted',
+    2: 'the file could not be read',
+    3: 'the file could not be decoded — this build may not carry that codec',
+    4: 'that format is not supported here'
+  };
+  player.addEventListener('error', () => {
+    const err = player.error;
+    const track = tracks[index];
+    trouble.textContent = `Could not play ${track ? track.name : 'that file'}: ` +
+      `${(err && REASON[err.code]) || 'unknown error'}.`;
+    trouble.hidden = false;
+  });
 
   const paint = () => {
     list.textContent = '';
@@ -1521,7 +1553,7 @@ function renderMusicFiles(body) {
         class: 'text-btn',
         onclick: () => { tracks = []; state.tracks = []; player.pause(); player.removeAttribute('src'); paint(); }
       }, 'Clear')),
-    player, amb, list);
+    player, trouble, amb, list);
 
   paint();
 }
@@ -2034,10 +2066,7 @@ function wireChrome() {
     b.onclick = () => exportAs(b.dataset.export);
   });
 
-  $('btn-appmenu').onclick = (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    api.win.menu(r.left, r.bottom);
-  };
+  $('btn-appmenu').onclick = (e) => showAppMenu(e.currentTarget);
   $('wc-min').onclick = () => api.win.minimize();
   $('wc-max').onclick = () => api.win.maximize();
   $('wc-close').onclick = () => api.win.close();
@@ -2079,6 +2108,7 @@ function ctx() {
   return {
     prefs: state.prefs,
     setPrefs,
+    platform: api.platform,
     sprint,
     themes: { THEMES, swatches },
     revisionColours: REVISION_COLOURS,

@@ -2,9 +2,10 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, shell, nativeTheme, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const os = require('os');
 const { getPrefs, getSession, docEntry, setDocEntry, addRecent } = require('./store');
-const { buildMenu } = require('./menu');
+const { buildMenu, describeMenu, invokeMenuItem } = require('./menu');
 const backups = require('./backups');
 const { buildDocx } = require('./docx');
 const { checkForUpdate } = require('./updates');
@@ -619,6 +620,8 @@ ipcMain.handle('win:maximize', (e) => {
   w.isMaximized() ? w.unmaximize() : w.maximize();
 });
 ipcMain.handle('win:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close());
+ipcMain.handle('menu:describe', () => describeMenu());
+ipcMain.handle('menu:invoke', (e, id) => invokeMenuItem(id));
 ipcMain.handle('win:menu', (e, { x, y }) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   const menu = Menu.getApplicationMenu();
@@ -714,7 +717,14 @@ ipcMain.handle('music:pick', async (e) => {
     filters: [{ name: 'Audio', extensions: ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus'] }]
   });
   if (result.canceled) return [];
-  return result.filePaths.map((p) => ({ path: p, name: path.basename(p).replace(/\.[^.]+$/, '') }));
+  /* The URL is built here rather than in the renderer: pathToFileURL gets the
+     escaping right for spaces, #, ? and non-ASCII names, and on Linux those
+     are exactly the paths a hand-rolled encodeURI leaves broken. */
+  return result.filePaths.map((p) => ({
+    path: p,
+    url: pathToFileURL(p).href,
+    name: path.basename(p).replace(/\.[^.]+$/, '')
+  }));
 });
 
 /* ------------------------------------------------------------- spelling */

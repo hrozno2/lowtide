@@ -392,6 +392,12 @@ export function showPreferences(ctx) {
     row('Hide the distractions', 'Comments, likes, recommendations and the shorts bar',
       toggle(p.youtubeMinimal !== false, (v) => set({ youtubeMinimal: v }))),
 
+    ...(ctx.platform === 'darwin' ? [] : [
+      row('Menu', 'A button in the title bar, or the menus written out along it',
+        segmented([['button', 'Button'], ['bar', 'Menu bar']],
+          p.menuStyle === 'bar' ? 'bar' : 'button', (v) => set({ menuStyle: v })))
+    ]),
+
     row('Check for updates on launch', 'Asks GitHub for the newest release; installs nothing',
       toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))),
 

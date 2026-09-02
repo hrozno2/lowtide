@@ -25,6 +25,7 @@ const DEFAULTS = {
   youtubeEnabled: true,
   youtubeMinimal: true,
   musicVolume: 1,
+  menuStyle: 'button',      // 'button' | 'bar' — Windows and Linux only
   statusBar: true,
   readingSpeed: 275,
   // Print template. The defaults describe a typical printed novel page;

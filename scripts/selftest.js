@@ -774,6 +774,100 @@ app.whenReady().then(async () => {
     }
   });
 
+  /* ========================================================== the menu === */
+  group = 'Application menu';
+
+  await test('the menu can be drawn by the app', async () => {
+    const tree = await js(`window.api.menu.describe()`);
+    ok('there are menus', tree.length >= 5);
+    for (const label of ['File', 'Edit', 'Format', 'View', 'Help']) {
+      ok(`${label} is there`, tree.some((t) => t.label === label));
+    }
+    const file = tree.find((t) => t.label === 'File');
+    ok('File has items', file.submenu.length > 3);
+    ok('every item can be invoked',
+      file.submenu.every((i) => i.type === 'separator' || !!i.id));
+    ok('accelerators come through',
+      file.submenu.some((i) => (i.accelerator || '').length > 0));
+  });
+
+  await test('choosing an item does the work', async () => {
+    // Drawn here, done by the real menu — which is how roles keep working.
+    const before = await js(`document.body.classList.contains('nav-open')`);
+    await js(`(async () => {
+      const tree = await window.api.menu.describe();
+      const view = tree.find((t) => t.label === 'View');
+      const item = view.submenu.find((i) => /navigator/i.test(i.label || ''));
+      return window.api.menu.invoke(item.id); })()`);
+    await wait(400);
+    eq('the command ran', await js(`document.body.classList.contains('nav-open')`), !before);
+    await js(`(async () => {
+      const tree = await window.api.menu.describe();
+      const view = tree.find((t) => t.label === 'View');
+      const item = view.submenu.find((i) => /navigator/i.test(i.label || ''));
+      return window.api.menu.invoke(item.id); })()`);
+    await wait(400);
+  });
+
+  await test('the button menu steps into one menu at a time', async () => {
+    await js(`document.body.classList.remove('mac'); document.body.classList.add('linux'); true`);
+    await wait(150);
+    await click('#btn-appmenu');
+    await wait(500);
+
+    const top = await js(`(() => { const m = document.querySelector('.appmenu');
+      return m ? { rows: m.querySelectorAll('.menu-row').length,
+                   labels: [...m.querySelectorAll('.menu-label')].map(x => x.textContent) } : null; })()`);
+    ok('it opens', !!top);
+    ok('it lists the menus rather than every item', top.rows < 12);
+    ok('File is one of them', top.labels.some((l) => l === 'File'));
+
+    await js(`(() => { const rows = [...document.querySelectorAll('.appmenu .menu-row')];
+      const f = rows.find(r => r.textContent.trim().startsWith('File')); f.click(); return true; })()`);
+    await wait(350);
+    const inner = await js(`(() => { const m = document.querySelector('.appmenu');
+      return { rows: m.querySelectorAll('.menu-row').length,
+               hasBack: !!m.querySelector('.menu-back') }; })()`);
+    ok('stepping in shows that menu', inner.rows > 3);
+    eq('with a way back', inner.hasBack, true);
+
+    await js(`document.querySelector('.appmenu .menu-back').click()`);
+    await wait(300);
+    ok('and back out again',
+      (await js(`document.querySelectorAll('.appmenu .menu-row').length`)) < 12);
+
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
+    await wait(250);
+    eq('clicking away closes it', await js(`!!document.querySelector('.appmenu')`), false);
+  });
+
+  await test('the menu bar writes the menus out along the title bar', async () => {
+    await js(`window.__setPref('menuStyle','bar')`);
+    await wait(500);
+    const bar = await js(`(() => { const b = document.getElementById('menubar');
+      return { labels: [...b.querySelectorAll('.menubar-item')].map(x => x.textContent),
+               shown: getComputedStyle(b).display !== 'none',
+               buttonHidden: getComputedStyle(document.getElementById('btn-appmenu')).display === 'none' }; })()`);
+    eq('the bar is shown', bar.shown, true);
+    eq('and the button stands down', bar.buttonHidden, true);
+    ok('the menus are written out', bar.labels.includes('Format'));
+
+    await js(`[...document.querySelectorAll('.menubar-item')].find(b => b.textContent === 'Format').click()`);
+    await wait(400);
+    ok('one of them opens', (await js(`document.querySelectorAll('.appmenu .menu-row').length`)) > 4);
+    eq('and is marked while open',
+      await js(`!!document.querySelector('.menubar-item.on')`), true);
+
+    await js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    await wait(250);
+    eq('Escape closes it', await js(`!!document.querySelector('.appmenu')`), false);
+
+    await js(`window.__setPref('menuStyle','button')`);
+    await wait(300);
+    await js(`document.body.classList.remove('linux'); document.body.classList.add('mac'); true`);
+    await wait(150);
+  });
+
   /* ==================================================== line heights ==== */
   group = 'Line heights';
 

@@ -141,7 +141,48 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
     }
   ];
 
-  return Menu.buildFromTemplate(template);
+  return Menu.buildFromTemplate(stamp(template));
 }
 
-module.exports = { buildMenu };
+/* Every item gets an id on the way through, so the renderer can draw the menu
+   itself and still ask the real one to do the work — roles included, which no
+   amount of serialised data could carry on its own. */
+let counter = 0;
+function stamp(items) {
+  for (const item of items) {
+    if (item.type === 'separator') continue;
+    if (!item.id) item.id = `m${counter++}`;
+    if (item.submenu) stamp(item.submenu);
+  }
+  return items;
+}
+
+/** The built menu as plain data: what to draw, and the id to invoke. */
+function describeMenu() {
+  const menu = Menu.getApplicationMenu();
+  if (!menu) return [];
+
+  const walk = (items) => items.map((item) => ({
+    id: item.id || null,
+    label: (item.label || '').replace(/&/g, ''),
+    sublabel: item.sublabel || '',
+    accelerator: item.accelerator || item.userAccelerator || '',
+    type: item.type,
+    enabled: item.enabled !== false,
+    checked: !!item.checked,
+    submenu: item.submenu ? walk(item.submenu.items) : null
+  }));
+
+  return walk(menu.items);
+}
+
+/** Runs the item the renderer's drawing stands for. */
+function invokeMenuItem(id) {
+  const menu = Menu.getApplicationMenu();
+  const item = menu && menu.getMenuItemById(id);
+  if (!item || item.enabled === false) return false;
+  item.click();
+  return true;
+}
+
+module.exports = { buildMenu, describeMenu, invokeMenuItem };

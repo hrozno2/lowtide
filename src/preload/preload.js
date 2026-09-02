@@ -55,6 +55,10 @@ contextBridge.exposeInMainWorld('api', {
     native: () => ipcRenderer.invoke('lookup:native')
   },
 
+  menu: {
+    describe: () => ipcRenderer.invoke('menu:describe'),
+    invoke: (id) => ipcRenderer.invoke('menu:invoke', id)
+  },
   music: {
     pick: () => ipcRenderer.invoke('music:pick'),
     openExternal: (url) => ipcRenderer.invoke('music:open-external', url)

@@ -56,6 +56,56 @@ input[type="range"], input[type="checkbox"], input[type="radio"] { line-height: 
 
 .tb-side { display: flex; align-items: center; gap: 2px; -webkit-app-region: no-drag; }
 
+/* The menu bar, when it is set to hang in the window rather than behind a
+   button. Hidden by default; the button is hidden instead when it is on. */
+.menubar { display: none; align-items: center; gap: 1px; -webkit-app-region: no-drag; }
+body.menu-bar .menubar { display: flex; }
+body.menu-bar #btn-appmenu { display: none; }
+body.mac .menubar { display: none; }
+
+.menubar-item {
+  padding: 4px 9px; border-radius: var(--radius-sm);
+  color: var(--text-2); font-size: 12.5px; line-height: 1.3;
+  white-space: nowrap;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.menubar-item:hover { background: var(--surface-3); color: var(--text); }
+.menubar-item.on { background: var(--surface-4); color: var(--text); }
+
+/* The drawn menu itself, in either shape. */
+.appmenu {
+  position: fixed; z-index: 60;
+  min-width: 216px; max-width: 340px;
+  padding: 6px;
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+  box-shadow: var(--shadow-2);
+  overflow-y: auto;
+  animation: bloom 120ms var(--ease);
+}
+.menu-row {
+  display: flex; align-items: center; gap: 16px; justify-content: space-between;
+  width: 100%; padding: 5px 9px;
+  border-radius: 6px;
+  color: var(--text-2); font-size: 12.5px; line-height: 1.35; text-align: left;
+}
+.menu-row:hover:not(.off) { background: var(--primary-dim); color: var(--text); }
+.menu-row.off { color: var(--text-4); }
+.menu-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-key { flex: 0 0 auto; font-size: 11px; color: var(--text-4); font-variant-numeric: tabular-nums; }
+.menu-row:hover:not(.off) .menu-key { color: var(--text-2); }
+.menu-sep { height: 1px; margin: 5px 8px; background: var(--outline-soft); }
+.menu-head {
+  padding: 8px 9px 4px;
+  font-size: 10px; line-height: 1.4; font-weight: 600; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--text-4);
+}
+.menu-head:first-child { padding-top: 3px; }
+.menu-back { color: var(--text-4); }
+.menu-back:hover { background: var(--surface-3); color: var(--text-2); }
+
 /* Keeps the app menu from reading as one of the document buttons next to it. */
 .tb-sep {
   width: 1px; height: 15px; margin: 0 5px;
@@ -536,6 +586,12 @@ body:not(.nav-open) .sidebar { margin-left: calc(-1 * var(--nav-w)); opacity: 0;
 .music-bar { flex: 0 0 auto; display: flex; gap: 8px; align-items: center; padding: 8px 12px; }
 .music-bar .filter-input { margin: 0; }
 .music-player { width: calc(100% - 24px); margin: 4px 12px 8px; }
+.music-error {
+  flex: 0 0 auto; margin: 0 12px 8px; padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3); border: 1px solid var(--outline);
+  color: var(--text-2); font-size: 11.5px; line-height: 1.5;
+}
 .music-list { flex: 1 1 auto; overflow-y: auto; padding: 0 8px 16px; }
 .music-track {
   display: block; width: 100%; text-align: left;
