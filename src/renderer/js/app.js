@@ -2046,9 +2046,11 @@ async function checkForUpdate({ force = false } = {}) {
 
 let unsubUpdateEvents = null;
 
-/* mac downloads through the browser, same as always. Windows and Linux
-   (AppImage) can fetch and install the new build themselves, so the same
-   button there means "download and restart" instead of "open a page". */
+/* mac installed by hand downloads through the browser, same as always. mac
+   installed via Homebrew updates through brew instead, so the button there
+   just hands over the command rather than opening a page brew users don't
+   need. Windows and Linux (AppImage) can fetch and install the new build
+   themselves, so the same button there means "download and restart". */
 function showUpdateBar(info) {
   const bar = $('update-bar');
   const text = $('update-text');
@@ -2061,7 +2063,19 @@ function showUpdateBar(info) {
   if (unsubUpdateEvents) { unsubUpdateEvents(); unsubUpdateEvents = null; }
   button.disabled = false;
 
-  if (!info.auto || !api.update.download) {
+  if (info.homebrew) {
+    text.append(document.createTextNode(' Installed via Homebrew — run '),
+                ui.h('code', {}, 'brew upgrade lowtide'),
+                document.createTextNode('.'));
+    button.textContent = 'Copy command';
+    button.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText('brew upgrade lowtide');
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy command'; }, 2000);
+      } catch { ui.toast('Could not copy — run: brew upgrade lowtide'); }
+    };
+  } else if (!info.auto || !api.update.download) {
     button.textContent = 'Download';
     button.onclick = () => api.update.open(info.url);
   } else {

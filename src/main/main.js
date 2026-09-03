@@ -815,12 +815,32 @@ function broadcast(channel, payload) {
   BrowserWindow.getAllWindows().forEach((w) => w.webContents.send(channel, payload));
 }
 
+/* Homebrew Cask copies the .app straight into /Applications with nothing left
+   behind that this process could inspect, so there's no reliable way to tell
+   from the running app alone. Asking `brew` itself is the honest way — by
+   full path, since a GUI app launched from Finder doesn't inherit the shell
+   PATH Homebrew installs itself onto. */
+function isHomebrewInstalled() {
+  if (!isMac) return false;
+  for (const brew of ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']) {
+    if (!fs.existsSync(brew)) continue;
+    try {
+      const out = require('child_process')
+        .execFileSync(brew, ['list', '--cask', '--versions', 'lowtide'], { timeout: 3000 })
+        .toString();
+      if (out.trim()) return true;
+    } catch { /* not installed via this brew */ }
+  }
+  return false;
+}
+
 ipcMain.handle('update:check', async (e, opts) => {
   // A harness can inject a result so the notice can be tested offline.
   if (process.env.LOWTIDE_FAKE_UPDATE) {
     return { checked: true, available: true, version: process.env.LOWTIDE_FAKE_UPDATE,
              current: app.getVersion(), url: 'https://github.com/hrozno2/lowtide/releases',
-             notes: 'Test release.', auto: usesAutoUpdater() };
+             notes: 'Test release.', auto: usesAutoUpdater(),
+             homebrew: process.env.LOWTIDE_FAKE_HOMEBREW ? true : isHomebrewInstalled() };
   }
   try {
     let result;
@@ -835,7 +855,10 @@ ipcMain.handle('update:check', async (e, opts) => {
         force: !!(opts && opts.force)
       });
     }
-    if (result && result.checked) result.auto = usesAutoUpdater();
+    if (result && result.checked) {
+      result.auto = usesAutoUpdater();
+      result.homebrew = process.env.LOWTIDE_FAKE_HOMEBREW ? true : isHomebrewInstalled();
+    }
     return result;
   } catch (err) {
     return { checked: false, reason: err.message };
