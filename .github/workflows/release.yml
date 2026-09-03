@@ -26,7 +26,15 @@ jobs:
       # README's Install table) — the app itself still never auto-updates on
       # mac (see usesAutoUpdater() in src/main/main.js), so the update-metadata
       # file electron-builder uploads alongside it is simply never read.
-      - run: npm run build:renderer && npx electron-builder --mac --publish always
+      #
+      # hdiutil detach on the mounted dmg volume is a known-flaky step on
+      # GitHub's macOS runners (intermittent "Resource busy"); retry the whole
+      # build+publish rather than fail the release over a transient mount race.
+      - uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          command: npm run build:renderer && npx electron-builder --mac --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -69,6 +77,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # The pacman target shells out to bsdtar (via fpm) to build the package's
+      # MTREE metadata; it isn't on the runner's default image.
+      - run: sudo apt-get update && sudo apt-get install -y libarchive-tools
       - run: npm ci
       - run: npm run dist:linux:publish
         env:
