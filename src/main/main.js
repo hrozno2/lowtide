@@ -521,27 +521,6 @@ ipcMain.handle('backup:snapshot', (e, { path: filePath, content }) => {
   return backups.snapshot(filePath, content, { force: true });
 });
 
-/* A file:// document can't fetch/XHR a sibling file — Chromium refuses it
-   even same-directory, isolation or no. The focus-sound recordings are
-   small (a couple MB each) and few, so reading them here and handing the
-   bytes across IPC is simpler than standing up a custom protocol for it. */
-const AUDIO_DIR = path.join(__dirname, '..', 'renderer', 'audio');
-const AUDIO_FILES = {
-  thunder: 'thunder.ogg',
-  waves: 'waves.ogg',
-  garden: 'garden-stream.ogg'
-};
-ipcMain.handle('audio:load', (e, name) => {
-  const file = AUDIO_FILES[name];
-  if (!file) return null;
-  try {
-    const buf = fs.readFileSync(path.join(AUDIO_DIR, file));
-    // Buffer is a view into a possibly-shared, possibly-larger pool; only
-    // this slice of the underlying ArrayBuffer is actually the file.
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-  } catch { return null; }
-});
-
 ipcMain.handle('doc:extras', (e, path) => (path ? docEntry(path) : {}));
 ipcMain.handle('doc:extras-set', (e, { path, patch }) => {
   if (!path) return null;
