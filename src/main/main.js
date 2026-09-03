@@ -830,7 +830,20 @@ ipcMain.handle('spell:set-languages', (e, languages) => {
 // mac keeps the notice-and-link path, since an unsigned, unnotarised build
 // can't self-update reliably through Squirrel.Mac. Also false when running
 // unpackaged (electron-updater needs a real, packaged app to check against).
-const usesAutoUpdater = () => !isMac && app.isPackaged;
+//
+// On Linux specifically, electron-builder's fpm target only writes the
+// "package-type" marker electron-updater needs for deb/rpm — not for pacman
+// or tar.gz, which is what this app actually ships. Without that marker,
+// electron-updater defaults to AppImageUpdater regardless of how the app was
+// really installed, and on a non-AppImage install that fails immediately
+// (no APPIMAGE env var) — silently, since the startup check doesn't surface
+// errors unless asked to force a check. APPIMAGE is set by the AppImage
+// runtime itself, so its presence is what actually tells the two apart.
+const usesAutoUpdater = () => {
+  if (isMac || !app.isPackaged) return false;
+  if (process.platform === 'win32') return true;
+  return !!process.env.APPIMAGE;
+};
 
 function broadcast(channel, payload) {
   BrowserWindow.getAllWindows().forEach((w) => w.webContents.send(channel, payload));
