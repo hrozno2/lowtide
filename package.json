@@ -171,7 +171,8 @@
     "publish": {
       "provider": "github",
       "owner": "hrozno2",
-      "repo": "lowtide"
+      "repo": "lowtide",
+      "releaseType": "release"
     }
   },
   "repository": {
