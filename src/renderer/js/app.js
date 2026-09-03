@@ -10,7 +10,6 @@ import { countWords, stripMarkup } from './markup.js';
 import * as ui from './panels.js';
 import { showAppMenu, renderMenuBar, forgetMenu, closeMenu } from './appmenu.js';
 import { THEMES, swatches, applyTheme } from './themes.js';
-import { AMBIENCES, createAmbiencePlayer, measureAmbience } from './ambience.js';
 import { REVISION_COLOURS, colourById, applyRevisions, restoreMarks,
          dropRevision, serialiseMarks, revisionCounts,
          revertRevision, applyRevision, rangesOf, keepMarks } from './revisions.js';
@@ -60,9 +59,6 @@ const debounce = (fn, ms) => {
 /* Set when the music pane exists, so a theme change can repaint the guest.
    Declared up here because applyPrefs reads it on the very first paint. */
 let repaintMusic = null;
-
-/* Built once and kept: closing the music pane should not stop the sound. */
-const ambience = createAmbiencePlayer();
 
 /* ------------------------------------------------------------------ boot */
 
@@ -116,9 +112,6 @@ const ambience = createAmbiencePlayer();
   window.__moveSection = (i, slot) => moveSection(i, slot);
   window.__sectionRange = (i) => sectionRange(i);
   window.__musicThemeCss = musicThemeCss;
-  window.__ambience = ambience;
-  window.__measureAmbience = measureAmbience;
-  window.__ambienceIds = () => AMBIENCES.map((a) => a.id);
 
   // after the editor is up, never before
   setTimeout(() => checkForUpdate(), 3000);
@@ -1509,7 +1502,6 @@ function showMusicPane(mode) {
 function renderMusicFiles(body) {
   const player = ui.h('audio', { controls: true, class: 'music-player' });
   const list = ui.h('div', { class: 'music-list' });
-  const amb = renderAmbience();
   let tracks = state.tracks || [];
   let index = 0;
 
@@ -1577,7 +1569,7 @@ function renderMusicFiles(body) {
         class: 'text-btn',
         onclick: () => { tracks = []; state.tracks = []; player.pause(); player.removeAttribute('src'); paint(); }
       }, 'Clear')),
-    player, trouble, amb, list);
+    player, trouble, list);
 
   paint();
 }
@@ -1691,47 +1683,6 @@ function musicThemeCss() {
   `;
 
   return state.prefs.youtubeMinimal === false ? palette : palette + minimal;
-}
-
-/* The bundled focus sounds. They are generated rather than played back, so
-   there is no file to run out — see ambience.js. */
-function renderAmbience() {
-  const wrap = ui.h('div', { class: 'amb' });
-  const rows = ui.h('div', { class: 'amb-list' });
-
-  const paint = () => {
-    rows.querySelectorAll('.amb-btn').forEach((b) => {
-      b.classList.toggle('on', b.dataset.amb === ambience.playing);
-    });
-    stopBtn.hidden = !ambience.playing;
-  };
-
-  const stopBtn = ui.h('button', {
-    class: 'text-btn', onclick: () => { ambience.stop(); paint(); }
-  }, 'Stop');
-
-  for (const a of AMBIENCES) {
-    rows.append(ui.h('button', {
-      class: 'amb-btn', 'data-amb': a.id, title: a.hint,
-      onclick: () => { ambience.play(a.id); paint(); }
-    }, a.name));
-  }
-
-  const vol = ui.h('input', {
-    type: 'range', min: 0, max: 100, value: String(Math.round(ambience.volume * 100)),
-    class: 'amb-vol', title: 'Focus sound volume',
-    oninput: (e) => ambience.setVolume(Number(e.target.value) / 100)
-  });
-
-  wrap.append(
-    ui.h('div', { class: 'amb-head' },
-      ui.h('span', { class: 'amb-title' }, 'Focus sounds'),
-      stopBtn),
-    rows,
-    ui.h('div', { class: 'amb-foot' }, vol));
-
-  paint();
-  return wrap;
 }
 
 /**

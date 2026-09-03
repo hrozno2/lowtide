@@ -26,7 +26,6 @@ const sections = [...packages].sort().map((name) => {
 });
 
 const font = readFileSync('src/renderer/fonts/OFL.txt', 'utf8').trim();
-const audio = readFileSync('src/renderer/audio/CREDITS.md', 'utf8').trim();
 
 writeFileSync('THIRD-PARTY-NOTICES.md', `# Third-party notices
 
@@ -47,12 +46,6 @@ SIL Open Font License 1.1 — https://quoteunquoteapps.com/courierprime/
 \`\`\`
 ${font}
 \`\`\`
-
----
-
-# Audio
-
-${audio}
 
 ---
 

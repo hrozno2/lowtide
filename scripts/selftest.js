@@ -171,10 +171,6 @@ app.whenReady().then(async () => {
   wc = win.webContents;
   js = (code) => wc.executeJavaScript(code, true);
 
-  /* The focus sounds are real audio out of the speakers, and a test run should
-     not make a noise. Everything they are checked for still holds at zero. */
-  await js(`window.__ambience && window.__ambience.setVolume(0)`);
-
   /* ===================================================== formatting ===== */
   group = 'Formatting';
 
@@ -599,116 +595,6 @@ app.whenReady().then(async () => {
 
     await js(`window.__applyTheme('material')`);
     await wait(250);
-  });
-
-  /* ==================================================== focus sounds ==== */
-  group = 'Focus sounds';
-
-  await test('every sound renders, and none of them is silent or clipped', async () => {
-    const ids = await js(`window.__ambienceIds()`);
-    eq('eleven of them are offered', ids.length, 11);
-    ok('a fireplace among them', ids.includes('fire'));
-
-    const levels = [];
-    for (const id of ids) {
-      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
-      ok(`${id} renders`, !!m);
-      if (!m) continue;
-      ok(`${id} makes a sound`, m.rms > 0.02);
-      eq(`${id} has no broken samples`, m.nonFinite, 0);
-      // Clipping is heard as crackle, which is the opposite of the point.
-      ok(`${id} keeps its headroom`, m.peak < 0.98);
-      levels.push(m.rms);
-    }
-    ok('switching between them is not a jolt',
-      Math.max(...levels) / Math.min(...levels) < 1.8);
-  });
-
-  await test('none of them sits in the band that grates', async () => {
-    /* Sharpness — the share of energy at 2–5 kHz — is the main thing that
-       makes a noise unpleasant to sit under, and filtered hiss lands right in
-       it. That is what made the first versions sound like static. The three
-       noises are definitions rather than imitations, so white keeps its top
-       end by right; the rest have no business up there. */
-    for (const id of ['rain', 'storm', 'fire', 'wind', 'night', 'cafe', 'waves', 'garden']) {
-      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
-      ok(`${id} stays out of 2-5 kHz`, m.sharp < 0.10);
-      ok(`${id} has no brittle top`, m.bright < 0.05);
-    }
-  });
-
-  await test('nothing moves at the rate that draws the ear', async () => {
-    /* Fluctuation is most noticeable around 4 Hz, and sound made of
-       distinguishable events is what breaks concentration. Measured as the
-       share of the envelope's own spectrum falling between 0.5 and 8 Hz:
-       steady noise sits near 0.15 whatever its colour, so anything well above
-       that is moving in a way you would notice. */
-    for (const id of await js(`window.__ambienceIds()`)) {
-      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 4)`);
-      ok(`${id} is steady`, m.fluctShare < 0.32);
-    }
-  });
-
-  await test('none of them is a point between your ears', async () => {
-    /* Noise that is identical in both channels images as a dot in the middle
-       of your head and is wearing to sit under for an hour. Every sound here
-       is generated separately per channel, so it has no location — which is
-       how weather actually arrives, and much easier to stop hearing. */
-    for (const id of await js(`window.__ambienceIds()`)) {
-      const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
-      ok(`${id} is spread across both ears`, Math.abs(m.correlation) < 0.3);
-    }
-  });
-
-  await test('each one still sounds like itself', async () => {
-    const of = async (id) => js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
-    const white = await of('white');
-    const brown = await of('brown');
-    const pink = await of('pink');
-    const fire = await of('fire');
-    const rain = await of('rain');
-    const night = await of('night');
-
-    // The three noises are what their names say they are.
-    ok('white noise is weighted high', white.bright > white.low * 3);
-    ok('brown noise is weighted low', brown.low > brown.bright * 3);
-    ok('pink noise sits between them', pink.low < brown.low && pink.bright < white.bright);
-
-    // And the rest are told apart by where their energy lives.
-    ok('a fire is mostly rumble', fire.low > 0.4);
-    ok('rain is mostly in the middle, where drops ring', rain.mid > 0.6);
-    ok('a night is quieter than rain', night.rms < rain.rms * 1.2);
-    ok('rain and fire are not the same sound', Math.abs(rain.low - fire.low) > 0.3);
-  });
-
-  await test('the focus sounds play, swap and stop', async () => {
-    await click('#btn-music');
-    await wait(800);
-    eq('the buttons are there', await js(`document.querySelectorAll('.amb-btn').length`), 11);
-    eq('nothing plays to begin with', await js(`window.__ambience.playing`), null);
-    ok('the stop button is put away', await js(`document.querySelector('.amb .text-btn').hidden`));
-
-    await js(`document.querySelector('.amb-btn[data-amb="rain"]').click()`);
-    await wait(600);
-    eq('rain starts', await js(`window.__ambience.playing`), 'rain');
-    eq('and is the one marked', await js(`document.querySelector('.amb-btn.on').dataset.amb`), 'rain');
-
-    await js(`document.querySelector('.amb-btn[data-amb="cafe"]').click()`);
-    await wait(600);
-    eq('picking another swaps to it', await js(`window.__ambience.playing`), 'cafe');
-    eq('only one is marked', await js(`document.querySelectorAll('.amb-btn.on').length`), 1);
-
-    await js(`document.querySelector('.amb-btn[data-amb="cafe"]').click()`);
-    await wait(600);
-    eq('picking the same one stops it', await js(`window.__ambience.playing`), null);
-    eq('nothing is marked', await js(`document.querySelectorAll('.amb-btn.on').length`), 0);
-
-    await js(`window.__ambience.setVolume(0.3)`);
-    await wait(200);
-    eq('the volume can be set', await js(`window.__ambience.volume`), 0.3);
-    await js(`window.__ambience.setVolume(5)`);
-    eq('and is held inside its range', await js(`window.__ambience.volume`), 1);
-    await js(`window.__ambience.setVolume(0.6)`);
   });
 
   /* ======================================================= side panels == */
@@ -1810,25 +1696,19 @@ app.whenReady().then(async () => {
     eq('the outline dock is not involved',
       await js(`document.getElementById('side-dock').hidden`), true);
 
-    await js(`document.querySelector('.amb-btn[data-amb="rain"]').click()`);
-    await wait(700);
-    eq('something is playing', await js(`window.__ambience.playing`), 'rain');
     const had = await js(`document.querySelectorAll('webview.yt-view').length`);
 
     await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(500);
     eq('clicking away puts it away', await js(`!!document.querySelector('.panel .music-body')`), false);
-    eq('but the sound carries on', await js(`window.__ambience.playing`), 'rain');
     eq('and the browser view is still there',
       await js(`document.querySelectorAll('webview.yt-view').length`), had);
     eq('the button goes out', await js(`document.getElementById('btn-music').classList.contains('on')`), false);
 
     await click('#btn-music');
     await wait(700);
-    eq('reopening finds it as it was', await js(`window.__ambience.playing`), 'rain');
-    eq('with its focus sounds intact', await js(`document.querySelectorAll('.amb-btn').length`), 11);
+    ok('reopening finds it as it was', await js(`!!document.querySelector('.panel .music-body')`));
 
-    await js(`window.__ambience.stop()`);
     await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(300);
   });

@@ -87,15 +87,11 @@ away and works offline.
 
 ![Synonyms in the sidebar](docs/screen-reference.png)
 
-**Sound.** Ten focus sounds are built in — rain, thunder, a fireplace, wind,
-night, a coffee shop, waves, and white, pink and brown noise. They are
-synthesised as they play rather than looped from a recording, so they run for
-as long as you leave them and never come back round to the same place. You can
-also play audio files from your machine, or browse YouTube in a pane, repainted
-in your theme with the comments, likes, recommendations and shorts stripped
-out, which leaves the search box and the player. Closing the pane hides it
-rather than stopping it, so whatever is playing keeps playing. YouTube can be
-switched off entirely.
+**Sound.** Play audio files from your machine, or browse YouTube in a pane,
+repainted in your theme with the comments, likes, recommendations and shorts
+stripped out, which leaves the search box and the player. Closing the pane
+hides it rather than stopping it, so whatever is playing keeps playing.
+YouTube can be switched off entirely.
 
 **Scratchpad.** Notes about the document, kept with it, never printed or counted.
 
@@ -194,15 +190,10 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 - The dictionary queries dictionaryapi.dev and datamuse.com. Only the single
   word is sent, the request comes from the main process rather than the editor,
   and the feature can be switched off.
-- The focus sounds are generated from noise and filters, not played back from
-  files. That is why they can run indefinitely without repeating and add
-  nothing to the download, and it means there is no third-party audio in here
-  and no licence to pass on.
 - The music pane shows YouTube's own site, with its palette overridden to match
   the current theme. Taking only the audio is against their terms, so it is not
-  done; use local files or a focus sound if you want sound with nothing to look
-  at. There is no Spotify tab — its web player needs DRM that Electron does not
-  ship.
+  done; use local files if you want sound with nothing to look at. There is no
+  Spotify tab — its web player needs DRM that Electron does not ship.
 
 ## Development
 
