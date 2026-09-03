@@ -8,7 +8,8 @@ const { getPrefs, getSession, docEntry, setDocEntry, addRecent } = require('./st
 const { buildMenu, describeMenu, invokeMenuItem } = require('./menu');
 const backups = require('./backups');
 const { buildDocx } = require('./docx');
-const { checkForUpdate, initAutoUpdater, checkForUpdateAuto } = require('./updates');
+const { checkForUpdate, initAutoUpdater, checkForUpdateAuto,
+        findBrew, installPacman, installHomebrew } = require('./updates');
 const { TEMPLATES, SAMPLES, templateBody } = require('./templates');
 // app.getVersion() reports Electron's version when running unpackaged.
 const APP_VERSION = require('../../package.json').version;
@@ -830,21 +831,27 @@ function broadcast(channel, payload) {
 
 /* Homebrew Cask copies the .app straight into /Applications with nothing left
    behind that this process could inspect, so there's no reliable way to tell
-   from the running app alone. Asking `brew` itself is the honest way — by
-   full path, since a GUI app launched from Finder doesn't inherit the shell
-   PATH Homebrew installs itself onto. */
+   from the running app alone. Asking `brew` itself is the honest way. */
 function isHomebrewInstalled() {
   if (!isMac) return false;
-  for (const brew of ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']) {
-    if (!fs.existsSync(brew)) continue;
-    try {
-      const out = require('child_process')
-        .execFileSync(brew, ['list', '--cask', '--versions', 'lowtide'], { timeout: 3000 })
-        .toString();
-      if (out.trim()) return true;
-    } catch { /* not installed via this brew */ }
-  }
-  return false;
+  const brew = findBrew();
+  if (!brew) return false;
+  try {
+    const out = require('child_process')
+      .execFileSync(brew, ['list', '--cask', '--versions', 'lowtide'], { timeout: 3000 })
+      .toString();
+    return !!out.trim();
+  } catch { return false; }
+}
+
+/* Same question for pacman: does the package database think it owns the
+   binary that's actually running right now? */
+function isPacmanInstalled() {
+  if (process.platform !== 'linux') return false;
+  try {
+    require('child_process').execFileSync('pacman', ['-Qo', process.execPath], { timeout: 3000 });
+    return true;
+  } catch { return false; }
 }
 
 ipcMain.handle('update:check', async (e, opts) => {
@@ -853,7 +860,8 @@ ipcMain.handle('update:check', async (e, opts) => {
     return { checked: true, available: true, version: process.env.LOWTIDE_FAKE_UPDATE,
              current: app.getVersion(), url: 'https://github.com/hrozno2/lowtide/releases',
              notes: 'Test release.', auto: usesAutoUpdater(),
-             homebrew: process.env.LOWTIDE_FAKE_HOMEBREW ? true : isHomebrewInstalled() };
+             homebrew: process.env.LOWTIDE_FAKE_HOMEBREW ? true : isHomebrewInstalled(),
+             pacman: process.env.LOWTIDE_FAKE_PACMAN ? true : isPacmanInstalled() };
   }
   try {
     let result;
@@ -871,6 +879,7 @@ ipcMain.handle('update:check', async (e, opts) => {
     if (result && result.checked) {
       result.auto = usesAutoUpdater();
       result.homebrew = process.env.LOWTIDE_FAKE_HOMEBREW ? true : isHomebrewInstalled();
+      result.pacman = process.env.LOWTIDE_FAKE_PACMAN ? true : isPacmanInstalled();
     }
     return result;
   } catch (err) {
@@ -894,6 +903,36 @@ ipcMain.handle('update:install', () => {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.quitAndInstall();
   return true;
+});
+
+/* pacman and Homebrew both need one privileged command to actually update —
+   neither is something electron-updater knows how to drive — so these run
+   it directly and report back rather than leaving the person to find a
+   terminal. Each puts up the OS's own permission prompt (polkit or macOS's
+   admin dialog); nothing here bypasses that. */
+ipcMain.handle('update:install-pacman', async (e) => {
+  try {
+    await installPacman(require('../../package.json'), (fraction) => {
+      BrowserWindow.fromWebContents(e.sender)?.webContents.send('update:install-progress', { percent: fraction * 100 });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+});
+
+ipcMain.handle('update:install-homebrew', async () => {
+  try {
+    await installHomebrew();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+});
+
+ipcMain.handle('update:restart', () => {
+  app.relaunch();
+  app.exit();
 });
 
 ipcMain.handle('app:dropbox', () => ({ root: dropboxRoot() }));

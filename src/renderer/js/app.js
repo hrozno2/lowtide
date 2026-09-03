@@ -1997,11 +1997,43 @@ async function checkForUpdate({ force = false } = {}) {
 
 let unsubUpdateEvents = null;
 
-/* mac installed by hand downloads through the browser, same as always. mac
-   installed via Homebrew updates through brew instead, so the button there
-   just hands over the command rather than opening a page brew users don't
-   need. Windows and Linux (AppImage) can fetch and install the new build
-   themselves, so the same button there means "download and restart". */
+/* A button that runs one privileged command (pkexec pacman -U, or a
+   Homebrew upgrade behind macOS's admin prompt) and reports back, rather
+   than a download+separate-install pair — there's no partial state to show
+   progress through in between. `install` does the work; `onProgress`, if
+   given, gets a 0-100 number to render while it runs. */
+function wirePrivilegedInstall(button, install, onProgress) {
+  const idle = button.textContent;
+  return async () => {
+    button.disabled = true;
+    button.textContent = onProgress ? 'Downloading…' : 'Installing…';
+    const offProgress = onProgress
+      ? api.update.onInstallProgress((p) => {
+          const pct = Math.round(p.percent || 0);
+          // 100% of the download, then a silent stretch while pkexec runs —
+          // worth its own label rather than sitting at "100%" looking stuck.
+          button.textContent = pct >= 100 ? 'Installing…' : `Downloading… ${pct}%`;
+        })
+      : null;
+    const result = await install();
+    if (offProgress) offProgress();
+    if (result && result.ok) {
+      button.textContent = 'Restart now';
+      button.disabled = false;
+      button.onclick = () => api.update.restart();
+    } else {
+      button.disabled = false;
+      button.textContent = idle;
+      ui.toast(`Update failed: ${(result && result.reason) || 'unknown error'}`);
+    }
+  };
+}
+
+/* mac installed by hand, and Linux installed from the tar.gz, download
+   through the browser like always — there's no package manager to hand the
+   file to. mac via Homebrew and Linux via pacman both update in place, each
+   behind that platform's own permission prompt. Windows and a real AppImage
+   fetch and install the new build themselves through electron-updater. */
 function showUpdateBar(info) {
   const bar = $('update-bar');
   const text = $('update-text');
@@ -2015,17 +2047,13 @@ function showUpdateBar(info) {
   button.disabled = false;
 
   if (info.homebrew) {
-    text.append(document.createTextNode(' Installed via Homebrew — run '),
-                ui.h('code', {}, 'brew upgrade lowtide'),
-                document.createTextNode('.'));
-    button.textContent = 'Copy command';
-    button.onclick = async () => {
-      try {
-        await navigator.clipboard.writeText('brew upgrade lowtide');
-        button.textContent = 'Copied';
-        setTimeout(() => { button.textContent = 'Copy command'; }, 2000);
-      } catch { ui.toast('Could not copy — run: brew upgrade lowtide'); }
-    };
+    text.append(document.createTextNode(' Installed via Homebrew — updating needs your password.'));
+    button.textContent = 'Update & Restart';
+    button.onclick = wirePrivilegedInstall(button, () => api.update.installHomebrew());
+  } else if (info.pacman) {
+    text.append(document.createTextNode(' Installed via pacman — updating needs your password.'));
+    button.textContent = 'Update & Restart';
+    button.onclick = wirePrivilegedInstall(button, () => api.update.installPacman(), true);
   } else if (!info.auto || !api.update.download) {
     button.textContent = 'Download';
     button.onclick = () => api.update.open(info.url);

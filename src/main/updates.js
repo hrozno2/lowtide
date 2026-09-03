@@ -1,10 +1,24 @@
 /* Update checking.
  *
- * Low Tide does not install anything by itself: it asks GitHub whether a newer
- * release exists and, if so, offers a link. That works on every platform we
- * ship to, needs no code signing, and never touches the running app.
+ * Low Tide asks GitHub whether a newer release exists and, on most platforms,
+ * offers a link — no code signing needed, and the running app is untouched
+ * until you choose to leave it. Windows and a real AppImage go further and
+ * self-install through electron-updater. A pacman install and a Homebrew
+ * cask can't do that (there's no electron-updater support for either), but
+ * both still need something better than "go find the file yourself": the
+ * installPacman/installHomebrew functions below run the one privileged
+ * command each format actually needs — pkexec pacman -U, or a Homebrew
+ * upgrade — behind the OS's own permission prompt (polkit, or macOS's admin
+ * dialog), never silently.
  */
 'use strict';
+
+const https = require('https');
+const fs = require('fs');
+const fsp = require('fs/promises');
+const os = require('os');
+const path = require('path');
+const { execFile } = require('child_process');
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;   // at most four times a day
 const TIMEOUT_MS = 6000;
@@ -147,7 +161,110 @@ function checkForUpdateAuto(currentVersion) {
   });
 }
 
+/* Homebrew Cask copies the .app straight into /Applications with nothing left
+   behind that this process could inspect, so there's no reliable way to tell
+   from the running app alone. Asking `brew` itself is the honest way — by
+   full path, since a GUI app launched from Finder doesn't inherit the shell
+   PATH Homebrew installs itself onto. */
+const BREW_PATHS = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'];
+function findBrew() {
+  return BREW_PATHS.find((p) => fs.existsSync(p)) || null;
+}
+
+function run(cmd, args) {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { timeout: 5 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || err.message || '').trim() || `${cmd} failed`));
+      else resolve(stdout);
+    });
+  });
+}
+
+/** Follows redirects itself: GitHub's release-asset URLs 302 to a signed S3
+    link, and a plain https.get does not chase that on its own. */
+function httpGet(url, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'low-tide-updater' } }, (res) => {
+      const loc = res.headers.location;
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && loc && redirectsLeft > 0) {
+        res.resume();
+        resolve(httpGet(new URL(loc, url).toString(), redirectsLeft - 1));
+        return;
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error(`GitHub returned ${res.statusCode} for ${url}`));
+        return;
+      }
+      resolve(res);
+    }).on('error', reject);
+  });
+}
+
+/** The matching asset from the latest release, or null. `namePattern` is
+    matched against each asset's file name (e.g. /-linux-x64\.pacman$/). */
+async function findReleaseAsset(slug, namePattern) {
+  const release = await fetchLatest(slug);
+  const asset = release && Array.isArray(release.assets)
+    ? release.assets.find((a) => namePattern.test(a.name))
+    : null;
+  return asset ? { url: asset.browser_download_url, name: asset.name, size: asset.size } : null;
+}
+
+/** Downloads to a temp file, reporting 0..1 progress as bytes arrive. */
+async function downloadToTemp(url, onProgress) {
+  const res = await httpGet(url);
+  const total = Number(res.headers['content-length']) || 0;
+  const dest = path.join(os.tmpdir(), `lowtide-update-${Date.now()}-${path.basename(new URL(url).pathname)}`);
+  const out = fs.createWriteStream(dest);
+  let received = 0;
+  await new Promise((resolve, reject) => {
+    res.on('data', (chunk) => {
+      received += chunk.length;
+      if (onProgress && total) onProgress(received / total);
+    });
+    res.on('error', reject);
+    out.on('error', reject);
+    out.on('finish', resolve);
+    res.pipe(out);
+  });
+  return dest;
+}
+
+/**
+ * Downloads the release's pacman package and installs it with pkexec, which
+ * puts up polkit's own graphical password prompt — the one step that can't
+ * be skipped, since writing into /opt and pacman's database needs root no
+ * matter who asks. --noconfirm because pkexec gives pacman no terminal to
+ * prompt on for the "proceed? [Y/n]" it would otherwise ask.
+ */
+async function installPacman(pkg, onProgress) {
+  const slug = repoSlug(pkg);
+  const asset = slug && await findReleaseAsset(slug, /-linux-x64\.pacman$/);
+  if (!asset) throw new Error('no pacman package found in the latest release');
+  const file = await downloadToTemp(asset.url, onProgress);
+  try {
+    await run('pkexec', ['pacman', '-U', '--noconfirm', file]);
+  } finally {
+    fsp.unlink(file).catch(() => {});
+  }
+}
+
+/**
+ * Runs the Homebrew upgrade behind macOS's own admin-password dialog. A
+ * personal-tap cask upgrade does not actually need elevation — Homebrew
+ * itself never wants sudo — but asking anyway keeps this the same shape as
+ * the Linux path: a real, visible gate in front of anything that changes
+ * the app on its own, rather than a click that just does it.
+ */
+async function installHomebrew() {
+  const brew = findBrew();
+  if (!brew) throw new Error('Homebrew was not found');
+  const script = `do shell script "${brew} upgrade lowtide" with administrator privileges`;
+  await run('osascript', ['-e', script]);
+}
+
 module.exports = {
   checkForUpdate, compareVersions, parseVersion, repoSlug, CHECK_INTERVAL_MS,
-  initAutoUpdater, checkForUpdateAuto
+  initAutoUpdater, checkForUpdateAuto, findBrew, installPacman, installHomebrew
 };
