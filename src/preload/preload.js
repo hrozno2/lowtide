@@ -69,6 +69,10 @@ contextBridge.exposeInMainWorld('api', {
     signIn: (partition) => ipcRenderer.invoke('music:sign-in', partition)
   },
 
+  audio: {
+    load: (name) => ipcRenderer.invoke('audio:load', name)
+  },
+
   spell: {
     languages: () => ipcRenderer.invoke('spell:languages'),
     setLanguages: (langs) => ipcRenderer.invoke('spell:set-languages', langs)

@@ -40,7 +40,8 @@ export const AMBIENCES = [
   { id: 'wind',  name: 'Wind',        hint: 'Air moving around the building' },
   { id: 'night', name: 'Night',       hint: 'Summer night, far from a road' },
   { id: 'cafe',  name: 'Coffee shop', hint: 'The wash of a room full of people' },
-  { id: 'waves', name: 'Waves',       hint: 'Slow surf' },
+  { id: 'waves',  name: 'Waves',  hint: 'Slow surf' },
+  { id: 'garden', name: 'Garden', hint: 'A stream over stones' },
   { id: 'white', name: 'White noise', hint: 'Flat, with the top taken off' },
   { id: 'pink',  name: 'Pink noise',  hint: 'Softer than white' },
   { id: 'brown', name: 'Brown noise', hint: 'Deep, low and dull' }
@@ -209,6 +210,67 @@ function drift(ctx, param, centre, depth, period) {
   return lfo;
 }
 
+/* ------------------------------------------------------------ real texture
+ *
+ * Three recipes (storm, waves, garden) blend one real, CC0-licensed field
+ * recording in under the synthesis — see src/renderer/audio/CREDITS.md.
+ * Loop-safe files (a short crossfade already baked into the seam), decoded
+ * once and cached. `cafe` stays fully synthesized on purpose: every real
+ * crowd recording still carries the odd intelligible word, and looped for an
+ * hour that is exactly the kind of countable event this file exists to
+ * avoid.
+ *
+ * A recipe that asks before the decode lands, or in a context with no audio
+ * device at all, gets `null` back and just plays its procedural layers alone
+ * — same as it always has.
+ */
+
+const SAMPLE_NAMES = ['thunder', 'waves', 'garden'];
+
+const sampleBuffers = new Map();   // name -> decoded AudioBuffer
+let preloadPromise = null;
+
+function preloadSamples() {
+  if (preloadPromise) return preloadPromise;
+  preloadPromise = Promise.all(SAMPLE_NAMES.map(async (name) => {
+    try {
+      if (typeof window === 'undefined' || !window.api?.audio) return;
+      const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OC) return;
+      // A file:// document can't fetch/XHR its own sibling files — Chromium
+      // refuses that regardless of isolation — so the bytes come from main
+      // over IPC instead (see main.js's audio:load handler).
+      const bytes = await window.api.audio.load(name);
+      if (!bytes) return;
+      // A throwaway 1-sample context: decodeAudioData is the only thing it's
+      // for, and unlike AudioContext it never touches an output device or
+      // waits on a user gesture.
+      const buf = await new OC(1, 1, 44100).decodeAudioData(bytes);
+      sampleBuffers.set(name, buf);
+    } catch {
+      // Missing asset, a stripped-down window.api, or a browser with no
+      // decoder for it — the recipe that wanted this just stays
+      // procedural-only.
+    }
+  }));
+  return preloadPromise;
+}
+
+/* Looped playback of a decoded sample, or null if it isn't loaded (yet, or
+   ever). Callers filter(Boolean) the same way they already do for the timers
+   and conditional nodes elsewhere in this file. */
+function sampleSource(ctx, name) {
+  const buf = sampleBuffers.get(name);
+  if (!buf) return null;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  src.start();
+  return src;
+}
+
+preloadSamples();
+
 /* --------------------------------------------------------------- recipes */
 
 const RECIPES = {
@@ -253,6 +315,16 @@ const RECIPES = {
     const g = gain(ctx, 0.0001);
     rumble.connect(shape).connect(g).connect(head);
 
+    /* A real recording folded in under the synthetic rumble, sharing its
+       gain envelope: the roll below gates both, so real thunder texture
+       inherits the same slow rise-and-fall rather than needing its own. */
+    const thunderSample = sampleSource(ctx, 'thunder');
+    if (thunderSample) {
+      const thunderShape = filter(ctx, 'lowpass', 200, 0.8);
+      const thunderTrim = gain(ctx, 0.8);
+      thunderSample.connect(thunderShape).connect(thunderTrim).connect(g);
+    }
+
     /* A soft, distant crack ahead of the rumble — held tightly under 200 Hz
        and given a slow enough attack that it reads as weather a long way off,
        not a clap in the room. Quieter and shorter than the rumble it leads
@@ -283,7 +355,7 @@ const RECIPES = {
       timer = setTimeout(again, (22 + Math.random() * 38) * 1000);
     }, 6000);
 
-    return [...parts, rumble, crackSrc, { stop: () => clearTimeout(timer) }];
+    return [...parts, rumble, crackSrc, thunderSample, { stop: () => clearTimeout(timer) }];
   },
 
   fire: (ctx, out) => {
@@ -407,6 +479,16 @@ const RECIPES = {
     const surfG = gain(ctx, 0.02);
     surf.connect(surfF).connect(surfG).connect(head);
 
+    /* A real recording, folded in at a level well under the synthetic body
+       so it colours the texture rather than taking it over — the swell
+       above stays the one thing that moves. */
+    const waveSample = sampleSource(ctx, 'waves');
+    if (waveSample) {
+      const sampleShape = filter(ctx, 'lowpass', 3200, 0.6);
+      const sampleG = gain(ctx, 0.32);
+      waveSample.connect(sampleShape).connect(sampleG).connect(head);
+    }
+
     const roll = () => {
       const now = ctx.currentTime;
       const rise = 3.4 + Math.random() * 1.8;
@@ -419,9 +501,37 @@ const RECIPES = {
     roll();
     let timer = setInterval(roll, 11000);
 
-    return [body, surf,
+    return [body, surf, waveSample,
       drift(ctx, bodyG.gain, 0.88, 0.14, 21),
       { stop: () => clearInterval(timer) }];
+  },
+
+  garden: (ctx, out) => {
+    const head = calm(ctx, out, { top: 4600, cut: -4 });
+
+    // A little room tone underneath, the way fire and night keep one — never
+    // silent even before the sample below has decoded.
+    const air = source(ctx, noiseBuffer(ctx, 'brown'), 0.75);
+    const airG = gain(ctx, 0.62);
+    air.connect(filter(ctx, 'lowpass', 320, 0.7)).connect(airG).connect(head);
+
+    // The stream itself: real running water, which is the one thing here
+    // that no filter recipe gets right. Its splash lives right in the band
+    // that reads as sharp, so it gets its own shelf ahead of the shared one
+    // — cut harder there specifically — with enough pushed in before both
+    // to still land at the same loudness as everything else. Kept behind
+    // the steady air bed above rather than out front: a real stream
+    // gurgles in bursts, and staying second keeps that movement from
+    // dominating what the ear actually tracks.
+    const streamSample = sampleSource(ctx, 'garden');
+    if (streamSample) {
+      const streamShape = filter(ctx, 'lowpass', 2800, 0.6);
+      const streamShelf = filter(ctx, 'highshelf', 1800, null, -11);
+      const streamG = gain(ctx, 3.6);
+      streamSample.connect(streamShape).connect(streamShelf).connect(streamG).connect(head);
+    }
+
+    return [air, streamSample, drift(ctx, airG.gain, 0.62, 0.1, 29)];
   },
 
   /* The three noises are definitions rather than imitations, so they keep
@@ -504,6 +614,10 @@ export async function measureAmbience(id, seconds = 4) {
   if (!recipe) return null;
   const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   if (!OC) return null;
+
+  // Deterministic either way: a measurement always sees a sample-backed
+  // recipe in the same state, never a race against its own decode.
+  await preloadSamples();
 
   const rate = 44100;
   const ctx = new OC(2, Math.floor(rate * seconds), rate);

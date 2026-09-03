@@ -606,7 +606,7 @@ app.whenReady().then(async () => {
 
   await test('every sound renders, and none of them is silent or clipped', async () => {
     const ids = await js(`window.__ambienceIds()`);
-    eq('ten of them are offered', ids.length, 10);
+    eq('eleven of them are offered', ids.length, 11);
     ok('a fireplace among them', ids.includes('fire'));
 
     const levels = [];
@@ -630,7 +630,7 @@ app.whenReady().then(async () => {
        it. That is what made the first versions sound like static. The three
        noises are definitions rather than imitations, so white keeps its top
        end by right; the rest have no business up there. */
-    for (const id of ['rain', 'storm', 'fire', 'wind', 'night', 'cafe', 'waves']) {
+    for (const id of ['rain', 'storm', 'fire', 'wind', 'night', 'cafe', 'waves', 'garden']) {
       const m = await js(`window.__measureAmbience(${JSON.stringify(id)}, 3)`);
       ok(`${id} stays out of 2-5 kHz`, m.sharp < 0.10);
       ok(`${id} has no brittle top`, m.bright < 0.05);
@@ -684,7 +684,7 @@ app.whenReady().then(async () => {
   await test('the focus sounds play, swap and stop', async () => {
     await click('#btn-music');
     await wait(800);
-    eq('the buttons are there', await js(`document.querySelectorAll('.amb-btn').length`), 10);
+    eq('the buttons are there', await js(`document.querySelectorAll('.amb-btn').length`), 11);
     eq('nothing plays to begin with', await js(`window.__ambience.playing`), null);
     ok('the stop button is put away', await js(`document.querySelector('.amb .text-btn').hidden`));
 
@@ -1826,7 +1826,7 @@ app.whenReady().then(async () => {
     await click('#btn-music');
     await wait(700);
     eq('reopening finds it as it was', await js(`window.__ambience.playing`), 'rain');
-    eq('with its focus sounds intact', await js(`document.querySelectorAll('.amb-btn').length`), 10);
+    eq('with its focus sounds intact', await js(`document.querySelectorAll('.amb-btn').length`), 11);
 
     await js(`window.__ambience.stop()`);
     await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
