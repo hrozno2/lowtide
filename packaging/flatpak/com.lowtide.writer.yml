@@ -1,0 +1,55 @@
+# Draft manifest, verified locally via:
+#   flatpak-builder --user --install --force-clean build-dir packaging/flatpak/com.lowtide.writer.yml
+# No account needed for that. Submitting to Flathub is a separate PR to
+# flathub/flathub and their review — a manual step, not scriptable here.
+#
+# --filesystem=home:rw is broad, and a Flathub reviewer may push back on it —
+# but Low Tide's .fountain/.txt/.md files can live anywhere in the user's
+# home directory (recent-files, Dropbox-folder detection), and Flatpak's
+# default sandbox has no home access at all without it. Narrowing this to a
+# portal-based open/save flow is future work, not done here.
+
+app-id: com.lowtide.writer
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '23.08'
+command: lowtide
+
+finish-args:
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --share=network
+  - --share=ipc
+  - --device=dri
+  - --filesystem=home:rw
+
+modules:
+  - name: lowtide
+    buildsystem: simple
+    sources:
+      - type: archive
+        url: https://github.com/hrozno2/lowtide/releases/download/v1.0.7/LowTide-1.0.7-linux-x86_64.AppImage
+        sha256: REPLACE_WITH_REAL_SHA256_OF_RELEASED_APPIMAGE
+        dest-filename: lowtide.AppImage
+        only-arches: [x86_64]
+      - type: file
+        path: com.lowtide.writer.desktop
+      - type: file
+        path: com.lowtide.writer.metainfo.xml
+      - type: file
+        path: ../../build/icon.png
+    build-commands:
+      - chmod +x lowtide.AppImage
+      - ./lowtide.AppImage --appimage-extract
+      - mv squashfs-root /app/lowtide
+      # AppRun always resolves to the right internal binary regardless of
+      # what electron-builder happened to name it, so symlink to that rather
+      # than guessing the binary's exact filename.
+      - install -d /app/bin
+      - ln -s /app/lowtide/AppRun /app/bin/lowtide
+      - install -Dm644 com.lowtide.writer.desktop /app/share/applications/com.lowtide.writer.desktop
+      - install -Dm644 com.lowtide.writer.metainfo.xml /app/share/metainfo/com.lowtide.writer.metainfo.xml
+      - install -Dm644 icon.png /app/share/icons/hicolor/512x512/apps/com.lowtide.writer.png

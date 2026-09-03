@@ -47,7 +47,11 @@ contextBridge.exposeInMainWorld('api', {
 
   update: {
     check: (opts) => ipcRenderer.invoke('update:check', opts),
-    open: (url) => ipcRenderer.invoke('update:open', url)
+    open: (url) => ipcRenderer.invoke('update:open', url),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onProgress: (fn) => on('update:progress', fn),
+    onDownloaded: (fn) => on('update:downloaded', fn)
   },
 
   lookup: {
@@ -61,7 +65,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   music: {
     pick: () => ipcRenderer.invoke('music:pick'),
-    openExternal: (url) => ipcRenderer.invoke('music:open-external', url)
+    openExternal: (url) => ipcRenderer.invoke('music:open-external', url),
+    signIn: (partition) => ipcRenderer.invoke('music:sign-in', partition)
   },
 
   spell: {

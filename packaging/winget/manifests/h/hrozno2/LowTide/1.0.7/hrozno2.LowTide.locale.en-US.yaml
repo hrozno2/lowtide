@@ -1,0 +1,22 @@
+PackageIdentifier: hrozno2.LowTide
+PackageVersion: 1.0.7
+PackageLocale: en-US
+Publisher: hrozno2
+PublisherUrl: https://github.com/hrozno2
+PackageName: Low Tide
+PackageUrl: https://github.com/hrozno2/lowtide
+License: MIT
+LicenseUrl: https://github.com/hrozno2/lowtide/blob/main/LICENSE
+ShortDescription: A fast, minimal novel writing app
+Description: >-
+  Low Tide keeps your outline, a dictionary and thesaurus, music, and notes
+  inside the app, so writing doesn't mean tabbing away to a browser.
+  Documents stay plain .fountain, .txt or .md files the whole time.
+Tags:
+  - writing
+  - novel
+  - screenwriting
+  - fountain
+  - markdown
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

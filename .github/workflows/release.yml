@@ -1,0 +1,59 @@
+name: Release
+
+# Building and publishing artifacts is scoped to a tag push (v1.2.3) so a
+# normal commit to main never uploads anything. Windows and Linux publish to
+# GitHub Releases so electron-updater has something to check against; mac
+# still builds here (a dmg/zip needs a real Mac to build on) but is never
+# auto-updated by the app, so publishing it is only for the manual-download
+# path already in the README.
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      # Published so the dmg/zip land on the release for manual download (the
+      # README's Install table) — the app itself still never auto-updates on
+      # mac (see usesAutoUpdater() in src/main/main.js), so the update-metadata
+      # file electron-builder uploads alongside it is simply never read.
+      - run: npm run build:renderer && npx electron-builder --mac --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run dist:win:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run dist:linux:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

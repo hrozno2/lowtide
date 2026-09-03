@@ -160,13 +160,15 @@ function source(ctx, buffer, rate = 1) {
 }
 
 /* Two copies at different rates never line up again, so a six-second buffer
-   stops sounding like a six-second buffer. */
+   stops sounding like a six-second buffer. `level` can be a plain number, or
+   a gain node handed in by the caller when it wants to drift that level
+   later (see rain's and fire's slow macro swells). */
 function pair(ctx, buffer, out, level, rateA = 1, rateB = 0.83) {
-  const g = gain(ctx, level);
+  const g = typeof level === 'number' ? gain(ctx, level) : level;
   const a = source(ctx, buffer, rateA);
   const b = source(ctx, buffer, rateB);
   a.connect(g); b.connect(g); g.connect(out);
-  return [a, b];
+  return [a, b, g];
 }
 
 const gain = (ctx, v) => { const g = ctx.createGain(); g.gain.value = v; return g; };
@@ -212,18 +214,31 @@ function drift(ctx, param, centre, depth, period) {
 const RECIPES = {
   rain: (ctx, out) => {
     const head = calm(ctx, out);
-    const drops = grainBuffer(ctx, { rate: 1500, fLo: 300, fHi: 1900, decay: 0.010, target: 0.22 });
-    const fine = grainBuffer(ctx, { rate: 3000, fLo: 900, fHi: 2600, decay: 0.005, click: 0.5, target: 0.12 });
+    // Jittered per play so two sessions of rain are never quite the same grain.
+    const jit = (v, pct) => v * (1 + (Math.random() * 2 - 1) * pct);
+    const drops = grainBuffer(ctx, {
+      rate: jit(1500, 0.05), fLo: 300, fHi: 1900, decay: jit(0.010, 0.10), target: 0.22
+    });
+    const fine = grainBuffer(ctx, {
+      rate: jit(3000, 0.05), fLo: 900, fHi: 2600, decay: jit(0.005, 0.10), click: 0.5, target: 0.12
+    });
 
-    const body = pair(ctx, drops, head, 0.60);
-    const mist = pair(ctx, fine, head, 0.17, 1, 0.77);
+    // Real rain surges and eases over tens of seconds rather than sitting at
+    // one intensity, so the two layers get their own slow, independent drift.
+    const bodyG = gain(ctx, 0.60);
+    const body = pair(ctx, drops, head, bodyG);
+    const mistG = gain(ctx, 0.17);
+    const mist = pair(ctx, fine, head, mistG, 1, 0.77);
 
     // A little air underneath so it sits in a room rather than in a vacuum.
     const bed = source(ctx, noiseBuffer(ctx, 'brown'), 0.9);
     const bedG = gain(ctx, 0.15);
     bed.connect(filter(ctx, 'lowpass', 500, 0.7)).connect(bedG).connect(head);
 
-    return [...body, ...mist, bed, drift(ctx, bedG.gain, 0.15, 0.04, 31)];
+    return [...body, ...mist, bed,
+      drift(ctx, bedG.gain, 0.15, 0.04, 31),
+      drift(ctx, bodyG.gain, 0.60, 0.11, 47),
+      drift(ctx, mistG.gain, 0.17, 0.04, 53)];
   },
 
   storm: (ctx, out) => {
@@ -238,6 +253,15 @@ const RECIPES = {
     const g = gain(ctx, 0.0001);
     rumble.connect(shape).connect(g).connect(head);
 
+    /* A soft, distant crack ahead of the rumble — held tightly under 200 Hz
+       and given a slow enough attack that it reads as weather a long way off,
+       not a clap in the room. Quieter and shorter than the rumble it leads
+       into, so it stays a lead-in rather than a second event to notice. */
+    const crackSrc = source(ctx, noiseBuffer(ctx, 'brown'), 1);
+    const crackShape = filter(ctx, 'lowpass', 180, 1.1);
+    const crackG = gain(ctx, 0.0001);
+    crackSrc.connect(crackShape).connect(crackG).connect(head);
+
     const roll = () => {
       const now = ctx.currentTime;
       const rise = 2.5 + Math.random() * 2.5;
@@ -246,13 +270,20 @@ const RECIPES = {
       g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), now);
       g.gain.linearRampToValueAtTime(0.5 + Math.random() * 0.35, now + rise);
       g.gain.exponentialRampToValueAtTime(0.0001, now + rise + fall);
+
+      const attack = 0.7 + Math.random() * 0.3;
+      const decay = 2.5 + Math.random() * 1.5;
+      crackG.gain.cancelScheduledValues(now);
+      crackG.gain.setValueAtTime(Math.max(0.0001, crackG.gain.value), now);
+      crackG.gain.linearRampToValueAtTime(0.16 + Math.random() * 0.08, now + attack);
+      crackG.gain.exponentialRampToValueAtTime(0.0001, now + attack + decay);
     };
     let timer = setTimeout(function again() {
       roll();
       timer = setTimeout(again, (22 + Math.random() * 38) * 1000);
     }, 6000);
 
-    return [...parts, rumble, { stop: () => clearTimeout(timer) }];
+    return [...parts, rumble, crackSrc, { stop: () => clearTimeout(timer) }];
   },
 
   fire: (ctx, out) => {
@@ -275,11 +306,22 @@ const RECIPES = {
        level still stepped about at a rate the ear follows; at a hundred and
        sixty it is a surface. */
     const ticks = grainBuffer(ctx, { rate: 160, fLo: 180, fHi: 1100, decay: 0.016, click: 0.4, target: 0.24 });
-    const crackle = pair(ctx, ticks, head, 0.26, 1, 0.71);
+    const crackleG = gain(ctx, 0.26);
+    const crackle = pair(ctx, ticks, head, crackleG, 1, 0.71);
 
-    return [burn, hiss, ...crackle,
+    /* A rare, lower, longer-ringing grain — a log settling — blended straight
+       into the same crackle stream at low level rather than surfaced as its
+       own layer, so it thickens the texture instead of becoming a thing you
+       could count. */
+    const pops = grainBuffer(ctx, { rate: 3, fLo: 120, fHi: 380, decay: 0.30, click: 0.2, target: 0.30 });
+    const popMix = pair(ctx, pops, head, 0.045, 1, 0.83);
+
+    return [burn, hiss, ...crackle, ...popMix,
       drift(ctx, burnG.gain, 0.70, 0.10, 23),
-      drift(ctx, hissG.gain, 0.10, 0.03, 37)];
+      drift(ctx, hissG.gain, 0.10, 0.03, 37),
+      // Crackle flares and settles like a log catching, well under the
+      // 0.08 Hz ceiling every other drift here respects.
+      drift(ctx, crackleG.gain, 0.26, 0.09, 17)];
   },
 
   wind: (ctx, out) => {

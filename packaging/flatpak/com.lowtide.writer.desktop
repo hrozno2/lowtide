@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Low Tide
+Comment=A fast, minimal novel writing app
+Exec=lowtide %F
+Icon=com.lowtide.writer
+Terminal=false
+Categories=Office;WordProcessor;
+StartupWMClass=low-tide
+MimeType=text/plain;text/markdown;

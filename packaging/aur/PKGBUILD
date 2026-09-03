@@ -1,0 +1,41 @@
+# Maintainer: hrozno2 <hrozno2@users.noreply.github.com>
+#
+# This file lives in the app's own repo for now — copy it into a fresh AUR
+# git checkout (ssh://aur@aur.archlinux.org/lowtide-bin.git) once there's an
+# AUR account with an SSH key registered to push it from. That account is a
+# one-time manual step on aur.archlinux.org; nothing here can do it for you.
+#
+# Bumping a release: update pkgver, run `updpkgsums` (or fill in the real
+# sha256sums by hand), then `makepkg --printsrcinfo > .SRCINFO` before pushing.
+
+pkgname=lowtide-bin
+pkgver=1.0.7
+pkgrel=1
+pkgdesc="A fast, minimal novel writing app (prebuilt AppImage)"
+arch=('x86_64')
+url="https://github.com/hrozno2/lowtide"
+license=('MIT')
+provides=('lowtide')
+conflicts=('lowtide')
+depends=('gtk3' 'nss' 'alsa-lib')
+source=(
+  "LowTide-${pkgver}-linux-x86_64.AppImage::https://github.com/hrozno2/lowtide/releases/download/v${pkgver}/LowTide-${pkgver}-linux-x86_64.AppImage"
+  "lowtide.desktop"
+  "lowtide.png::https://raw.githubusercontent.com/hrozno2/lowtide/v${pkgver}/build/icon.png"
+)
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP')
+
+package() {
+  install -Dm755 "LowTide-${pkgver}-linux-x86_64.AppImage" "$pkgdir/opt/${pkgname%-bin}/lowtide.AppImage"
+  install -Dm644 "lowtide.desktop" "$pkgdir/usr/share/applications/lowtide.desktop"
+  install -Dm644 "lowtide.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/lowtide.png"
+
+  install -d "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/lowtide" <<'EOF'
+#!/bin/sh
+exec /opt/lowtide/lowtide.AppImage --no-sandbox "$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/lowtide"
+}

@@ -1413,6 +1413,7 @@ const SERVICES = {
     name: 'YouTube',
     home: 'https://m.youtube.com/',
     partition: 'persist:music-youtube',
+    signIn: true,
     search: (q) => `https://m.youtube.com/results?search_query=${encodeURIComponent(q)}`,
     owns: (url) => /^https:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be|google\.com|googleusercontent\.com)\//i.test(url),
     link: (raw) => {
@@ -1786,6 +1787,22 @@ function renderMusicWeb(body, service) {
     onclick: () => api.music.openExternal(web.getURL ? web.getURL() : startUrl)
   }, 'Browser');
 
+  /* Opens a real, separate window sharing this webview's own session, so
+     signing in there hands cookies straight to this view — reload after
+     it closes and the guest just is signed in, nothing else to wire up. */
+  const signIn = service.signIn ? ui.h('button', {
+    class: 'text-btn', title: `Sign in to ${service.name}`,
+    onclick: async (e) => {
+      e.target.disabled = true;
+      try {
+        await api.music.signIn(service.partition);
+        go(service.home);
+      } finally {
+        e.target.disabled = false;
+      }
+    }
+  }, 'Sign in') : null;
+
   const applyZoom = () => {
     const zoom = Math.max(0.4, Math.min(1.2, state.prefs.musicZoom || 0.75));
     try { web.setZoomFactor(zoom); } catch {}
@@ -1916,7 +1933,7 @@ function renderMusicWeb(body, service) {
 
   body.append(
     ui.h('div', { class: 'music-bar' }, back, search),
-    ui.h('div', { class: 'music-bar tight' }, home, openOut,
+    ui.h('div', { class: 'music-bar tight' }, home, openOut, signIn,
       ui.h('span', { class: 'spacer' }), volume, zoomOut, zoomLabel, zoomIn),
     web, status);
 
@@ -2027,14 +2044,45 @@ async function checkForUpdate({ force = false } = {}) {
   showUpdateBar(info);
 }
 
+let unsubUpdateEvents = null;
+
+/* mac downloads through the browser, same as always. Windows and Linux
+   (AppImage) can fetch and install the new build themselves, so the same
+   button there means "download and restart" instead of "open a page". */
 function showUpdateBar(info) {
   const bar = $('update-bar');
   const text = $('update-text');
+  const button = $('update-get');
   text.textContent = '';
   text.append(document.createTextNode('Low Tide '),
               ui.h('b', {}, info.version),
               document.createTextNode(` is available. You have ${info.current}.`));
-  $('update-get').onclick = () => api.update.open(info.url);
+
+  if (unsubUpdateEvents) { unsubUpdateEvents(); unsubUpdateEvents = null; }
+  button.disabled = false;
+
+  if (!info.auto || !api.update.download) {
+    button.textContent = 'Download';
+    button.onclick = () => api.update.open(info.url);
+  } else {
+    button.textContent = 'Download and install';
+    button.onclick = async () => {
+      button.disabled = true;
+      button.textContent = 'Downloading…';
+      const started = await api.update.download();
+      if (!started) { button.disabled = false; button.textContent = 'Download and install'; }
+    };
+    const offProgress = api.update.onProgress((p) => {
+      if (button.disabled) button.textContent = `Downloading… ${Math.round(p.percent || 0)}%`;
+    });
+    const offDownloaded = api.update.onDownloaded(() => {
+      button.disabled = false;
+      button.textContent = 'Restart and install';
+      button.onclick = () => api.update.install();
+    });
+    unsubUpdateEvents = () => { offProgress(); offDownloaded(); };
+  }
+
   $('update-dismiss').onclick = () => {
     bar.hidden = true;
     setPrefs({ updateDismissed: info.version });
