@@ -50,8 +50,12 @@ contextBridge.exposeInMainWorld('api', {
     open: (url) => ipcRenderer.invoke('update:open', url),
     download: () => ipcRenderer.invoke('update:download'),
     install: () => ipcRenderer.invoke('update:install'),
+    installPacman: () => ipcRenderer.invoke('update:install-pacman'),
+    installHomebrew: () => ipcRenderer.invoke('update:install-homebrew'),
+    restart: () => ipcRenderer.invoke('update:restart'),
     onProgress: (fn) => on('update:progress', fn),
-    onDownloaded: (fn) => on('update:downloaded', fn)
+    onDownloaded: (fn) => on('update:downloaded', fn),
+    onInstallProgress: (fn) => on('update:install-progress', fn)
   },
 
   lookup: {
