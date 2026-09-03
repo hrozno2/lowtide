@@ -30,6 +30,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Keeps the (separate, personal) homebrew-lowtide tap current. Quietly does
+  # nothing until HOMEBREW_TAP_TOKEN is set as a repo secret and that tap repo
+  # actually exists — continue-on-error so a missing tap never fails a release.
+  homebrew:
+    needs: mac
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/update-homebrew-tap.mjs "${GITHUB_REF_NAME#v}"
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
   windows:
     runs-on: windows-latest
     permissions:
