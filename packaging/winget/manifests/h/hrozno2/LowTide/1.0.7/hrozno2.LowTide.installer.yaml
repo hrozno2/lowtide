@@ -1,0 +1,17 @@
+# TODO before submitting: replace both InstallerSha256 placeholders with the
+# real sha256 of the released .exe files (`CertUtil -hashfile <file> SHA256`).
+PackageIdentifier: hrozno2.LowTide
+PackageVersion: 1.0.7
+InstallerType: nullsoft
+InstallerSwitches:
+  Silent: "/S"
+  SilentWithProgress: "/S"
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/hrozno2/lowtide/releases/download/v1.0.7/LowTide-1.0.7-win-x64.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+  - Architecture: arm64
+    InstallerUrl: https://github.com/hrozno2/lowtide/releases/download/v1.0.7/LowTide-1.0.7-win-arm64.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.6.0

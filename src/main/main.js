@@ -8,7 +8,7 @@ const { getPrefs, getSession, docEntry, setDocEntry, addRecent } = require('./st
 const { buildMenu, describeMenu, invokeMenuItem } = require('./menu');
 const backups = require('./backups');
 const { buildDocx } = require('./docx');
-const { checkForUpdate } = require('./updates');
+const { checkForUpdate, initAutoUpdater, checkForUpdateAuto } = require('./updates');
 const { TEMPLATES, SAMPLES, templateBody } = require('./templates');
 // app.getVersion() reports Electron's version when running unpackaged.
 const APP_VERSION = require('../../package.json').version;
@@ -727,6 +727,54 @@ ipcMain.handle('music:pick', async (e) => {
   }));
 });
 
+let signInWindow = null;
+
+/* A real, separate desktop window sharing the music webview's own persistent
+   partition — not the mobile-styled <webview> the panel embeds. Signing in
+   here writes cookies straight into that shared session, so closing the
+   window and reloading the panel is all "signed in" needs to mean: no token
+   to hand back, nothing to replicate by hand. */
+ipcMain.handle('music:sign-in', (e, partition) => {
+  const target = typeof partition === 'string' && partition.startsWith('persist:')
+    ? partition : 'persist:music-youtube';
+
+  if (signInWindow && !signInWindow.isDestroyed()) {
+    signInWindow.focus();
+    return Promise.resolve();
+  }
+
+  const owner = BrowserWindow.fromWebContents(e.sender);
+  signInWindow = new BrowserWindow({
+    width: 480,
+    height: 720,
+    parent: owner || undefined,
+    title: 'Sign in',
+    backgroundColor: BG,
+    webPreferences: {
+      partition: target,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  /* A stock desktop Chrome UA, Electron's own signature stripped out: the
+     panel's <webview> forces a mobile UA to get YouTube's light layout, but
+     that (or a UA naming Electron) on a sign-in page reads as an unusual,
+     possibly-unsafe browser to Google. This window should look ordinary. */
+  const ua = signInWindow.webContents.getUserAgent().replace(/\s*low-tide\/\S+/i, '').replace(/\s*Electron\/\S+/i, '');
+  signInWindow.webContents.setUserAgent(ua);
+  signInWindow.webContents.setWindowOpenHandler(({ url }) => ({
+    action: 'allow',
+    overrideBrowserWindowOptions: { webPreferences: { partition: target } }
+  }));
+  signInWindow.loadURL(process.env.LOWTIDE_TEST_SIGNIN_URL || 'https://accounts.google.com/');
+
+  return new Promise((resolve) => {
+    signInWindow.on('closed', () => { signInWindow = null; resolve(); });
+  });
+});
+
 /* ------------------------------------------------------------- spelling */
 
 /**
@@ -757,20 +805,38 @@ ipcMain.handle('spell:set-languages', (e, languages) => {
   return { managedByOS: false, current: ses.getSpellCheckerLanguages() };
 });
 
+// Windows and Linux (AppImage) can fetch and install a new build themselves;
+// mac keeps the notice-and-link path, since an unsigned, unnotarised build
+// can't self-update reliably through Squirrel.Mac. Also false when running
+// unpackaged (electron-updater needs a real, packaged app to check against).
+const usesAutoUpdater = () => !isMac && app.isPackaged;
+
+function broadcast(channel, payload) {
+  BrowserWindow.getAllWindows().forEach((w) => w.webContents.send(channel, payload));
+}
+
 ipcMain.handle('update:check', async (e, opts) => {
   // A harness can inject a result so the notice can be tested offline.
   if (process.env.LOWTIDE_FAKE_UPDATE) {
     return { checked: true, available: true, version: process.env.LOWTIDE_FAKE_UPDATE,
              current: app.getVersion(), url: 'https://github.com/hrozno2/lowtide/releases',
-             notes: 'Test release.' };
+             notes: 'Test release.', auto: usesAutoUpdater() };
   }
   try {
-    return await checkForUpdate({
-      currentVersion: app.getVersion(),
-      pkg: require('../../package.json'),
-      prefs: getPrefs(),
-      force: !!(opts && opts.force)
-    });
+    let result;
+    if (usesAutoUpdater()) {
+      initAutoUpdater((type, payload) => broadcast(`update:${type}`, payload));
+      result = await checkForUpdateAuto(app.getVersion());
+    } else {
+      result = await checkForUpdate({
+        currentVersion: app.getVersion(),
+        pkg: require('../../package.json'),
+        prefs: getPrefs(),
+        force: !!(opts && opts.force)
+      });
+    }
+    if (result && result.checked) result.auto = usesAutoUpdater();
+    return result;
   } catch (err) {
     return { checked: false, reason: err.message };
   }
@@ -779,6 +845,19 @@ ipcMain.handle('update:check', async (e, opts) => {
 ipcMain.handle('update:open', (e, url) => {
   if (/^https:\/\/github\.com\//i.test(url || '')) { shell.openExternal(url); return true; }
   return false;
+});
+
+ipcMain.handle('update:download', async () => {
+  if (!usesAutoUpdater()) return false;
+  const { autoUpdater } = require('electron-updater');
+  try { await autoUpdater.downloadUpdate(); return true; } catch { return false; }
+});
+
+ipcMain.handle('update:install', () => {
+  if (!usesAutoUpdater()) return false;
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.quitAndInstall();
+  return true;
 });
 
 ipcMain.handle('app:dropbox', () => ({ root: dropboxRoot() }));

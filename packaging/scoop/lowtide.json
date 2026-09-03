@@ -1,0 +1,22 @@
+{
+  "version": "1.0.7",
+  "description": "A fast, minimal novel writing app",
+  "homepage": "https://github.com/hrozno2/lowtide",
+  "license": "MIT",
+  "notes": "Draft — meant to live in a personal Scoop bucket repo (e.g. github.com/hrozno2/scoop-lowtide) with this file at bucket/lowtide.json. No review process; `scoop bucket add lowtide https://github.com/hrozno2/scoop-lowtide` then `scoop install lowtide` once that repo exists. Replace the placeholder hash with the real one from `scoop hash <url>` against the actual released .exe.",
+  "url": "https://github.com/hrozno2/lowtide/releases/download/v1.0.7/LowTide-1.0.7-win-x64.exe",
+  "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "innosetup": false,
+  "installer": {
+    "args": ["/S"]
+  },
+  "uninstaller": {
+    "args": ["/S"]
+  },
+  "checkver": {
+    "github": "https://github.com/hrozno2/lowtide"
+  },
+  "autoupdate": {
+    "url": "https://github.com/hrozno2/lowtide/releases/download/v$version/LowTide-$version-win-x64.exe"
+  }
+}

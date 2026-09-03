@@ -94,4 +94,60 @@ async function checkForUpdate({ currentVersion, pkg, prefs, force = false }) {
   };
 }
 
-module.exports = { checkForUpdate, compareVersions, parseVersion, repoSlug, CHECK_INTERVAL_MS };
+/* Windows and the Linux AppImage can install a new build themselves via
+   electron-updater; mac stays on the notice-and-link path above, since an
+   unsigned, unnotarised build can't self-update reliably through Squirrel.Mac.
+   Required lazily so the plain-Node unit tests, which only exercise the pure
+   functions above, never have to load an Electron-aware module. */
+let wired = false;
+
+/** Wires download/install events to a callback, once per process. */
+function initAutoUpdater(onEvent) {
+  const { autoUpdater } = require('electron-updater');
+  if (wired) return autoUpdater;
+  wired = true;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.on('download-progress', (p) => onEvent('progress', {
+    percent: p.percent, bytesPerSecond: p.bytesPerSecond, transferred: p.transferred, total: p.total
+  }));
+  autoUpdater.on('update-downloaded', () => onEvent('downloaded', {}));
+  autoUpdater.on('error', (err) => onEvent('error', { message: err.message }));
+  return autoUpdater;
+}
+
+/**
+ * Runs one electron-updater check and maps it into the same shape
+ * checkForUpdate() returns above, so the renderer doesn't need to know
+ * which path a given platform is on.
+ */
+function checkForUpdateAuto(currentVersion) {
+  const { autoUpdater } = require('electron-updater');
+  return new Promise((resolve) => {
+    const done = (result) => {
+      autoUpdater.removeListener('update-available', onAvailable);
+      autoUpdater.removeListener('update-not-available', onNotAvailable);
+      autoUpdater.removeListener('error', onError);
+      resolve(result);
+    };
+    const onAvailable = (info) => done({
+      checked: true,
+      available: true,
+      version: String(info.version).replace(/^v/i, ''),
+      current: currentVersion,
+      url: `https://github.com/hrozno2/lowtide/releases/tag/v${info.version}`,
+      notes: typeof info.releaseNotes === 'string' ? info.releaseNotes.slice(0, 500) : ''
+    });
+    const onNotAvailable = () => done({ checked: true, available: false });
+    const onError = (err) => done({ checked: false, reason: err.message });
+    autoUpdater.once('update-available', onAvailable);
+    autoUpdater.once('update-not-available', onNotAvailable);
+    autoUpdater.once('error', onError);
+    autoUpdater.checkForUpdates().catch(onError);
+  });
+}
+
+module.exports = {
+  checkForUpdate, compareVersions, parseVersion, repoSlug, CHECK_INTERVAL_MS,
+  initAutoUpdater, checkForUpdateAuto
+};

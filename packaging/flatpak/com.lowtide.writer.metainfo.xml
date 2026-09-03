@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.lowtide.writer</id>
+  <name>Low Tide</name>
+  <summary>A fast, minimal novel writing app</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer_name>hrozno2</developer_name>
+
+  <description>
+    <p>
+      Low Tide keeps your outline, a dictionary and thesaurus, music, and
+      notes inside the app, so writing a novel or screenplay doesn't mean
+      tabbing away to a browser. Documents stay plain .fountain, .txt or .md
+      files the whole time — no database, no lock-in.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">com.lowtide.writer.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/hrozno2/lowtide/main/docs/screen-layout.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/hrozno2/lowtide/main/docs/screen-outline-pages.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/hrozno2/lowtide</url>
+  <url type="bugtracker">https://github.com/hrozno2/lowtide/issues</url>
+
+  <content_rating type="oars-1.1" />
+
+  <!-- TODO: set the real release date before submitting to Flathub -->
+  <releases>
+    <release version="1.0.7" date="2026-01-01" />
+  </releases>
+</component>

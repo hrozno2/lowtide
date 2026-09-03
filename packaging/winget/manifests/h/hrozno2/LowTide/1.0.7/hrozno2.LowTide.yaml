@@ -1,0 +1,8 @@
+# Drafted here; a real submission is a PR to microsoft/winget-pkgs at this
+# same relative path. Can be automated post-release with the community
+# vedantmgoyal2009/winget-releaser GitHub Action (see .github/workflows/release.yml).
+PackageIdentifier: hrozno2.LowTide
+PackageVersion: 1.0.7
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0
