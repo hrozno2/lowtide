@@ -147,7 +147,10 @@ async function click(selector) {
 }
 
 app.whenReady().then(async () => {
-  await wait(2200);
+  // A bare CI runner (no GPU, no real session bus) boots Chromium noticeably
+  // slower than a real desktop — give it more room before giving up.
+  const boot = process.env.CI ? 6000 : 2200;
+  await wait(boot);
 
   // A fresh profile opens the Home window; start a document from it the way a
   // person would, then test against that window.
@@ -160,7 +163,7 @@ app.whenReady().then(async () => {
     if (!home) { console.log('neither a home nor a document window opened'); app.exit(1); return; }
     // Do not await: this closes the Home window, so the promise never settles.
     home.webContents.executeJavaScript(`window.api.home.create('blank')`, true).catch(() => {});
-    await wait(2000);
+    await wait(boot);
   }
 
   win = findDoc();

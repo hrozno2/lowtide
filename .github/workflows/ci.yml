@@ -13,11 +13,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install Electron's Linux runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libnss3 libasound2t64 dbus-x11 xvfb
       - run: npm ci
-      - run: xvfb-run -a npm test
+      # dbus-run-session gives Chromium a real (if empty) session bus instead
+      # of failing to connect to one repeatedly, which otherwise slows and
+      # sometimes breaks startup on a bare runner.
+      - run: dbus-run-session -- xvfb-run -a npm test
         env:
           # GitHub's runners don't have Electron's setuid sandbox helper
           # configured (chrome-sandbox isn't owned by root), which makes
           # Electron abort on launch. Only affects CI; nothing to do with
           # what actually ships to users.
           ELECTRON_DISABLE_SANDBOX: '1'
+          CI: 'true'
