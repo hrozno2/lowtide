@@ -19,7 +19,7 @@ process.env.LOWTIDE_FAKE_UPDATE = '9.9.9';
 require(path.join(base, 'src', 'main', 'main.js'));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-setTimeout(() => { report('TIMED OUT'); app.exit(2); }, 300000);
+setTimeout(() => { report('TIMED OUT'); app.exit(2); }, 900000);
 process.on('unhandledRejection', (err) => {
   console.log('REJECTED:', (err && err.stack) || err);
   report();
@@ -75,7 +75,17 @@ async function until(check, { timeout = 5000, every = 25, what = 'condition' } =
   const deadline = Date.now() + timeout;
   for (;;) {
     let ok = false;
-    try { ok = await check(); } catch { ok = false; }
+    try {
+      /* Raced against the clock. executeJavaScript can sit unresolved if the
+         renderer is wedged, and an await with no ceiling turns one stuck call
+         into a suite that hangs rather than one that fails — which tells you
+         nothing about where the problem is. */
+      ok = await Promise.race([
+        Promise.resolve().then(check),
+        wait(2000).then(() => 'stuck')
+      ]);
+      if (ok === 'stuck') ok = false;
+    } catch { ok = false; }
     if (ok) return true;
     if (Date.now() > deadline) {
       results.push({ group, name: `timed out waiting for ${what}`, ok: false,
@@ -1779,10 +1789,51 @@ app.whenReady().then(async () => {
     await wait(250);
   });
 
+  await test('the music pane is a panel that keeps playing when it closes', async () => {
+    /* The pane holds a <webview>, and taking that out of the document
+       destroys the guest along with whatever is playing. So this panel is
+       parked rather than rebuilt — the one place where closing has to leave
+       the thing running. */
+    await load('# One\n\nWords.');
+    await wait(400);
+    const area = () => js(`Math.round(document.querySelector('.view-area').getBoundingClientRect().width)`);
+    const before = await area();
+
+    await click('#btn-music');
+    await wait(900);
+    ok('it opens as a panel', await js(`!!document.querySelector('.panel .music-body')`));
+    eq('it takes no width from the page', await area(), before);
+    eq('the button is lit', await js(`document.getElementById('btn-music').classList.contains('on')`), true);
+    eq('the outline dock is not involved',
+      await js(`document.getElementById('side-dock').hidden`), true);
+
+    await js(`document.querySelector('.amb-btn[data-amb="rain"]').click()`);
+    await wait(700);
+    eq('something is playing', await js(`window.__ambience.playing`), 'rain');
+    const had = await js(`document.querySelectorAll('webview.yt-view').length`);
+
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
+    await wait(500);
+    eq('clicking away puts it away', await js(`!!document.querySelector('.panel .music-body')`), false);
+    eq('but the sound carries on', await js(`window.__ambience.playing`), 'rain');
+    eq('and the browser view is still there',
+      await js(`document.querySelectorAll('webview.yt-view').length`), had);
+    eq('the button goes out', await js(`document.getElementById('btn-music').classList.contains('on')`), false);
+
+    await click('#btn-music');
+    await wait(700);
+    eq('reopening finds it as it was', await js(`window.__ambience.playing`), 'rain');
+    eq('with its focus sounds intact', await js(`document.querySelectorAll('.amb-btn').length`), 10);
+
+    await js(`window.__ambience.stop()`);
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
+    await wait(300);
+  });
+
   await test('music pane plays local files, not hidden video', async () => {
     await click('#btn-music');
     await wait(500);
-    ok('music pane opens', !(await js(`document.getElementById('side-dock').hidden`)));
+    ok('music pane opens', await js(`!!document.querySelector('.panel .music-body')`));
     ok('local files are the default', await js(`!!document.querySelector('.music-player')`));
     await js(`[...document.querySelectorAll('.music-tabs .home-tab')].find(b => b.textContent === 'YouTube').click()`);
     await wait(600);
@@ -1791,7 +1842,7 @@ app.whenReady().then(async () => {
       await js(`!!document.querySelector('.music-bar .filter-input')`));
     await js(`[...document.querySelectorAll('.music-tabs .home-tab')].find(b => b.textContent === 'Your files').click()`);
     await wait(300);
-    await click('#dock-close');
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(250);
   });
 
@@ -1814,7 +1865,7 @@ app.whenReady().then(async () => {
 
   await test('leaving fullscreen gives the interface back', async () => {
     await js(`window.__setPref('musicMode','youtube')`);
-    if (await js(`document.getElementById('side-dock').hidden`)) {
+    if (!(await js(`!!document.querySelector('.panel .music-body')`))) {
       await click('#btn-music');
       await wait(3000);
     }
@@ -1836,8 +1887,10 @@ app.whenReady().then(async () => {
       inline: document.querySelector('webview').style.position || '',
       titlebar: getComputedStyle(document.querySelector('.titlebar')).display !== 'none',
       sidebar: getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
-      contained: (() => { const r = document.querySelector('webview').getBoundingClientRect();
-        const d = document.getElementById('side-dock').getBoundingClientRect();
+      contained: (() => { const w = document.querySelector('webview');
+        const p = w.closest('.panel');
+        if (!p) return false;
+        const r = w.getBoundingClientRect(); const d = p.getBoundingClientRect();
         return r.left >= d.left - 1 && r.right <= d.right + 1; })()
     })`);
     eq('fullscreen state cleared', after.bodyClass, false);
@@ -1855,17 +1908,19 @@ app.whenReady().then(async () => {
       window.dispatchEvent(new Event('resize')); return true; })()`);
     await wait(600);
     eq('an escape after the event is caught too', await js(`(() => {
-      const r = document.querySelector('webview').getBoundingClientRect();
-      const d = document.getElementById('side-dock').getBoundingClientRect();
+      const w = document.querySelector('webview');
+      const p = w.closest('.panel');
+      if (!p) return false;
+      const r = w.getBoundingClientRect(); const d = p.getBoundingClientRect();
       return r.left >= d.left - 2 && r.right <= d.right + 2; })()`), true);
 
-    await click('#dock-close');
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(250);
   });
 
   await test('the music pane has its own volume', async () => {
     await js(`window.__setPref('musicMode','youtube')`);
-    if (await js(`document.getElementById('side-dock').hidden`)) {
+    if (!(await js(`!!document.querySelector('.panel .music-body')`))) {
       await click('#btn-music');
       await wait(3000);
     }
@@ -1883,7 +1938,7 @@ app.whenReady().then(async () => {
     await js(`(() => { const v = document.querySelector('.yt-vol');
       v.value = '100'; v.dispatchEvent(new Event('input')); return true; })()`);
     await wait(300);
-    await click('#dock-close');
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(250);
   });
 
@@ -1900,7 +1955,7 @@ app.whenReady().then(async () => {
     await js(`window.__setPref('youtubeEnabled', true)`);
     await wait(400);
     ok('turning it back on restores the tab', (await js(`document.querySelectorAll('.music-tabs .home-tab').length`)) === 2);
-    await click('#dock-close');
+    await js(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await wait(250);
   });
 

@@ -180,7 +180,7 @@ function applyPrefs(p, prev) {
   }
   if (changed('youtubeEnabled')) {
     const music = $('dock-body') && $('dock-body').querySelector('.dock-view[data-mode="music"]');
-    if (music) renderMusicDock({ rebuild: true });
+    if (musicPanelBody()) renderMusicDock({ rebuild: true });
   }
   if (changed('previewNotes') || changed('previewTitlePage') ||
       changed('pageSize') || changed('printMargin') ||
@@ -1132,7 +1132,7 @@ async function showBackups() {
 /* One pane on the right, three things it can hold. The outline is a second
    editor so it behaves exactly like the manuscript beside it. */
 
-const DOCK_TITLES = { outline: 'Outline', music: 'Music' };
+const DOCK_TITLES = { outline: 'Outline' };
 
 /**
  * Each mode keeps its own container, built once and then only shown or hidden.
@@ -1166,7 +1166,6 @@ function dockOpen(mode) {
   syncToolbarState();
 
   if (mode === 'outline') renderOutlineDock();
-  if (mode === 'music') renderMusicDock();
   showDockView(mode);
 
   setPrefs({ dockMode: mode, dockOpen: true });
@@ -1440,8 +1439,31 @@ function serviceEnabled(id) {
 }
 
 /** Build the music pane once; afterwards only switch which sub-pane shows. */
-function renderMusicDock({ rebuild = false } = {}) {
-  const body = dockView('music');
+/* The music pane is a panel like the rest, but one that is kept rather than
+   rebuilt: it holds a <webview>, and taking that out of the document destroys
+   the guest along with whatever is playing. Closing it hides it, so the sound
+   carries on while you write. */
+function toggleMusicPanel() {
+  if (ui.panelIsOpen('music')) { ui.closePanel(); syncToolbarState(); return; }
+
+  let body = ui.keptPanel('music');
+  if (!body) {
+    body = ui.panelShell('Music', ui.h('div', { class: 'music-body' }));
+    body.classList.add('wide');
+  }
+  renderMusicDock({ host: body.querySelector('.music-body') });
+  ui.openPanel('music', body, { persist: true, onClose: () => syncToolbarState() });
+  syncToolbarState();
+}
+
+function musicPanelBody() {
+  const panel = ui.keptPanel('music');
+  return panel ? panel.querySelector('.music-body') : null;
+}
+
+function renderMusicDock({ rebuild = false, host = null } = {}) {
+  const body = host || musicPanelBody();
+  if (!body) return;
   if (rebuild) body.textContent = '';
 
   const available = Object.keys(SERVICES).filter(serviceEnabled);
@@ -1475,7 +1497,8 @@ function renderMusicDock({ rebuild = false } = {}) {
 }
 
 function showMusicPane(mode) {
-  const body = dockView('music');
+  const body = musicPanelBody();
+  if (!body) return;
   body.querySelectorAll('.music-pane').forEach((p) => { p.hidden = p.dataset.pane !== mode; });
   body.querySelectorAll('.music-tabs .home-tab').forEach((t) => {
     t.classList.toggle('on', t.dataset.pane === mode);
@@ -1863,10 +1886,11 @@ function renderMusicWeb(body, service) {
   };
 
   const escaped = () => {
-    const dock = document.getElementById('side-dock');
-    if (!dock || dock.hidden) return false;
+    // The pane the guest is supposed to stay inside.
+    const pane = web.closest('.panel');
+    if (!pane || pane.hidden) return false;
     const r = web.getBoundingClientRect();
-    const d = dock.getBoundingClientRect();
+    const d = pane.getBoundingClientRect();
     return r.width > d.width + 4 || r.left < d.left - 4 || r.top < d.top - 4;
   };
 
@@ -1908,7 +1932,7 @@ function toolbarItems() {
   return [
     { id: 'export', title: 'Export', icon: 'i-export', run: () => ui.showExport(ctx()) },
     { id: 'theme', title: 'Editor Theme', icon: 'i-theme', run: () => ui.showThemes(ctx()) },
-    { id: 'music', title: 'Music', icon: 'i-music', run: () => dockToggle('music') },
+    { id: 'music', title: 'Music', icon: 'i-music', run: () => toggleMusicPanel() },
     { id: 'sprint', title: 'Sprint', icon: 'i-sprint', run: () => ui.showSprint(ctx()) },
     { id: 'focus', title: 'Focus Mode', icon: 'i-focus',
       run: () => setPrefs({ focusMode: !state.prefs.focusMode }) },
@@ -1949,7 +1973,7 @@ function syncToolbarState() {
   const focus = $('btn-focus');
   if (focus) focus.classList.toggle('on', !!state.prefs.focusMode);
   const music = $('btn-music');
-  if (music) music.classList.toggle('on', state.dockMode === 'music' && !$('side-dock').hidden);
+  if (music) music.classList.toggle('on', ui.panelIsOpen('music'));
 }
 
 /* ------------------------------------------------------------ view switch */
@@ -2189,7 +2213,7 @@ function wireMenu() {
     'view:theme': () => ui.showThemes(ctx()),
     'view:outline': () => dockToggle('outline'),
     'view:reference': () => setSidebarTab('reference'),
-    'view:music': () => dockToggle('music'),
+    'view:music': () => toggleMusicPanel(),
     'tools:scratch': () => setSidebarTab('scratch'),
     'tools:revision': () => { setSidebarTab('revisions'); ui.showNewRevision(ctx()); },
 

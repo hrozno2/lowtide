@@ -28,6 +28,12 @@ export function h(tag, attrs = {}, ...kids) {
 
 let outsideCloser = null;
 
+/* Panels that must not be rebuilt when they close. The music pane holds a
+   <webview>; removing it from the document destroys the guest and takes
+   whatever is playing with it. These are hidden instead and handed back the
+   next time they are asked for. */
+const kept = new Map();
+
 /* The control the panel came out of, so it can be pointed at and so clicking
    it again closes rather than reopens. */
 let lastTrigger = null;
@@ -85,7 +91,17 @@ function stopWatchingOutside() {
 export function closePanel() {
   if (!current) return;
   stopWatchingOutside();
-  current.el.remove();
+  if (current.persist) {
+    /* Parked, not removed. It keeps its place in the document — moving a
+       <webview> destroys the guest — but it gives up the .panel class while
+       it is away, so that looking for "the panel that is open" cannot find
+       this one sitting behind the one that is. */
+    current.el.hidden = true;
+    current.el.classList.remove('panel');
+    current.el.classList.add('panel-parked');
+  } else {
+    current.el.remove();
+  }
   scrim().hidden = true;
   document.body.classList.remove('panel-open');
   const after = current.onClose;
@@ -143,9 +159,13 @@ function place(el, anchor) {
   const centre = Math.min(Math.max(r.left + r.width / 2 - left, 30), w - 30);
   el.style.setProperty('--nub-x', `${Math.round(centre)}px`);
   if (!el.querySelector('.panel-nub')) el.append(makeNub());
+  el.classList.remove('centred');
 }
 
-export function openPanel(name, el, { onClose, focus, anchor } = {}) {
+/** The kept element for a panel, if it has been built already. */
+export function keptPanel(name) { return kept.get(name) || null; }
+
+export function openPanel(name, el, { onClose, focus, anchor, persist = false } = {}) {
   // Clicking the button of the panel that is already open just closes it.
   if (suppress && suppress.name === name && Date.now() - suppress.at < 400) {
     suppress = null;
@@ -156,18 +176,31 @@ export function openPanel(name, el, { onClose, focus, anchor } = {}) {
 
   closePanel();
   const trigger = anchorFor(name, anchor);
-  host().append(el);
-  current = { name, el, onClose, trigger };
 
-  if (trigger) place(el, trigger);
-  else el.classList.add('centred');
+  let node = el;
+  if (persist) {
+    const already = kept.get(name);
+    if (already && already.isConnected) node = already;
+    else { kept.set(name, el); host().append(el); }
+    node.hidden = false;
+    node.classList.remove('panel-parked');
+    node.classList.add('panel');
+  } else {
+    host().append(node);
+  }
+
+  current = { name, el: node, onClose, trigger, persist };
+
+  // Measuring needs the element laid out, so this comes after unhiding.
+  if (trigger) place(node, trigger);
+  else node.classList.add('centred');
 
   /* Wait a frame before listening, or the very click that opened the panel
      closes it again. */
   requestAnimationFrame(() => {
-    if (!current || current.el !== el) return;
+    if (!current || current.el !== node) return;
     outsideCloser = (e) => {
-      if (el.contains(e.target)) return;
+      if (node.contains(e.target)) return;
       if (current.trigger && current.trigger.contains(e.target)) {
         suppress = { name: current.name, at: Date.now() };
       }
@@ -177,7 +210,7 @@ export function openPanel(name, el, { onClose, focus, anchor } = {}) {
   });
 
   if (focus) requestAnimationFrame(() => focus.focus());
-  return el;
+  return node;
 }
 
 export function panelIsOpen(name) { return !!current && (!name || current.name === name); }

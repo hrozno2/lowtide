@@ -689,6 +689,22 @@ body:not(.status-on) .statusbar { display: none; }
 }
 .panel .panel-body { border-radius: 0 0 14px 14px; }
 
+/* A panel that is kept rather than rebuilt, while it is away. */
+.panel-parked { display: none !important; }
+
+/* The music pane needs more room than a list of settings does. It sizes to
+   whatever is in it rather than filling the height: with no files added there
+   is nothing to scroll, and a tall panel of empty space under three lines of
+   text looks like something failed to load. */
+.panel.wide { width: 420px; max-height: min(78vh, 720px); }
+.panel.wide .panel-body { padding: 0 0 8px; display: flex; flex-direction: column; min-height: 0; }
+.music-body { display: flex; flex-direction: column; min-height: 0; }
+.panel.wide .music-pane { flex: 0 1 auto; }
+.panel.wide .music-list { flex: 0 1 auto; max-height: 240px; }
+.panel.wide .dock-empty { padding: 18px 20px 10px; }
+/* The browser view still wants real height when the YouTube tab is showing. */
+.panel.wide .music-pane[data-pane="youtube"] { flex: 1 1 auto; min-height: 380px; }
+
 .panel-nub {
   position: absolute; top: -19px; left: var(--nub-x, 50%);
   width: 56px; height: 20px; margin-left: -28px;
