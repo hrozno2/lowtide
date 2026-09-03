@@ -15,3 +15,9 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: xvfb-run -a npm test
+        env:
+          # GitHub's runners don't have Electron's setuid sandbox helper
+          # configured (chrome-sandbox isn't owned by root), which makes
+          # Electron abort on launch. Only affects CI; nothing to do with
+          # what actually ships to users.
+          ELECTRON_DISABLE_SANDBOX: '1'
