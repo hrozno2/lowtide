@@ -130,7 +130,12 @@ function applyPrefs(p, prev) {
   const changed = (k) => !prev || prev[k] !== p[k];
 
   if (changed('theme') || changed('youtubeMinimal')) {
-    if (changed('theme')) applyTheme(p.theme || 'material');
+    if (changed('theme')) {
+      applyTheme(p.theme || 'material');
+      // Best-effort: an older packaged build without the themed icons on
+      // disk just keeps whatever icon it already had.
+      api.theme.setIcon(p.theme || 'material').catch(() => {});
+    }
     if (repaintMusic) repaintMusic();     // the music pane follows both
   }
   if (changed('fontFamily')) css.setProperty('--doc-font', docFont(p.fontFamily));

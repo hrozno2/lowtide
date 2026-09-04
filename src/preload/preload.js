@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('api', {
     onChange: (fn) => on('prefs:changed', fn)
   },
 
+  theme: {
+    setIcon: (id) => ipcRenderer.invoke('theme:set-icon', id)
+  },
+
   doc: {
     state: (state) => ipcRenderer.invoke('doc:state', state),
     extras: (path) => ipcRenderer.invoke('doc:extras', path),

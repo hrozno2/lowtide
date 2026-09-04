@@ -19,6 +19,7 @@
     "dist:win:publish": "npm run build:renderer && electron-builder --win --publish always",
     "dist:linux:publish": "npm run build:renderer && electron-builder --linux --publish always",
     "icon": "electron scripts/icon.js",
+    "theme-icons": "electron scripts/theme-icons.mjs",
     "shot": "electron scripts/shot.js",
     "pack": "npm run build:renderer && electron-builder --dir",
     "test": "npm run test:unit && npm run test:app",
@@ -165,6 +166,14 @@
       {
         "from": "build/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "build/icons/themes",
+        "to": "icons/themes"
+      },
+      {
+        "from": "build/icons/mono",
+        "to": "icons/mono"
       }
     ],
     "afterPack": "build/after-pack.js",

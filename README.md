@@ -138,6 +138,7 @@ column width, page size, margins and print leading are all adjustable, and the
 toolbar buttons can be reordered or switched off. On Windows and Linux the menu
 is either a button in the title bar or written out along it, whichever you
 prefer — drawn in the theme either way rather than in the system's colours.
+The taskbar/dock icon follows along too, its mark recoloured to match.
 
 ![Ten themes, light and dark](docs/screen-themes.png)
 
