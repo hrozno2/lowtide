@@ -405,17 +405,18 @@ export function showPreferences(ctx) {
 
     h('div', { class: 'theme-group' }, 'Page layout'),
 
-    row('Page size', 'Used by the preview and PDF', segmented(
-      [['letter', 'Letter'], ['a4', 'A4']], p.pageSize || 'letter',
-      (v) => set({ pageSize: v }))),
+    row('Trim size', 'The first two are book trims; Letter and A4 are manuscript paper',
+      segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
+        p.pageSize || '6x9', (v) => set({ pageSize: v }))),
 
-    row('Margins', null, slider(p.printMargin || 1, 0.5, 1.5, 0.05, (v) => `${v.toFixed(2)}"`,
+    row('Margins', null, slider(p.printMargin || 0.75, 0.5, 1.5, 0.05, (v) => `${v.toFixed(2)}"`,
       (v) => set({ printMargin: v }))),
 
     row('Print type size', null, slider(p.printFontSize || 12, 9, 16, 0.5, (v) => `${v}pt`,
       (v) => set({ printFontSize: v }))),
 
-    row('Print leading', 'Drives the page count', slider(p.printLeading || 1.8, 1.2, 2.4, 0.05,
+    row('Print leading', 'Book typesetting runs 120–145% of the type size',
+      slider(p.printLeading || 1.4, 1.2, 2.4, 0.05,
       (v) => v.toFixed(2), (v) => set({ printLeading: v }))),
 
     row('Justify text', null, toggle(p.printJustify !== false, (v) => set({ printJustify: v }))),

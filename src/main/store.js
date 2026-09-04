@@ -30,12 +30,18 @@ const DEFAULTS = {
   readingSpeed: 275,
   // Print template. The defaults describe a typical printed novel page;
   // every value is adjustable in Preferences.
-  pageSize: 'letter',        // 'letter' | 'a4'
+  /* A printed novel, not a manuscript. 6x9 is the standard trade paperback
+     trim; 12pt with leading at 140% and 3/4in margins is inside every range
+     book typesetters work to, and measured against a 25,700-word novella it
+     puts 265 words on a page for 97 pages — where real printed editions of
+     that book run between 64 and 140. Letter and A4 are still there for a
+     manuscript you are posting to someone. */
+  pageSize: '6x9',           // '6x9' | '5.5x8.5' | 'letter' | 'a4'
   printFontSize: 12,         // pt
-  printLeading: 1.8,         // multiple of the font size
+  printLeading: 1.4,         // multiple of the font size
   theme: 'material',
   saveTo: 'documents',      // 'documents' | 'dropbox'
-  printMargin: 1,            // inches
+  printMargin: 0.75,         // inches
   printJustify: true,
   goal: null,
   goalHistory: [],

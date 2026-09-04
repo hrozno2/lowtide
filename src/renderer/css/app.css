@@ -909,10 +909,31 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 10.5pt; line-height: 1.4;
   color: #16191a;
 }
-.page h1 { font-size: 15pt; font-weight: 700; text-align: center; margin: 1.6in 0 .6in; letter-spacing: .04em; }
-.page h1.first { margin-top: .4in; }
-.page h2 { font-size: 12.5pt; font-weight: 700; text-align: center; margin: .5in 0 .25in; }
-.page h3 { font-size: 12pt; font-weight: 700; margin: .35in 0 .12in; }
+/* Set the way a book sets it: the part title in italic rather than bold, the
+   chapter head roman and unemphasised, and the opening words of a chapter in
+   small caps — which is how a printed novel signals a beginning without
+   needing a rule or extra space. */
+.page h1 {
+  font-size: 14pt; font-weight: 400; font-style: italic;
+  text-align: center; margin: 1.1in 0 .5in; letter-spacing: .01em;
+}
+.page h1.first { margin-top: .5in; }
+.page h2 {
+  font-size: 12.5pt; font-weight: 400; text-align: center;
+  margin: .45in 0 .28in;
+}
+.page h3 { font-size: 11.5pt; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
+
+/* The first line after a chapter or section head. */
+.page h1 + p, .page h2 + p, .page h3 + p,
+.page-measure h1 + p, .page-measure h2 + p, .page-measure h3 + p {
+  text-indent: 0;
+}
+.page h2 + p::first-line, .page h1 + p::first-line,
+.page-measure h2 + p::first-line, .page-measure h1 + p::first-line {
+  font-variant-caps: small-caps;
+  letter-spacing: .03em;
+}
 .page p { margin: 0; text-indent: .5in; text-align: justify; }
 .page.ragged p, .page-measure.ragged p { text-align: left; }
 .page p.flush { text-indent: 0; }

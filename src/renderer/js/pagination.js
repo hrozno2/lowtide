@@ -13,14 +13,19 @@
 const DPI = 96;               // CSS pixels per inch
 const MAX_PAGES = 4000;
 
+/* Trim sizes. The first two are what novels are actually printed at; letter
+   and A4 are manuscript paper, which is a different job — useful for something
+   you are posting to an agent, wrong for seeing what the book will look like. */
 const SHEETS = {
+  '6x9': { w: 6, h: 9 },
+  '5.5x8.5': { w: 5.5, h: 8.5 },
   letter: { w: 8.5, h: 11 },
   a4: { w: 8.27, h: 11.69 }
 };
 
 /** Text-box size in CSS pixels for the current print template. */
 export function geometryFor(prefs = {}) {
-  const sheet = SHEETS[prefs.pageSize] || SHEETS.letter;
+  const sheet = SHEETS[prefs.pageSize] || SHEETS['6x9'];
   const margin = Number(prefs.printMargin) || 1;
   return {
     width: Math.round((sheet.w - margin * 2) * DPI),
