@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, shell, nativeTheme, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, shell, nativeTheme, session, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -24,6 +24,27 @@ const LINUX_ICON = app.isPackaged
   ? path.join(process.resourcesPath, 'icon.png')
   : path.join(__dirname, '..', '..', 'build', 'icon.png');
 const windowIcon = () => (isLinux && fs.existsSync(LINUX_ICON) ? LINUX_ICON : undefined);
+
+// The badge that follows whichever theme is active — Windows/Linux take it
+// per-window, mac takes it for the whole app via app.dock, which is why the
+// IPC handler below branches on platform rather than just calling setIcon().
+const THEME_ICON_DIR = app.isPackaged
+  ? path.join(process.resourcesPath, 'icons', 'themes')
+  : path.join(__dirname, '..', '..', 'build', 'icons', 'themes');
+
+ipcMain.handle('theme:set-icon', (e, id) => {
+  const file = path.join(THEME_ICON_DIR, `${id}.png`);
+  if (!fs.existsSync(file)) return false;
+  const img = nativeImage.createFromPath(file);
+  if (img.isEmpty()) return false;
+  if (isMac) {
+    app.dock?.setIcon(img);
+  } else {
+    BrowserWindow.fromWebContents(e.sender)?.setIcon(img);
+  }
+  return true;
+});
+
 const HARNESS = !!process.env.LOWTIDE_HARNESS;
 
 /** Report a problem without blocking an automated run behind a modal. */
