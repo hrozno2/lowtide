@@ -68,8 +68,7 @@ let repaintMusic = null;
 
   state.prefs = await api.prefs.get();
   state.goal = state.prefs.goal || null;
-  // Older versions kept the ones that were given up too; drop them on sight.
-  state.goalHistory = (state.prefs.goalHistory || []).filter((e) => e && e.met);
+  state.goalHistory = state.prefs.goalHistory || [];
   state.dropbox = (await api.app.dropbox()).root || null;
   state.spelling = await api.spell.languages();
 
@@ -849,7 +848,11 @@ function renderGoal() {
 function renderGoalHistory() {
   const list = $('goal-history');
   list.textContent = '';
-  const history = state.goalHistory || [];
+  /* Goals that were given up on are kept but not shown. Filtering here rather
+     than on the way in matters: the list held in memory is what gets written
+     back the next time a goal is finished, so filtering it there would delete
+     entries from a version that did record them. */
+  const history = (state.goalHistory || []).filter((e) => e && e.met);
   if (!history.length) {
     list.append(ui.h('div', { class: 'goal-empty' }, 'Goals you meet are listed here.'));
     return;
