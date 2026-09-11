@@ -2208,8 +2208,11 @@ function wireChrome() {
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('drop', (e) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.path) api.file.openPath(file.path);
+    // Every file dropped opens in its own window; a folder is ignored.
+    for (const file of e.dataTransfer.files) {
+      const p = api.file.pathOf(file);
+      if (p && /\.(fountain|txt|md|markdown)$/i.test(p)) api.file.openPath(p);
+    }
   });
 }
 

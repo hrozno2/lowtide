@@ -1,5 +1,5 @@
 'use strict';
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const listeners = new Map();
 function on(channel, fn) {
@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   file: {
+    /* The path of a File dropped onto the window. File.path was removed in
+       Electron 32; this is the way through now, and it only works from a
+       preload, which is why it lives here rather than in the page. */
+    pathOf: (file) => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
     new: () => ipcRenderer.invoke('file:new'),
     open: () => ipcRenderer.invoke('file:open'),
     openPath: (p) => ipcRenderer.invoke('file:open-path', p),

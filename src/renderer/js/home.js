@@ -143,6 +143,25 @@ function openSelected() {
     };
   });
 
+  /* Drop a manuscript on the window to open it. The whole window is the
+     target — there is nothing on Home you could be trying to drop onto
+     instead — and it lights up while a file is over it so that is clear. */
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    document.body.classList.add('dropping');
+  });
+  window.addEventListener('dragleave', (e) => {
+    if (!e.relatedTarget) document.body.classList.remove('dropping');
+  });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    document.body.classList.remove('dropping');
+    for (const file of e.dataTransfer.files) {
+      const p = api.file.pathOf(file);
+      if (p && /\.(fountain|txt|md|markdown)$/i.test(p)) api.home.open(p);
+    }
+  });
+
   $('home-new').onclick = () => api.home.create('blank');
   $('home-browse').onclick = () => api.home.browse();
   $('home-open').onclick = openSelected;

@@ -130,3 +130,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
   background: var(--scroll-thumb, rgba(140, 175, 175, .16));
   border: 3px solid transparent; background-clip: padding-box; border-radius: 8px;
 }
+
+/* A file is being dragged over the window. */
+body.dropping::after {
+  content: 'Drop to open';
+  position: fixed; inset: 10px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--primary);
+  border-radius: 14px;
+  background: var(--primary-ghost);
+  color: var(--primary);
+  font-size: 16px; font-weight: 500; letter-spacing: .02em;
+  pointer-events: none;
+  z-index: 50;
+}

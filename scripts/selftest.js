@@ -915,6 +915,24 @@ app.whenReady().then(async () => {
     eq('clearing every field removes the block', await content(), '# One\n\nWords.');
   });
 
+  await test('a file dropped on the window opens', async () => {
+    /* File.path went away in Electron 32, which had quietly turned the drop
+       handler into a no-op. The path now comes through the preload. */
+    ok('the preload resolves a dropped file', await js(`typeof window.api.file.pathOf === 'function'`));
+    const file = path.join(WORK, 'dropped.fountain');
+    fs.writeFileSync(file, '# Dropped\n\nThis came in by drag and drop.', 'utf8');
+    // The handler the drop calls, with the path a real drop would resolve to.
+    await js(`window.api.file.openPath(${JSON.stringify(file)})`);
+    await wait(1500);
+    const opened = BrowserWindow.getAllWindows().some((w) => !w.isDestroyed() &&
+      w.webContents.getURL().includes('index.html') && w !== win);
+    ok('it opens in a window of its own', opened);
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w !== win && !w.isDestroyed() && w.webContents.getURL().includes('index.html')) w.destroy();
+    }
+    await wait(300);
+  });
+
   /* ==================================================== line heights ==== */
   group = 'Line heights';
 
