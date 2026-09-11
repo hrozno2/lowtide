@@ -398,6 +398,9 @@ export function showPreferences(ctx) {
         ? h('span', { class: 'val' }, 'System')
         : languagePicker(ctx)),
 
+    row('Page markers', 'Page numbers in the margin as you write',
+      toggle(p.pageMarkers !== false, (v) => set({ pageMarkers: v }))),
+
     row('Status bar', null, toggle(p.statusBar !== false, (v) => set({ statusBar: v }))),
 
     h('div', { class: 'theme-group' }, 'Toolbar'),
@@ -765,6 +768,50 @@ export function showBackups(ctx) {
 }
 
 /* ------------------------------------------------------------------ export */
+
+/**
+ * The title page as a form. The document keeps it as a Key: Value block at the
+ * top — that is what the file format is — but nobody should have to remember
+ * the keys. Fill the fields in and the block is written; clear them and it
+ * goes. Turning the title page on in the pages view is a separate switch,
+ * since a manuscript can carry the details without printing a page of them.
+ */
+export function showTitlePage(ctx) {
+  const meta = ctx.frontMatter();
+  const fields = [
+    ['title', 'Title', meta.title || ''],
+    ['author', 'Author', meta.author || meta.authors || ''],
+    ['contact', 'Contact', meta.contact || ''],
+    ['draft date', 'Draft date', meta['draft date'] || meta.date || ''],
+    ['copyright', 'Copyright', meta.copyright || '']
+  ];
+
+  const inputs = {};
+  const body = h('div', { class: 'title-form' },
+    ...fields.map(([key, label, value]) => {
+      const input = h('input', { type: 'text', class: 'filter-input', value, spellcheck: 'false',
+                                 placeholder: label });
+      inputs[key] = input;
+      return h('label', { class: 'title-field' }, h('span', {}, label), input);
+    }),
+    h('p', { class: 'hint' },
+      'Kept at the top of the file as plain text, so it travels with the manuscript. ' +
+      'Tick “Title Page” in the pages view to print it.'));
+
+  const apply = () => {
+    const entries = fields
+      .map(([key, label]) => [label, inputs[key].value.trim()])
+      .filter(([, v]) => v);
+    ctx.setFrontMatter(entries);
+    closePanel();
+    toast(entries.length ? 'Title page updated' : 'Title page cleared');
+  };
+
+  openPanel('title', panelShell('Title Page', body, [
+    h('button', { class: 'btn', onclick: closePanel }, 'Cancel'),
+    h('button', { class: 'btn primary', onclick: apply }, 'Save')
+  ]), { focus: inputs.title });
+}
 
 export function showExport(ctx) {
   const body = h('div', {},

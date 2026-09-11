@@ -809,13 +809,120 @@ app.whenReady().then(async () => {
     await wait(150);
   });
 
+  /* ======================================================= the book ==== */
+  group = 'The printed page';
+
+  const NOVEL = ['# One', '',
+    'The lamp had been burning for ninety-one years when Marta first climbed the stairs to meet it, and in all that time nobody had thought to give it a name. ' +
+    'She counted the steps because her father had counted them, and his mother before him, and the number was a kind of prayer in the family, muttered on the way up and never on the way down.',
+    '', 'At the top the light turned in its slow circle, indifferent as weather, and the extraordinarily long paragraphs of the manuscript continued for a considerable distance without pause.'
+  ].concat(Array.from({ length: 60 }, (_, i) => `\nParagraph ${i + 2} of the manuscript keeps going with characteristically unremarkable sentences about the lighthouse and its keeper and the weather that would not settle.`)).join('\n');
+
+  await test('the default page is a book, not manuscript paper', async () => {
+    const p = await js(`(async () => (await window.api.prefs.get()))()`);
+    eq('trim is 6x9', p.pageSize, '6x9');
+    eq('type is 11pt', p.printFontSize, 11);
+    ok('leading is inside what typesetters use', p.printLeading >= 1.2 && p.printLeading <= 1.45);
+    eq('margins are an inch', p.printMargin, 1);
+
+    await load(NOVEL);
+    await menu('view:preview');
+    await wait(1200);
+    const page = await js(`(() => {
+      const el = document.querySelector('.page');
+      const p = document.querySelector('.page p');
+      const cs = getComputedStyle(el), ps = getComputedStyle(p);
+      return { w: cs.width, pad: cs.paddingLeft, hyph: ps.hyphens || ps.webkitHyphens, align: ps.textAlign,
+               h1Style: getComputedStyle(document.querySelector('.page h1')).fontStyle }; })()`);
+    eq('the sheet is six inches wide', page.w, '576px');
+    eq('with an inch of margin', page.pad, '96px');
+    eq('words break at the margin rather than the spaces stretching', page.hyph, 'auto');
+    eq('and the text is justified', page.align, 'justify');
+    eq('the chapter title is set in italic', page.h1Style, 'italic');
+    await menu('view:preview');
+    await wait(400);
+  });
+
+  await test('the pages view zooms with the same keys as the text', async () => {
+    await load(NOVEL);
+    await menu('view:preview');
+    await wait(1000);
+    const zoom = () => js(`parseFloat(getComputedStyle(document.getElementById('preview-scroll')).getPropertyValue('--page-zoom'))`);
+    const size = () => js(`(async () => (await window.api.prefs.get()).fontSize)()`);
+    const fit = await zoom();
+    const font = await size();
+    await menu('view:zoom-in'); await wait(200);
+    ok('zooming in enlarges the page', (await zoom()) > fit * 1.1);
+    eq('and leaves the editor type alone', await size(), font);
+    await menu('view:zoom-reset'); await wait(200);
+    ok('reset goes back to fitting', Math.abs((await zoom()) - fit) < 0.001);
+    await menu('view:preview');
+    await wait(400);
+  });
+
+  await test('page markers sit in the margin of the writing view', async () => {
+    await load(NOVEL);
+    await wait(1500);
+    const marks = await js(`(() => {
+      const m = [...document.querySelectorAll('.cm-content .cm-line.page-start')];
+      return { count: m.length, pages: m.map(x => x.dataset.page),
+               drawn: m[0] ? getComputedStyle(m[0], '::after').content : null,
+               total: window.__pages().length }; })()`);
+    ok('the document runs to several pages', marks.total > 2);
+    ok('a marker is drawn where each later page begins', marks.count >= 1);
+    eq('the first is page two', marks.pages[0], '2');
+    eq('the number is what is drawn', marks.drawn, '"2"');
+
+    await js(`window.__setPref('pageMarkers', false)`);
+    await wait(900);
+    eq('they can be switched off', await js(`document.querySelectorAll('.cm-line.page-start').length`), 0);
+    await js(`window.__setPref('pageMarkers', true)`);
+    await wait(900);
+    ok('and back on', (await js(`document.querySelectorAll('.cm-line.page-start').length`)) >= 1);
+  });
+
+  await test('the title page is a form', async () => {
+    await load('# One\n\nWords.');
+    await js(`window.__titlePage()`);
+    await wait(400);
+    const fields = await js(`[...document.querySelectorAll('.title-form input')].map(i => i.placeholder)`);
+    eq('it asks for the usual things', fields, ['Title', 'Author', 'Contact', 'Draft date', 'Copyright']);
+
+    await js(`(() => { const f = [...document.querySelectorAll('.title-form input')];
+      f[0].value = 'The Long Light'; f[1].value = 'A. Writer'; return true; })()`);
+    await js(`[...document.querySelectorAll('.panel .btn')].find(b => b.textContent === 'Save').click()`);
+    await wait(500);
+    eq('saving writes the block to the top of the file',
+      (await content()).split('\n').slice(0, 3), ['Title: The Long Light', 'Author: A. Writer', '']);
+    ok('and the manuscript is still there', (await content()).endsWith('# One\n\nWords.'));
+
+    await js(`window.__titlePage()`);
+    await wait(400);
+    eq('reopening shows what is there',
+      await js(`document.querySelector('.title-form input').value`), 'The Long Light');
+    await js(`(() => { const f = [...document.querySelectorAll('.title-form input')]; f[1].value = 'B. Writer'; return true; })()`);
+    await js(`[...document.querySelectorAll('.panel .btn')].find(b => b.textContent === 'Save').click()`);
+    await wait(500);
+    eq('editing replaces the block rather than adding another',
+      (await content()).split('Title:').length - 1, 1);
+    ok('with the change made', (await content()).includes('Author: B. Writer'));
+
+    await js(`window.__titlePage()`);
+    await wait(400);
+    await js(`(() => { for (const f of document.querySelectorAll('.title-form input')) f.value = ''; return true; })()`);
+    await js(`[...document.querySelectorAll('.panel .btn')].find(b => b.textContent === 'Save').click()`);
+    await wait(500);
+    eq('clearing every field removes the block', await content(), '# One\n\nWords.');
+  });
+
   /* ==================================================== line heights ==== */
   group = 'Line heights';
 
   const boxes = () => js(`(() => [...document.querySelectorAll('.cm-content .cm-line')].map((el) => {
     const cs = getComputedStyle(el);
+    // A line can also carry page-start, which says nothing about its kind.
     return { h: +el.getBoundingClientRect().height.toFixed(2),
-             cls: el.className.replace('cm-line', '').trim(),
+             cls: el.className.replace('cm-line', '').replace('page-start', '').trim(),
              lh: cs.lineHeight, text: el.textContent.slice(0, 20) };
   }))()`);
 

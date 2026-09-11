@@ -28,16 +28,16 @@ Take the file for your machine from
 
 | System | File |
 | --- | --- |
-| macOS, Apple silicon | `LowTide-1.0.7-mac-arm64.dmg` |
-| macOS, Intel | `LowTide-1.0.7-mac-x64.dmg` |
-| Windows | `LowTide-1.0.7-win-x64.exe` (or `-arm64`) |
-| Linux, any distro | `LowTide-1.0.7-linux-x86_64.AppImage` |
-| Arch, CachyOS, Manjaro | `LowTide-1.0.7-linux-x64.pacman` |
+| macOS, Apple silicon | `LowTide-‹version›-mac-arm64.dmg` |
+| macOS, Intel | `LowTide-‹version›-mac-x64.dmg` |
+| Windows | `LowTide-‹version›-win-x64.exe` |
+| Linux, any distro | `LowTide-‹version›-linux-x86_64.AppImage` |
+| Arch, CachyOS, Manjaro | `LowTide-‹version›-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`.
 - **AppImage** — `chmod +x` it and run it. Nothing to install.
-- **Arch** — `sudo pacman -U LowTide-1.0.7-linux-x64.pacman`
+- **Arch** — `sudo pacman -U LowTide-‹version›-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
 right-click the app and choose **Open** (double-clicking will refuse); on
@@ -55,9 +55,9 @@ npm start
 To make installers yourself:
 
 ```bash
-npm run dist:mac      # .dmg + .zip            (Apple silicon + Intel)
+npm run dist:mac      # .dmg                   (Apple silicon + Intel)
 npm run dist:win      # installer              (x64 + arm64)
-npm run dist:linux    # AppImage, pacman, tar.gz
+npm run dist:linux    # AppImage, pacman
 ```
 
 Each has to run on that platform, or in CI.

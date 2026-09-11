@@ -7,6 +7,7 @@ import { search, searchKeymap, openSearchPanel, closeSearchPanel,
          highlightSelectionMatches } from '@codemirror/search';
 import { markupExtensions, setStyleOptions } from './decorations.js';
 import { revisionState } from './revisions.js';
+import { pageMarkState } from './pagemarks.js';
 
 const typography = new Compartment();
 const spellcheck = new Compartment();
@@ -84,6 +85,7 @@ export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs })
       search({ top: true }),
       markupExtensions,
       revisionState,
+      pageMarkState,
       keymap.of([
         { key: 'Mod-s', run: () => { onSave(); return true; }, preventDefault: true },
         { key: 'Mod-f', run: openSearchPanel, preventDefault: true },

@@ -257,10 +257,18 @@ async function installPacman(pkg, onProgress) {
  * the Linux path: a real, visible gate in front of anything that changes
  * the app on its own, rather than a click that just does it.
  */
+/* Opens Terminal and runs the upgrade there, in plain sight, as the user.
+   Not with administrator privileges: Homebrew refuses to run as root, so an
+   elevated `brew upgrade` fails every time — which is what this did before.
+   The --cask is needed too; Low Tide is a cask, not a formula. */
 async function installHomebrew() {
   const brew = findBrew();
   if (!brew) throw new Error('Homebrew was not found');
-  const script = `do shell script "${brew} upgrade lowtide" with administrator privileges`;
+  const cmd = `${brew} upgrade --cask lowtide`;
+  const script = `tell application "Terminal"
+    activate
+    do script ${JSON.stringify(cmd)}
+  end tell`;
   await run('osascript', ['-e', script]);
 }
 

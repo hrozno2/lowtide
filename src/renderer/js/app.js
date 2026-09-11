@@ -5,6 +5,7 @@ import { createEditor, toggleEmphasis, setHeading, toggleCenter, wrapNote,
 import { outline as buildOutline, pagesHtml, printHtml, frontMatter,
          titlePageHtml, esc, documentBlocks } from './parse.js';
 import { paginate, geometryFor } from './pagination.js';
+import { showPageMarks } from './pagemarks.js';
 import { OUTLINE_TEMPLATES, templateById } from './outlines.js';
 import { countWords, stripMarkup } from './markup.js';
 import * as ui from './panels.js';
@@ -111,6 +112,8 @@ let repaintMusic = null;
   window.__moveSection = (i, slot) => moveSection(i, slot);
   window.__sectionRange = (i) => sectionRange(i);
   window.__musicThemeCss = musicThemeCss;
+  window.__previewZoom = () => previewScale;
+  window.__titlePage = () => ui.showTitlePage(ctx());
 
   // after the editor is up, never before
   setTimeout(() => checkForUpdate(), 3000);
@@ -142,6 +145,7 @@ function applyPrefs(p, prev) {
   if (changed('fontSize')) css.setProperty('--doc-size', `${p.fontSize}px`);
   if (changed('lineHeight')) css.setProperty('--doc-lh', String(p.lineHeight));
   if (changed('pageWidth')) css.setProperty('--doc-width', `${p.pageWidth}px`);
+  if (changed('pageMarkers') && prev) repaginate();
 
   if (changed('menuStyle')) {
     const bar = p.menuStyle === 'bar';
@@ -882,6 +886,22 @@ function readingTime(words) {
   return `${Math.floor(mins / 60)} h ${mins % 60} min`;
 }
 
+/* Rewrites the Key: Value block at the top of the document. `entries` is
+   [[label, value]]; an empty list removes the block. The rest of the text is
+   untouched, and the caret keeps its place in it. */
+function writeFrontMatter(entries) {
+  const text = view.state.doc.toString();
+  const { bodyOffset } = frontMatter(text);
+  const block = entries.map(([k, v]) => `${k}: ${v}`).join('\n');
+  // Everything after the old block and the blank lines under it.
+  const rest = text.slice(bodyOffset).replace(/^\n+/, '');
+  // Only the head changes; splice just that so the edit is small and undoable.
+  view.dispatch({
+    changes: { from: 0, to: text.length - rest.length, insert: block ? block + '\n\n' : '' },
+    userEvent: 'input.frontmatter'
+  });
+}
+
 const repaginate = debounce(() => {
   const text = view.state.doc.toString();
   const sections = pagesHtml(text, previewOptions());
@@ -889,6 +909,13 @@ const repaginate = debounce(() => {
   state.pages = paginate(sections, geometryFor(state.prefs));
   // An empty document has no pages, not one blank one.
   state.pageCount = text.trim() ? state.pages.length : 0;
+
+  /* Where each page after the first begins, for the markers in the margin.
+     Page one starts at the top, which needs no mark. */
+  const starts = state.prefs.pageMarkers === false ? [] : state.pages
+    .map((pg, i) => ({ line: pg.line, page: i + 1 }))
+    .filter((m) => m.page > 1 && m.line != null);
+  showPageMarks(view, starts);
   state.pageMs = Math.round(performance.now() - t0);
   window.__pageMs = state.pageMs;
   renderStats();
@@ -1024,7 +1051,11 @@ function previewOptions() {
   };
 }
 
-/** Shrink the sheet so a whole page is visible however wide the pane is. */
+/* The sheet is shrunk to fit the pane, then scaled by whatever the reader has
+   asked for on top of that: ⌘+ and ⌘− in the pages view zoom the page rather
+   than the editor text, and ⌘0 goes back to fitting. */
+let previewScale = 1;
+
 function fitPreviewZoom() {
   const scroller = $('preview-scroll');
   if (!scroller || $('preview-host').hidden) return;
@@ -1032,8 +1063,13 @@ function fitPreviewZoom() {
   const pageWidth = geo.sheet.w * 96;
   const available = scroller.clientWidth - 40;
   if (available <= 0) return;
-  const zoom = Math.min(1, Math.max(0.25, available / pageWidth));
-  scroller.style.setProperty('--page-zoom', zoom.toFixed(4));
+  const fit = Math.min(1, Math.max(0.25, available / pageWidth));
+  scroller.style.setProperty('--page-zoom', (fit * previewScale).toFixed(4));
+}
+
+function zoomPreview(delta) {
+  previewScale = delta === 0 ? 1 : Math.max(0.5, Math.min(3, previewScale * (delta > 0 ? 1.15 : 1 / 1.15)));
+  fitPreviewZoom();
 }
 
 function paintPreview(keepScroll) {
@@ -2182,6 +2218,8 @@ function ctx() {
     prefs: state.prefs,
     setPrefs,
     platform: api.platform,
+    frontMatter: () => frontMatter(view.state.doc.toString()).meta,
+    setFrontMatter: (entries) => writeFrontMatter(entries),
     sprint,
     themes: { THEMES, swatches },
     revisionColours: REVISION_COLOURS,
@@ -2206,9 +2244,10 @@ function ctx() {
 /* ------------------------------------------------------------ menu bridge */
 
 function wireMenu() {
-  const zoom = (delta) => setPrefs({
-    fontSize: Math.max(12, Math.min(32, (state.prefs.fontSize || 18) + delta))
-  });
+  const zoom = (delta) => {
+    if (state.previewOpen) { zoomPreview(delta); return; }
+    setPrefs({ fontSize: Math.max(12, Math.min(32, (state.prefs.fontSize || 18) + delta)) });
+  };
 
   const actions = {
     'file:save': () => save(false),
@@ -2240,7 +2279,7 @@ function wireMenu() {
     'view:statusbar': () => setPrefs({ statusBar: !(state.prefs.statusBar !== false) }),
     'view:zoom-in': () => zoom(1),
     'view:zoom-out': () => zoom(-1),
-    'view:zoom-reset': () => setPrefs({ fontSize: 18 }),
+    'view:zoom-reset': () => { if (state.previewOpen) zoomPreview(0); else setPrefs({ fontSize: 18 }); },
 
     'tools:sprint': () => ui.showSprint(ctx()),
     'tools:goto': () => {
@@ -2263,6 +2302,7 @@ function wireMenu() {
     'view:outline': () => dockToggle('outline'),
     'view:reference': () => setSidebarTab('reference'),
     'view:music': () => toggleMusicPanel(),
+    'file:title-page': () => ui.showTitlePage(ctx()),
     'tools:scratch': () => setSidebarTab('scratch'),
     'tools:revision': () => { setSidebarTab('revisions'); ui.showNewRevision(ctx()); },
 

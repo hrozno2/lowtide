@@ -48,7 +48,7 @@
   "build": {
     "appId": "com.lowtide.writer",
     "productName": "Low Tide",
-    "copyright": "Copyright © 2026",
+    "copyright": "Copyright \u00a9 2026",
     "artifactName": "LowTide-${version}-${os}-${arch}.${ext}",
     "directories": {
       "buildResources": "build",
@@ -83,30 +83,33 @@
             "arm64",
             "x64"
           ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
         }
       ]
     },
     "dmg": {
-      "title": "${productName}"
+      "title": "${productName}",
+      "writeUpdateInfo": false,
+      "contents": [
+        {
+          "x": 150,
+          "y": 200
+        },
+        {
+          "x": 430,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 580,
+        "height": 400
+      }
     },
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "portable",
           "arch": [
             "x64"
           ]
@@ -117,7 +120,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Low Tide"
+      "shortcutName": "Low Tide",
+      "differentialPackage": false
     },
     "linux": {
       "category": "Office",
@@ -130,18 +134,11 @@
         {
           "target": "AppImage",
           "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "pacman",
-          "arch": [
             "x64"
           ]
         },
         {
-          "target": "tar.gz",
+          "target": "pacman",
           "arch": [
             "x64"
           ]

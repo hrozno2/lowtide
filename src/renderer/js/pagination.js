@@ -23,6 +23,14 @@ const SHEETS = {
   a4: { w: 8.27, h: 11.69 }
 };
 
+/* The source line a page starts on: the first block's tag carries it. A page
+   that begins partway through a paragraph reports that paragraph's line, which
+   is where the marker in the editor belongs. */
+export function pageStartLine(html) {
+  const m = /data-line="(\d+)"/.exec(html);
+  return m ? Number(m[1]) : null;
+}
+
 /** Text-box size in CSS pixels for the current print template. */
 export function geometryFor(prefs = {}) {
   const sheet = SHEETS[prefs.pageSize] || SHEETS['6x9'];
@@ -181,7 +189,7 @@ export function paginate(sections, geometry) {
     host.innerHTML = section.html;
     const blocks = Array.from(host.children);
     if (!blocks.length) {
-      pages.push({ html: section.html, chapter: section.chapter });
+      pages.push({ html: section.html, chapter: section.chapter, line: pageStartLine(section.html) });
       continue;
     }
 
@@ -194,7 +202,7 @@ export function paginate(sections, geometry) {
       boxes.forEach((box, j) => lines.push({ i, j, top: box.top, bottom: box.bottom }));
     });
     if (!lines.length) {
-      pages.push({ html: section.html, chapter: section.chapter });
+      pages.push({ html: section.html, chapter: section.chapter, line: pageStartLine(section.html) });
       continue;
     }
 
@@ -235,7 +243,7 @@ export function paginate(sections, geometry) {
         }
         if (i === end.i) break;
       }
-      pages.push({ html: parts.join('\n'), chapter: section.chapter });
+      pages.push({ html: parts.join('\n'), chapter: section.chapter, line: pageStartLine(parts.join('\n')) });
     }
   }
 

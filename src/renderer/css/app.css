@@ -257,6 +257,17 @@ body:not(.nav-open) .sidebar { margin-left: calc(-1 * var(--nav-w)); opacity: 0;
 }
 .nav-item:hover .guide, .nav-item.active .guide { background: var(--outline); }
 
+/* ---------------------------------------------------------- title page */
+
+.title-form { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 2px; }
+.title-field { display: flex; flex-direction: column; gap: 4px; }
+.title-field span {
+  font-size: 10.5px; line-height: 1.4; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-4);
+}
+.title-field .filter-input { margin: 0; }
+.title-form .hint { margin: 6px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--text-4); }
+
 /* ---------------------------------------------------------- reordering */
 
 .nav-item[draggable="true"] { cursor: grab; }
@@ -896,8 +907,16 @@ input[type="range"]::-webkit-slider-thumb {
   box-shadow: var(--shadow-2);
   border-radius: 2px;
   font-family: var(--font-serif);
-  font-size: var(--print-size, 12pt);
-  line-height: var(--print-leading, 1.6);
+  font-size: var(--print-size, 11pt);
+  line-height: var(--print-leading, 1.42);
+  /* Justified text without hyphenation stretches the spaces in any line the
+     words happen not to fill, which is what made some lines gape. Breaking a
+     word at the margin instead is what every printed book does. */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
 }
 .page { position: relative; }
 .page .page-head {
@@ -932,9 +951,8 @@ input[type="range"]::-webkit-slider-thumb {
 .page h2 + p::first-line, .page h1 + p::first-line,
 .page-measure h2 + p::first-line, .page-measure h1 + p::first-line {
   font-variant-caps: small-caps;
-  letter-spacing: .03em;
 }
-.page p { margin: 0; text-indent: .5in; text-align: justify; }
+.page p { margin: 0; text-indent: .28in; text-align: justify; }
 .page.ragged p, .page-measure.ragged p { text-align: left; }
 .page p.flush { text-indent: 0; }
 .page p.center { text-align: center; text-indent: 0; }
@@ -944,6 +962,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* Offscreen twin of a page's text box, used to find real page breaks. */
 .page-measure {
+  hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;
   position: absolute !important;
   left: -20000px !important;
   top: 0 !important;

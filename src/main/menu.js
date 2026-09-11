@@ -50,6 +50,7 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
         { label: 'Revert to Backup…', click: send('file:backups') },
         { label: 'Move to Dropbox', click: send('file:dropbox') },
         { type: 'separator' },
+        { label: 'Title Page…', click: send('file:title-page') },
         { label: 'Export…', accelerator: 'CmdOrCtrl+E', click: send('file:export') },
         { label: 'Print / PDF…', accelerator: 'CmdOrCtrl+P', click: send('file:print') },
         { type: 'separator' },

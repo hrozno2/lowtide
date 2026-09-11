@@ -219,7 +219,12 @@ export function pagesHtml(text, opts = {}) {
     flushNext = true;
   };
 
+  let idx = -1;
   for (const raw of lines) {
+    idx++;
+    // The source line this block came from, so the editor can mark where a
+    // page begins. Zero-based, counted over the whole document.
+    const L = ` data-line="${bodyLine + idx}"`;
     const info = classifyLine(raw);
     const body = raw.slice(info.contentFrom);
 
@@ -232,7 +237,7 @@ export function pagesHtml(text, opts = {}) {
         break;
 
       case LINE.divider:
-        page.push('<hr>');
+        page.push(`<hr${L}>`);
         flushNext = true;
         break;
 
@@ -244,26 +249,26 @@ export function pagesHtml(text, opts = {}) {
         }
         const tag = `h${Math.min(info.level, 3)}`;
         const cls = info.level === 1 && firstOnPage ? ' class="first"' : '';
-        page.push(`<${tag}${cls}>${inlineHtml(info.title || '', showNotes)}</${tag}>`);
+        page.push(`<${tag}${cls}${L}>${inlineHtml(info.title || '', showNotes)}</${tag}>`);
         firstOnPage = false;
         flushNext = true;
         break;
       }
 
       case LINE.list:
-        page.push(`<p class="list">• ${inlineHtml(info.title || '', showNotes)}</p>`);
+        page.push(`<p class="list"${L}>• ${inlineHtml(info.title || '', showNotes)}</p>`);
         firstOnPage = false;
         flushNext = true;
         break;
 
       case LINE.center:
-        page.push(`<p class="center">${inlineHtml(body.replace(/\s*<\s*$/, ''), showNotes)}</p>`);
+        page.push(`<p class="center"${L}>${inlineHtml(body.replace(/\s*<\s*$/, ''), showNotes)}</p>`);
         firstOnPage = false;
         flushNext = true;
         break;
 
       case LINE.right:
-        page.push(`<p class="right">${inlineHtml(body, showNotes)}</p>`);
+        page.push(`<p class="right"${L}>${inlineHtml(body, showNotes)}</p>`);
         firstOnPage = false;
         flushNext = true;
         break;
@@ -271,7 +276,7 @@ export function pagesHtml(text, opts = {}) {
       default: {
         const html = inlineHtml(raw, showNotes).trim();
         if (!html) break;
-        page.push(`<p${flushNext ? ' class="flush"' : ''}>${html}</p>`);
+        page.push(`<p${flushNext ? ' class="flush"' : ''}${L}>${html}</p>`);
         firstOnPage = false;
         flushNext = false;
       }

@@ -124,13 +124,15 @@ eq('outline of empty doc', M.outline('').length, 0);
 const sec = (t, o) => M.pagesHtml(t, o);
 eq('page break splits sections', sec('a\n\n===\n\nb').length, 2);
 eq('chapter starts a section', sec('# A\n\nx\n\n# B\n\ny').length, 2);
-ok('first paragraph is flush', sec('# A\n\none\n\ntwo')[0].html.includes('<p class="flush">one</p>'));
-ok('second paragraph indents', sec('# A\n\none\n\ntwo')[0].html.includes('<p>two</p>'));
+// Every block also names the source line it came from, for the page markers.
+ok('first paragraph is flush', /<p class="flush" data-line="\d+">one<\/p>/.test(sec('# A\n\none\n\ntwo')[0].html));
+ok('second paragraph indents', /<p data-line="\d+">two<\/p>/.test(sec('# A\n\none\n\ntwo')[0].html));
+ok('blocks record their line', sec('# A\n\none\n\ntwo')[0].html.includes('data-line="2"'));
 ok('notes hidden by default', !sec('a [[note]] b')[0].html.includes('note'));
 ok('notes shown when asked', sec('a [[note]] b', { notes: true })[0].html.includes('class="note"'));
 ok('comments never printed', !sec('a /* secret */ b')[0].html.includes('secret'));
 ok('html is escaped', sec('a < b & c')[0].html.includes('&lt;') && sec('a < b & c')[0].html.includes('&amp;'));
-ok('list rendered', sec('- one')[0].html.includes('<p class="list">'));
+ok('list rendered', sec('- one')[0].html.includes('<p class="list" data-line='));
 eq('chapter tracked on the page', sec('# Ch\n\nx')[0].chapter, 'Ch');
 
 /* ------------------------------------------------------------------ print */

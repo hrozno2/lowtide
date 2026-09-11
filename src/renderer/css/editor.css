@@ -25,6 +25,28 @@ body.typewriter .cm-editor .cm-content { padding-top: 30vh; padding-bottom: 52vh
 
 .cm-editor .cm-line { padding: 0; }
 
+/* Where a printed page begins: a short rule and the number, out in the
+   right margin where they sit beside the text rather than in it. */
+.cm-editor .cm-line.page-start { position: relative; }
+.cm-editor .cm-line.page-start::before {
+  content: '';
+  position: absolute; left: 100%; top: 0;
+  width: 44px; height: 1px; margin-left: 36px;
+  background: var(--outline);
+  pointer-events: none;
+}
+.cm-editor .cm-line.page-start::after {
+  content: attr(data-page);
+  position: absolute; left: 100%; top: .25em;
+  margin-left: 36px; width: 44px;
+  text-align: center;
+  font-family: var(--font-ui); font-size: 11.5px; line-height: 1.4;
+  color: var(--text-4);
+  pointer-events: none; user-select: none;
+}
+body.focus-mode .cm-editor .cm-line.page-start::before,
+body.focus-mode .cm-editor .cm-line.page-start::after { opacity: .35; }
+
 .cm-editor .cm-cursor, .cm-editor .cm-dropCursor {
   border-left: 2px solid var(--caret);
   margin-left: -1px;
