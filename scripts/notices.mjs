@@ -26,6 +26,7 @@ const sections = [...packages].sort().map((name) => {
 });
 
 const font = readFileSync('src/renderer/fonts/OFL.txt', 'utf8').trim();
+const libertinus = readFileSync('src/renderer/fonts/OFL-Libertinus.txt', 'utf8').trim();
 
 writeFileSync('THIRD-PARTY-NOTICES.md', `# Third-party notices
 
@@ -45,6 +46,14 @@ SIL Open Font License 1.1 — https://quoteunquoteapps.com/courierprime/
 
 \`\`\`
 ${font}
+\`\`\`
+
+## Libertinus Serif
+
+SIL Open Font License 1.1 — https://github.com/alerque/libertinus — subset to Latin, with small capitals and old-style figures
+
+\`\`\`
+${libertinus}
 \`\`\`
 
 ---

@@ -118,6 +118,9 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
         { label: 'New Revision…', accelerator: 'CmdOrCtrl+Shift+V', click: send('tools:revision') },
         { type: 'separator' },
         { label: 'Bigger Text', accelerator: 'CmdOrCtrl+Plus', click: send('view:zoom-in') },
+        // ⌘+ needs shift on most keyboards; plain ⌘= is what people press.
+        { label: 'Bigger Text', accelerator: 'CmdOrCtrl+=', visible: false,
+          acceleratorWorksWhenHidden: true, click: send('view:zoom-in') },
         { label: 'Smaller Text', accelerator: 'CmdOrCtrl+-', click: send('view:zoom-out') },
         { label: 'Actual Size', accelerator: 'CmdOrCtrl+Shift+0', click: send('view:zoom-reset') },
         { type: 'separator' },

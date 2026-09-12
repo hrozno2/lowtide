@@ -581,7 +581,7 @@ ipcMain.handle('file:export', async (e, { content, html, format, suggested, runn
       const setup = pageSetup || {};
       backups.writeAtomic(result.filePath, buildDocx(blocks || [], meta || {}, {
         fontSize: setup.fontSize, leading: setup.leading,
-        justify: setup.justify, margin: setup.margin,
+        justify: setup.justify, margin: setup.margin, sideMargin: setup.sideMargin,
         titlePage: setup.titlePage
       }));
     } catch (err) {
@@ -597,9 +597,13 @@ ipcMain.handle('file:export', async (e, { content, html, format, suggested, runn
 function headerTemplate(runningHead, margin) {
   const safe = String(runningHead || '').replace(/[&<>]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-  return `<div style="width:100%;font:9px Georgia,'Times New Roman',serif;color:#000;` +
-         `padding:0 ${margin}in;text-align:right;">${safe}&nbsp;&middot;&nbsp;` +
-         `<span class="pageNumber"></span></div>`;
+  // Set like the preview's running head: the title centred in small caps and
+  // the page number at the outer edge. Header templates cannot see the page's
+  // fonts, so this falls back through the system serifs.
+  return `<div style="width:100%;box-sizing:border-box;position:relative;padding:0 ${margin}in;` +
+         `font:11px 'Hoefler Text',Georgia,'Times New Roman',serif;color:#000;text-align:center;` +
+         `font-variant-caps:all-small-caps;letter-spacing:.04em;">${safe}` +
+         `<span class="pageNumber" style="position:absolute;right:${margin}in;top:0;letter-spacing:0"></span></div>`;
 }
 
 // Chromium knows the manuscript papers by name; the book trims are given as
@@ -612,6 +616,7 @@ async function exportPdf(html, target, runningHead, pageSetup) {
   const tmp = path.join(os.tmpdir(), `low-tide-print-${Date.now()}.html`);
   fs.writeFileSync(tmp, html, 'utf8');
   const m = (pageSetup && Number(pageSetup.margin)) || 1;
+  const side = (pageSetup && Number(pageSetup.sideMargin)) || m;
   const printer = new BrowserWindow({ show: false, webPreferences: { offscreen: true, javascript: false } });
   try {
     await printer.loadFile(tmp);
@@ -620,12 +625,12 @@ async function exportPdf(html, target, runningHead, pageSetup) {
       pageSize: pdfSheet(pageSetup && pageSetup.pageSize),
       margins: {
         marginType: 'custom',
-        top: m, bottom: m, left: m, right: m
+        top: m, bottom: m, left: side, right: side
       },
       // Chromium paginates the HTML itself, so the running head has to come
       // from the print engine rather than from the document.
       displayHeaderFooter: !!runningHead,
-      headerTemplate: headerTemplate(runningHead, m),
+      headerTemplate: headerTemplate(runningHead, side),
       footerTemplate: '<div></div>'
     });
     fs.writeFileSync(target, data);

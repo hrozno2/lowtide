@@ -898,50 +898,52 @@ input[type="range"]::-webkit-slider-thumb {
      `zoom` is used rather than a transform so the surrounding layout
      reflows with it and nothing is clipped. */
   zoom: var(--page-zoom, 1);
-  width: var(--page-w, 8.5in);
-  min-height: var(--page-h, 11in);
+  width: var(--page-w, 8.27in);
+  min-height: var(--page-h, 11.69in);
   margin: 0 auto 24px;
-  padding: var(--page-margin, 1in);
+  padding: var(--page-margin, 1in) var(--page-margin-x, 1.45in);
   background: #f7f5f0;
   color: #16191a;
   box-shadow: var(--shadow-2);
   border-radius: 2px;
   font-family: var(--font-serif);
-  font-size: var(--print-size, 11pt);
-  line-height: var(--print-leading, 1.42);
-  /* Justified text without hyphenation stretches the spaces in any line the
-     words happen not to fill, which is what made some lines gape. Breaking a
-     word at the margin instead is what every printed book does. */
-  hyphens: auto;
-  -webkit-hyphens: auto;
-  hyphenate-limit-chars: 6 3 3;
+  font-size: var(--print-size, 12.75pt);
+  line-height: var(--print-leading, 1.65);
   text-rendering: optimizeLegibility;
   font-kerning: normal;
+}
+/* Off by default, as Highland has it; on a column this wide the spaces stay
+   even without it. Breaking words at the margin is there for anyone who
+   wants the book look on a narrow trim. */
+.page.hyphenate, .page-measure.hyphenate {
+  hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;
 }
 .page { position: relative; }
 .page .page-head {
   position: absolute;
-  top: calc(var(--page-margin, 1in) * .45);
-  left: var(--page-margin, 1in);
-  right: var(--page-margin, 1in);
-  display: flex; justify-content: space-between;
-  font-size: 10.5pt; line-height: 1.4;
+  top: calc(var(--page-margin, 1in) * .55);
+  left: var(--page-margin-x, 1.45in);
+  right: var(--page-margin-x, 1.45in);
+  text-align: center;
+  font-size: 11pt; line-height: 1.4;
+  font-variant-caps: all-small-caps; letter-spacing: .04em;
   color: #16191a;
 }
+.page .page-head .page-no { position: absolute; right: 0; top: 0; letter-spacing: 0; }
 /* Set the way a book sets it: the part title in italic rather than bold, the
    chapter head roman and unemphasised, and the opening words of a chapter in
    small caps — which is how a printed novel signals a beginning without
    needing a rule or extra space. */
 .page h1 {
-  font-size: 14pt; font-weight: 400; font-style: italic;
-  text-align: center; margin: 1.1in 0 .5in; letter-spacing: .01em;
+  font-size: 2em; font-weight: 400; font-style: italic;
+  text-align: center; margin: 1.9in 0 .5in; letter-spacing: .01em; line-height: 1.2;
 }
-.page h1.first { margin-top: .5in; }
 .page h2 {
-  font-size: 12.5pt; font-weight: 400; text-align: center;
-  margin: .45in 0 .28in;
+  font-size: 1.35em; font-weight: 400; text-align: center;
+  margin: .45in 0 .3in; line-height: 1.3;
 }
-.page h3 { font-size: 11.5pt; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
+.page h1 + h2 { margin-top: 0; }
+.page h3 { font-size: 1.1em; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
 
 /* The first line after a chapter or section head. */
 .page h1 + p, .page h2 + p, .page h3 + p,
@@ -952,7 +954,7 @@ input[type="range"]::-webkit-slider-thumb {
 .page-measure h2 + p::first-line, .page-measure h1 + p::first-line {
   font-variant-caps: small-caps;
 }
-.page p { margin: 0; text-indent: .28in; text-align: justify; }
+.page p { margin: 0; text-indent: .3in; text-align: justify; }
 .page.ragged p, .page-measure.ragged p { text-align: left; }
 .page p.flush { text-indent: 0; }
 .page p.center { text-align: center; text-indent: 0; }
@@ -962,7 +964,6 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* Offscreen twin of a page's text box, used to find real page breaks. */
 .page-measure {
-  hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;
   position: absolute !important;
   left: -20000px !important;
   top: 0 !important;
@@ -996,6 +997,13 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--surface);
 }
 .preview-foot .btn.primary { margin-left: auto; }
+.pv-zoom { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
+.pv-zoom button {
+  font: 12px var(--font-ui); color: var(--text-3);
+  background: none; border: 0; border-radius: 6px; padding: 3px 7px; cursor: pointer;
+}
+.pv-zoom button:hover { background: var(--surface-3); color: var(--text); }
+#pv-zoom-val { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
 .check {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 12px; color: var(--text-3); user-select: none;

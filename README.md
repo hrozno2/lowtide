@@ -81,6 +81,17 @@ outline belongs to its document and stays open in both the text and pages views.
 
 ![The outline open beside the finished pages](docs/screen-outline-pages.png)
 
+**Pages.** The pages view sets the manuscript the way Highland's Novel
+template does — 17px type on 28px lines with wide side margins, a centred
+running head, each chapter opening a third of the way down the page — so the
+page count is the one you are used to. The face is Libertinus Serif, which sets
+the same text to the same lines as Highland's Hoefler Text and, unlike it, can
+ship on every platform. Letter or A4 follows your region; book trims, margins,
+type size, leading, justification and hyphenation are in Preferences, with a
+Reset. Where each printed page begins is marked in the margin of the writing
+view. Zoom the pages with ⌘+ and ⌘−, ⌘-scroll, or the −/+ under them; ⌘0 fits
+the page. The PDF is the preview, at the trim you chose.
+
 **Reference.** Definitions, synonyms and antonyms in the sidebar. Click a
 synonym to swap it into your prose. On macOS the system dictionary is one click
 away and works offline.
@@ -214,8 +225,8 @@ src/renderer/css/  theme.css holds every palette token
 
 MIT — see `LICENSE`. Everything bundled is permissively licensed, with the full
 text in `THIRD-PARTY-NOTICES.md`. CodeMirror, Electron, esbuild and
-electron-builder are MIT; Courier Prime is under the SIL Open Font License and
-is redistributed unmodified.
+electron-builder are MIT; Courier Prime and Libertinus Serif are under the SIL
+Open Font License, Libertinus subset to the Latin ranges.
 
 Every icon, style and string here was written for this project; it is not
 derived from any other application's code or assets. Fountain is an open syntax.

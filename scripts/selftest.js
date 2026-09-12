@@ -15,7 +15,7 @@ fs.mkdirSync(WORK, { recursive: true });
 // the day written out in full, plus one thing the user actually chose.
 fs.mkdirSync(PROFILE, { recursive: true });
 fs.writeFileSync(path.join(PROFILE, 'preferences.json'), JSON.stringify({
-  pageSize: 'letter', printFontSize: 12, printLeading: 1.8, readingSpeed: 310
+  pageSize: '6x9', printFontSize: 12, printLeading: 1.8, readingSpeed: 310
 }));
 
 process.env.LOWTIDE_HARNESS = '1';
@@ -824,27 +824,51 @@ app.whenReady().then(async () => {
     '', 'At the top the light turned in its slow circle, indifferent as weather, and the extraordinarily long paragraphs of the manuscript continued for a considerable distance without pause.'
   ].concat(Array.from({ length: 60 }, (_, i) => `\nParagraph ${i + 2} of the manuscript keeps going with characteristically unremarkable sentences about the lighthouse and its keeper and the weather that would not settle.`)).join('\n');
 
-  await test('the default page is a book, not manuscript paper', async () => {
+  await test('the page is set the way Highland sets it', async () => {
     const p = await js(`(async () => (await window.api.prefs.get()))()`);
-    eq('trim is 6x9', p.pageSize, '6x9');
-    eq('type is 11pt', p.printFontSize, 11);
-    ok('leading is inside what typesetters use', p.printLeading >= 1.2 && p.printLeading <= 1.45);
-    eq('margins are an inch', p.printMargin, 1);
+    ok('paper follows the region', ['a4', 'letter'].includes(p.pageSize));
+    eq('17px type', p.printFontSize, 12.75);
+    eq('on 28px lines', p.printLeading, 1.65);
+    eq('an inch top and bottom', p.printMargin, 1);
+    eq('and wide side margins', p.printSideMargin, 1.45);
 
+    await js(`window.__setPref('pageSize', 'a4')`);
     await load(NOVEL);
     await menu('view:preview');
     await wait(1200);
-    const page = await js(`(() => {
+    const page = await js(`(async () => {
+      await document.fonts.ready;
       const el = document.querySelector('.page');
-      const p = document.querySelector('.page p');
+      const p = document.querySelectorAll('.page p')[1];  // the first is unindented, as after any head
       const cs = getComputedStyle(el), ps = getComputedStyle(p);
-      return { w: cs.width, pad: cs.paddingLeft, hyph: ps.hyphens || ps.webkitHyphens, align: ps.textAlign,
-               h1Style: getComputedStyle(document.querySelector('.page h1')).fontStyle }; })()`);
-    eq('the sheet is six inches wide', page.w, '576px');
-    eq('with an inch of margin', page.pad, '96px');
-    eq('words break at the margin rather than the spaces stretching', page.hyph, 'auto');
-    eq('and the text is justified', page.align, 'justify');
-    eq('the chapter title is set in italic', page.h1Style, 'italic');
+      const head = document.querySelectorAll('.page')[1].querySelector('.page-head');
+      const hs = getComputedStyle(head);
+      return { w: cs.width, padX: cs.paddingLeft, padY: cs.paddingTop, size: cs.fontSize, lh: cs.lineHeight,
+               hyph: ps.hyphens || ps.webkitHyphens, align: ps.textAlign, indent: ps.textIndent,
+               face: document.fonts.check('17px "Libertinus Serif"'),
+               h1: getComputedStyle(document.querySelector('.page h1')).fontStyle,
+               headAlign: hs.textAlign, headCaps: hs.fontVariantCaps,
+               no: head.querySelector('.page-no').textContent }; })()`);
+    ok('the sheet is A4', Math.abs(parseFloat(page.w) - 793.92) < 0.1);
+    eq('with 1.45in at the sides', page.padX, '139.2px');
+    eq('and an inch above', page.padY, '96px');
+    eq('type is 17px', page.size, '17px');
+    eq('on 28px lines', page.lh, '28.05px');
+    eq('not hyphenated', page.hyph, 'manual');
+    eq('justified', page.align, 'justify');
+    eq('paragraphs indented .3in', page.indent, '28.8px');
+    ok('set in Libertinus Serif', page.face);
+    eq('the chapter title is italic', page.h1, 'italic');
+    eq('the running head is centred', page.headAlign, 'center');
+    eq('in small capitals', page.headCaps, 'all-small-caps');
+    eq('with the page number beside it', page.no, '2');
+
+    await js(`window.__setPref('printHyphenate', true)`);
+    await wait(900);
+    eq('hyphenation can be turned on',
+      await js(`getComputedStyle(document.querySelector('.page p')).hyphens`), 'auto');
+    await js(`window.__setPref('printHyphenate', false)`);
+    await wait(600);
     await menu('view:preview');
     await wait(400);
   });
@@ -860,8 +884,17 @@ app.whenReady().then(async () => {
     await menu('view:zoom-in'); await wait(200);
     ok('zooming in enlarges the page', (await zoom()) > fit * 1.1);
     eq('and leaves the editor type alone', await size(), font);
+    eq('the footer says so', await js(`document.getElementById('pv-zoom-val').textContent`), '115%');
     await menu('view:zoom-reset'); await wait(200);
     ok('reset goes back to fitting', Math.abs((await zoom()) - fit) < 0.001);
+    await js(`document.getElementById('pv-zoom-out').click()`); await wait(200);
+    ok('the − button shrinks it', (await zoom()) < fit * 0.9);
+    await js(`document.getElementById('pv-zoom-val').click()`); await wait(200);
+    ok('clicking the percentage fits again', Math.abs((await zoom()) - fit) < 0.001);
+    await js(`document.getElementById('preview-scroll').dispatchEvent(new WheelEvent('wheel', { deltaY: -60, ctrlKey: true, bubbles: true, cancelable: true }))`);
+    await wait(200);
+    ok('⌘-scroll zooms', (await zoom()) > fit * 1.3);
+    await menu('view:zoom-reset'); await wait(200);
     await menu('view:preview');
     await wait(400);
   });
@@ -889,8 +922,17 @@ app.whenReady().then(async () => {
 
   await test('page layout follows the current defaults', async () => {
     const p = await js(`(async () => (await window.api.prefs.get()))()`);
-    eq('an old default left on disk does not stick', [p.pageSize, p.printFontSize, p.printLeading], ['6x9', 11, 1.42]);
+    ok('an old default left on disk does not stick', ['a4', 'letter'].includes(p.pageSize) && p.printFontSize === 12.75 && p.printLeading === 1.65);
     eq('a value the user chose does', p.readingSpeed, 310);
+    eq('and the file is stamped so it is not migrated twice', p.settingsVersion, 2);
+
+    // Choosing a value that happens to be a retired default must now stick.
+    await js(`window.__setPref('printFontSize', 12)`);
+    await wait(700);
+    eq('a retired default chosen deliberately is kept on disk',
+      JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')).printFontSize, 12);
+    await js(`window.__setPref('printFontSize', 12.75)`);
+    await wait(500);
 
     await js(`window.__setPref('printLeading', 2)`);
     await wait(700);
@@ -906,10 +948,10 @@ app.whenReady().then(async () => {
     await js(`document.getElementById('reset-page-layout').click()`);
     await wait(700);
     eq('reset puts the leading back',
-      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.42);
+      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.65);
     const after = await js(`[...document.querySelectorAll('.prefs-body .row')]
       .find(r => r.textContent.startsWith('Print leading')).querySelector('.val').textContent`);
-    eq('and the panel shows it', after, '1.42');
+    eq('and the panel shows it', after, '1.65');
     eq('the file no longer carries it',
       'printLeading' in JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')), false);
     await click('#btn-prefs');

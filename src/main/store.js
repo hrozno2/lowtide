@@ -35,12 +35,17 @@ const DEFAULTS = {
      how a trade paperback is actually set — inside every range typesetters
      work to, and close to what Highland draws. Letter and A4 are still there
      for a manuscript you are posting to someone. */
-  pageSize: '6x9',           // '6x9' | '5.5x8.5' | 'letter' | 'a4'
-  printFontSize: 11,         // pt
-  printLeading: 1.42,        // multiple of the font size
+  // The page is set the way Highland's Novel template sets it: 17px type on
+  // 28px lines, wide side margins, no hyphenation. The paper follows the
+  // locale (see getPrefs); the rest is measured from Highland's own output.
+  pageSize: 'a4',            // '6x9' | '5.5x8.5' | 'letter' | 'a4'
+  printFontSize: 12.75,      // pt (17px)
+  printLeading: 1.65,        // multiple of the font size (28px)
+  printSideMargin: 1.45,     // inches, left and right
+  printHyphenate: false,
   theme: 'material',
   saveTo: 'documents',      // 'documents' | 'dropbox'
-  printMargin: 1,            // inches
+  printMargin: 1,            // inches, top and bottom
   printJustify: true,
   pageMarkers: true,         // page numbers in the margin of the writing view
   goal: null,
@@ -83,15 +88,24 @@ function migrateOldProfile() {
 
 let migrated = false;
 
-// Values earlier versions wrote to disk as defaults. A stored value equal to
-// one of these was never chosen, so it is dropped on read and the current
-// default applies. (A deliberate pick of the same value is indistinguishable
-// and is dropped too; that is the price of the older, whole-object writes.)
+// Values earlier versions wrote to disk as their defaults. A settings file
+// from before SETTINGS_VERSION 2 has them written out in full whether or not
+// they were ever chosen, so on first read they are dropped and the current
+// defaults apply. (A deliberate pick of the same value is indistinguishable
+// and goes with them; that is the price of the older, whole-object writes.)
+// The file is then stamped, so a value chosen later is never touched.
+const SETTINGS_VERSION = 2;
 const RETIRED_DEFAULTS = {
-  pageSize: 'letter',
-  printFontSize: 12,
-  printLeading: 1.8
+  pageSize: ['letter', '6x9'],
+  printFontSize: [12, 11],
+  printLeading: [1.8, 1.42]
 };
+
+// Letter is the paper of the US and a few of its neighbours; everywhere else
+// it is A4.
+function paperFor(country) {
+  return ['US', 'CA', 'MX', 'PH'].includes(String(country || '').toUpperCase()) ? 'letter' : 'a4';
+}
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
@@ -107,12 +121,14 @@ class JsonFile {
   _read() {
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      for (const [k, v] of Object.entries(RETIRED_DEFAULTS)) {
-        if (same(raw[k], v)) delete raw[k];
+      if ((raw.settingsVersion || 0) < SETTINGS_VERSION) {
+        for (const [k, olds] of Object.entries(RETIRED_DEFAULTS)) {
+          if (olds.some((v) => same(raw[k], v))) delete raw[k];
+        }
       }
-      return Object.assign({}, this.defaults, raw);
+      return Object.assign({}, this.defaults, raw, { settingsVersion: SETTINGS_VERSION });
     } catch {
-      return Object.assign({}, this.defaults);
+      return Object.assign({}, this.defaults, { settingsVersion: SETTINGS_VERSION });
     }
   }
   get all() { return this.data; }
@@ -159,7 +175,12 @@ let session = null;
 let sidecar = null;
 
 function getPrefs() {
-  if (!prefs) prefs = new JsonFile('preferences.json', DEFAULTS);
+  if (!prefs) {
+    let country = '';
+    try { country = app.getLocaleCountryCode(); } catch { /* not ready: A4 */ }
+    DEFAULTS.pageSize = paperFor(country);
+    prefs = new JsonFile('preferences.json', DEFAULTS);
+  }
   return prefs;
 }
 

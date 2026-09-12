@@ -33,13 +33,15 @@ export function pageStartLine(html) {
 
 /** Text-box size in CSS pixels for the current print template. */
 export function geometryFor(prefs = {}) {
-  const sheet = SHEETS[prefs.pageSize] || SHEETS['6x9'];
+  const sheet = SHEETS[prefs.pageSize] || SHEETS.a4;
   const margin = Number(prefs.printMargin) || 1;
+  const side = Number(prefs.printSideMargin) || margin;
   return {
-    width: Math.round((sheet.w - margin * 2) * DPI),
+    width: Math.round((sheet.w - side * 2) * DPI),
     height: Math.round((sheet.h - margin * 2) * DPI),
     sheet,
-    margin
+    margin,
+    side
   };
 }
 
@@ -49,6 +51,9 @@ function measurerEl() {
   if (measurer && measurer.isConnected) return measurer;
   measurer = document.createElement('div');
   measurer.className = 'page page-measure';
+  // Created on demand, so it picks up whatever the template has already set.
+  measurer.classList.toggle('ragged', document.body.classList.contains('print-ragged'));
+  measurer.classList.toggle('hyphenate', document.body.classList.contains('print-hyphenate'));
   measurer.setAttribute('aria-hidden', 'true');
   document.body.appendChild(measurer);
   return measurer;

@@ -139,19 +139,26 @@ eq('chapter tracked on the page', sec('# Ch\n\nx')[0].chapter, 'Ch');
 const html = M.printHtml('Title: T\nAuthor: A\n\n# One\n\nbody', { title: 'T' },
   { titlePage: true, template: { pageSize: 'a4', margin: 1.25, fontSize: 11, leading: 1.5, justify: false } });
 ok('print uses A4', html.includes('size: A4'));
-ok('print uses margin', html.includes('margin: 1.25in'));
+ok('print uses margin', html.includes('margin: 1.25in 1.25in'));
 ok('print uses type size', html.includes('font-size: 11pt'));
 ok('print uses leading', html.includes('line-height: 1.5'));
 ok('ragged when not justified', html.includes('text-align: left'));
 ok('title page included', html.includes('title-page') && html.includes('>T<'));
 ok('front matter not in body', !html.includes('Title: T'));
-const book = M.printHtml('# One\n\nbody', {}, { template: { pageSize: '6x9', margin: 1, fontSize: 11, leading: 1.42 } });
+const book = M.printHtml('# One\n\nbody', {}, { template: { pageSize: '6x9', margin: 1, sideMargin: 0.8, fontSize: 11, leading: 1.42, hyphenate: true } });
 ok('a book trim is given to the printer in inches', book.includes('size: 6in 9in'));
+ok('side margins are their own number', book.includes('margin: 1in 0.8in'));
 ok('the title page is exactly the text box tall', book.includes('height: calc(9in - 2in)'));
 ok('the print sets like the preview: italic chapter heads', /h1 \{[^}]*font-style: italic/.test(book));
-ok('and hyphenates', /body \{[^}]*hyphens: auto/.test(book));
-ok('and the same paragraph indent', book.includes('text-indent: .28in'));
-ok('default trim is 6x9', M.printHtml('x', {}, {}).includes('size: 6in 9in'));
+ok('hyphenates when asked', /body \{[^}]*hyphens: auto/.test(book));
+ok('and not otherwise', !/hyphens: auto/.test(M.printHtml('x', {}, {})));
+ok('and the same paragraph indent', book.includes('text-indent: .3in'));
+const dflt = M.printHtml('x', {}, {});
+ok('the default page is A4 at 17px on 28px lines', dflt.includes('size: A4') && dflt.includes('font-size: 12.75pt') && dflt.includes('line-height: 1.65'));
+ok('set in the bundled face', dflt.includes('"Libertinus Serif"'));
+ok('an HTML export carries no font files', !dflt.includes('@font-face'));
+const pdf = M.printHtml('x', {}, { fontBase: 'file:///app/fonts/' });
+ok('a PDF gets the face by absolute URL', pdf.includes('src: url("file:///app/fonts/ls-400.woff2")') && pdf.includes('ls-italic-700.woff2'));
 
 /* ------------------------------------------------------------ strip markup */
 eq('strip heading', M.stripMarkup('# Chapter **One**'), 'Chapter One');

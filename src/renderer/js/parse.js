@@ -333,10 +333,19 @@ export function printHtml(text, docMeta = {}, opts = {}) {
   const { meta } = frontMatter(stripComments(text));
   const title = meta.title || docMeta.title || 'Untitled';
   const tpl = Object.assign(
-    { pageSize: '6x9', margin: 1, fontSize: 11, leading: 1.42, justify: true },
+    { pageSize: 'a4', margin: 1, fontSize: 12.75, leading: 1.65, justify: true, hyphenate: false },
     opts.template || {});
-  const sheet = PRINT_SHEETS[tpl.pageSize] || PRINT_SHEETS.letter;
+  if (tpl.sideMargin == null) tpl.sideMargin = tpl.margin;
+  const sheet = PRINT_SHEETS[tpl.pageSize] || PRINT_SHEETS.a4;
   const textHeight = `calc(${sheet.h}in - ${2 * tpl.margin}in)`;
+  // The PDF is printed from a file on this machine, so it can reach the
+  // bundled face; an HTML file may travel, so it is left to the reader's fonts.
+  const faces = opts.fontBase ? [
+    ['ls-400', 'normal', 400], ['ls-700', 'normal', 700],
+    ['ls-italic-400', 'italic', 400], ['ls-italic-700', 'italic', 700]
+  ].map(([f, style, weight]) =>
+    `@font-face { font-family: "Libertinus Serif"; font-style: ${style}; font-weight: ${weight}; src: url("${opts.fontBase}${f}.woff2") format("woff2"); }`
+  ).join('\n  ') : '';
   const pages = pagesHtml(text, opts);
 
   let n = 0;
@@ -352,23 +361,25 @@ export function printHtml(text, docMeta = {}, opts = {}) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-  @page { size: ${sheet.css}; margin: ${tpl.margin}in; }
+  ${faces}
+  @page { size: ${sheet.css}; margin: ${tpl.margin}in ${tpl.sideMargin}in; }
   html { background: #fff; }
   /* The same setting as the preview's page, so what prints is what was shown. */
-  body { margin: 0; color: #000; font-family: "Iowan Old Style", Palatino, Georgia, "Liberation Serif", serif;
+  body { margin: 0; color: #000;
+         font-family: "Libertinus Serif", "Hoefler Text", "Iowan Old Style", Palatino, Georgia, "Liberation Serif", serif;
          font-size: ${tpl.fontSize}pt; line-height: ${tpl.leading};
-         hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;
+         ${tpl.hyphenate ? 'hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;' : ''}
          text-rendering: optimizeLegibility; font-kerning: normal; }
   .sheet { page-break-after: always; position: relative; }
   .sheet:last-child { page-break-after: auto; }
-  h1 { font-size: 14pt; font-weight: 400; font-style: italic; text-align: center;
-       margin: 1.1in 0 .5in; letter-spacing: .01em; }
-  .sheet.first h1, h1.first { margin-top: .5in; }
-  h2 { font-size: 12.5pt; font-weight: 400; text-align: center; margin: .45in 0 .28in; }
-  h3 { font-size: 11.5pt; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
+  h1 { font-size: 2em; font-weight: 400; font-style: italic; text-align: center;
+       margin: 1.9in 0 .5in; letter-spacing: .01em; line-height: 1.2; }
+  h2 { font-size: 1.35em; font-weight: 400; text-align: center; margin: .45in 0 .3in; line-height: 1.3; }
+  h1 + h2 { margin-top: 0; }
+  h3 { font-size: 1.1em; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
   h1 + p, h2 + p, h3 + p { text-indent: 0; }
   h1 + p::first-line, h2 + p::first-line { font-variant-caps: small-caps; }
-  p  { margin: 0; text-indent: .28in; text-align: ${tpl.justify ? 'justify' : 'left'};
+  p  { margin: 0; text-indent: .3in; text-align: ${tpl.justify ? 'justify' : 'left'};
        orphans: 2; widows: 2; }
   p.cont { text-indent: 0; }
   p.flush { text-indent: 0; }

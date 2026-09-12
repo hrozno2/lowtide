@@ -356,7 +356,7 @@ function toggle(value, onPick) {
   return b;
 }
 
-const PAGE_LAYOUT_KEYS = ['pageSize', 'printMargin', 'printFontSize', 'printLeading', 'printJustify'];
+const PAGE_LAYOUT_KEYS = ['pageSize', 'printMargin', 'printSideMargin', 'printFontSize', 'printLeading', 'printJustify', 'printHyphenate'];
 
 export function showPreferences(ctx) {
   openPanel('prefs', panelShell('Preferences', preferencesBody(ctx)));
@@ -414,23 +414,28 @@ function preferencesBody(ctx) {
 
     h('div', { class: 'theme-group' }, 'Page layout'),
 
-    row('Trim size', 'The first two are book trims; Letter and A4 are manuscript paper',
+    row('Paper', 'Letter and A4 are manuscript paper; the first two are book trims',
       segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
-        p.pageSize || '6x9', (v) => set({ pageSize: v }))),
+        p.pageSize || 'a4', (v) => set({ pageSize: v }))),
 
-    row('Margins', null, slider(p.printMargin || 1, 0.5, 1.5, 0.05, (v) => `${v.toFixed(2)}"`,
+    row('Side margins', null, slider(p.printSideMargin || 1.45, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`,
+      (v) => set({ printSideMargin: v }))),
+
+    row('Top and bottom', null, slider(p.printMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`,
       (v) => set({ printMargin: v }))),
 
-    row('Print type size', null, slider(p.printFontSize || 11, 9, 16, 0.5, (v) => `${v}pt`,
+    row('Print type size', null, slider(p.printFontSize || 12.75, 9, 16, 0.25, (v) => `${v}pt`,
       (v) => set({ printFontSize: v }))),
 
-    row('Print leading', 'Book typesetting runs 120–145% of the type size',
-      slider(p.printLeading || 1.42, 1.2, 2.4, 0.05,
+    row('Print leading', 'Book typesetting runs 120–170% of the type size',
+      slider(p.printLeading || 1.65, 1.2, 2.4, 0.05,
       (v) => v.toFixed(2), (v) => set({ printLeading: v }))),
 
     row('Justify text', null, toggle(p.printJustify !== false, (v) => set({ printJustify: v }))),
+    row('Hyphenate', 'Break words at the margin, as a printed book does',
+      toggle(!!p.printHyphenate, (v) => set({ printHyphenate: v }))),
 
-    row('Reset page layout', 'Back to the book defaults: 6×9, 1" margins, 11pt at 142%',
+    row('Reset page layout', 'Back to the defaults: 17px type on 28px lines with wide side margins',
       h('button', { class: 'btn', id: 'reset-page-layout', onclick: async () => {
         const prefs = await ctx.resetPrefs(PAGE_LAYOUT_KEYS);
         // Rebuild the body so the sliders show the values they now hold.

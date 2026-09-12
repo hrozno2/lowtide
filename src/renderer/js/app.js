@@ -175,8 +175,9 @@ function applyPrefs(p, prev) {
     if (changed('smartTypography')) editor.setSmartTypography(p.smartTypography !== false);
     if (changed('spellcheck')) editor.setSpellcheck(p.spellcheck !== false);
   }
-  if (changed('pageSize') || changed('printMargin') || changed('printFontSize') ||
-      changed('printLeading') || changed('printJustify') || !prev) {
+  if (changed('pageSize') || changed('printMargin') || changed('printSideMargin') ||
+      changed('printFontSize') || changed('printLeading') || changed('printJustify') ||
+      changed('printHyphenate') || !prev) {
     applyPageTemplate(p);
   }
   if (changed('youtubeEnabled')) {
@@ -184,8 +185,8 @@ function applyPrefs(p, prev) {
     if (musicPanelBody()) renderMusicDock({ rebuild: true });
   }
   if (changed('previewNotes') || changed('previewTitlePage') ||
-      changed('pageSize') || changed('printMargin') ||
-      changed('printFontSize') || changed('printLeading')) {
+      changed('pageSize') || changed('printMargin') || changed('printSideMargin') ||
+      changed('printFontSize') || changed('printLeading') || changed('printHyphenate')) {
     repaginate();
   }
 }
@@ -198,14 +199,19 @@ function applyPageTemplate(p) {
   css.setProperty('--page-w', `${geo.sheet.w}in`);
   css.setProperty('--page-h', `${geo.sheet.h}in`);
   css.setProperty('--page-margin', `${geo.margin}in`);
-  css.setProperty('--print-size', `${p.printFontSize || 11}pt`);
-  css.setProperty('--print-leading', String(p.printLeading || 1.42));
+  css.setProperty('--page-margin-x', `${geo.side}in`);
+  css.setProperty('--print-size', `${p.printFontSize || 12.75}pt`);
+  css.setProperty('--print-leading', String(p.printLeading || 1.65));
   css.setProperty('--page-text-w', `${geo.width}px`);
 
   const ragged = p.printJustify === false;
-  document.querySelectorAll('.page, .page-measure').forEach((el) =>
-    el.classList.toggle('ragged', ragged));
+  const hyphenate = !!p.printHyphenate;
+  document.querySelectorAll('.page, .page-measure').forEach((el) => {
+    el.classList.toggle('ragged', ragged);
+    el.classList.toggle('hyphenate', hyphenate);
+  });
   document.body.classList.toggle('print-ragged', ragged);
+  document.body.classList.toggle('print-hyphenate', hyphenate);
 }
 
 function setPrefs(patch) {
@@ -1043,11 +1049,13 @@ const sprint = (() => {
 function printTemplate() {
   const p = state.prefs;
   return {
-    pageSize: p.pageSize || '6x9',
+    pageSize: p.pageSize || 'a4',
     margin: Number(p.printMargin) || 1,
-    fontSize: Number(p.printFontSize) || 11,
-    leading: Number(p.printLeading) || 1.42,
-    justify: p.printJustify !== false
+    sideMargin: Number(p.printSideMargin) || Number(p.printMargin) || 1,
+    fontSize: Number(p.printFontSize) || 12.75,
+    leading: Number(p.printLeading) || 1.65,
+    justify: p.printJustify !== false,
+    hyphenate: !!p.printHyphenate
   };
 }
 
@@ -1076,8 +1084,15 @@ function fitPreviewZoom() {
 }
 
 function zoomPreview(delta) {
-  previewScale = delta === 0 ? 1 : Math.max(0.5, Math.min(3, previewScale * (delta > 0 ? 1.15 : 1 / 1.15)));
+  zoomPreviewBy(delta === 0 ? 0 : (delta > 0 ? 1.15 : 1 / 1.15));
+}
+
+// A factor of 0 means back to fitting the pane.
+function zoomPreviewBy(factor) {
+  previewScale = factor === 0 ? 1 : Math.max(0.5, Math.min(3, previewScale * factor));
   fitPreviewZoom();
+  const val = $('pv-zoom-val');
+  if (val) val.textContent = `${Math.round(previewScale * 100)}%`;
 }
 
 function paintPreview(keepScroll) {
@@ -1093,15 +1108,17 @@ function paintPreview(keepScroll) {
   state.pages.forEach((page, i) => {
     const n = i + 1;
     const head = n > 1
-      ? `<header class="page-head"><span>${esc(page.chapter || '')}</span><span>${n}</span></header>`
+      ? `<header class="page-head"><span>${esc(page.chapter || '')}</span><span class="page-no">${n}</span></header>`
       : '<header class="page-head"></header>';
     out.push(`<article class="page">${head}${page.html}</article>`);
   });
 
   scroller.innerHTML = out.join('\n');
-  if (state.prefs.printJustify === false) {
-    scroller.querySelectorAll('.page').forEach((el) => el.classList.add('ragged'));
-  }
+  const ragged = state.prefs.printJustify === false, hyphenate = !!state.prefs.printHyphenate;
+  scroller.querySelectorAll('.page').forEach((el) => {
+    el.classList.toggle('ragged', ragged);
+    el.classList.toggle('hyphenate', hyphenate);
+  });
   const p = state.pageCount;
   $('preview-title').textContent =
     `${state.title} · ${state.words.toLocaleString()} words · ${p} page${p === 1 ? '' : 's'}`;
@@ -1147,7 +1164,10 @@ async function exportAs(format) {
     content: format === 'txt' ? plainText(text) : text,
     html: format === 'pdf' || format === 'html'
       ? printHtml(text, { title: state.title },
-                  Object.assign(previewOptions(), { template: printTemplate() }))
+                  Object.assign(previewOptions(), {
+                    template: printTemplate(),
+                    fontBase: format === 'pdf' ? new URL('fonts/', location.href).href : null
+                  }))
       : '',
     blocks: format === 'docx' ? documentBlocks(text, previewOptions()) : null,
     meta: { title: meta.title || state.title, author: meta.author || meta.authors || '' },
@@ -2141,6 +2161,15 @@ function wireChrome() {
   $('btn-navigator').onclick = () => setPrefs({ navigatorOpen: !(state.prefs.navigatorOpen !== false) });
 
   $('btn-preview').onclick = () => togglePreview(true);
+  $('pv-zoom-in').onclick = () => zoomPreview(1);
+  $('pv-zoom-out').onclick = () => zoomPreview(-1);
+  $('pv-zoom-val').onclick = () => zoomPreview(0);
+  // ⌘-scroll, and the pinch a trackpad reports as a ctrl-wheel.
+  $('preview-scroll').addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    zoomPreviewBy(Math.exp(-e.deltaY * 0.01));
+  }, { passive: false });
   $('view-text').onclick = () => togglePreview(false);
   wireViewSwitch();
   $('btn-home').onclick = () => api.home.show();
