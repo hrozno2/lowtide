@@ -1,7 +1,7 @@
 {
   "name": "low-tide",
   "productName": "Low Tide",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "A fast, minimal novel writing app.",
   "main": "src/main/main.js",
   "author": "hrozno2",
@@ -48,7 +48,7 @@
   "build": {
     "appId": "com.lowtide.writer",
     "productName": "Low Tide",
-    "copyright": "Copyright \u00a9 2026",
+    "copyright": "Copyright © 2026",
     "artifactName": "LowTide-${version}-${os}-${arch}.${ext}",
     "directories": {
       "buildResources": "build",
