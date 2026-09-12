@@ -198,8 +198,8 @@ function applyPageTemplate(p) {
   css.setProperty('--page-w', `${geo.sheet.w}in`);
   css.setProperty('--page-h', `${geo.sheet.h}in`);
   css.setProperty('--page-margin', `${geo.margin}in`);
-  css.setProperty('--print-size', `${p.printFontSize || 12}pt`);
-  css.setProperty('--print-leading', String(p.printLeading || 1.6));
+  css.setProperty('--print-size', `${p.printFontSize || 11}pt`);
+  css.setProperty('--print-leading', String(p.printLeading || 1.42));
   css.setProperty('--page-text-w', `${geo.width}px`);
 
   const ragged = p.printJustify === false;
@@ -213,6 +213,14 @@ function setPrefs(patch) {
   state.prefs = Object.assign({}, prev, patch);
   applyPrefs(state.prefs, prev);
   api.prefs.set(patch);
+}
+
+// Back to the defaults for the given keys; the store knows what those are.
+async function resetPrefs(keys) {
+  const prev = state.prefs;
+  state.prefs = await api.prefs.reset(keys);
+  applyPrefs(state.prefs, prev);
+  return state.prefs;
 }
 
 api.prefs.onChange((p) => {
@@ -1035,10 +1043,10 @@ const sprint = (() => {
 function printTemplate() {
   const p = state.prefs;
   return {
-    pageSize: p.pageSize || 'letter',
+    pageSize: p.pageSize || '6x9',
     margin: Number(p.printMargin) || 1,
-    fontSize: Number(p.printFontSize) || 12,
-    leading: Number(p.printLeading) || 1.6,
+    fontSize: Number(p.printFontSize) || 11,
+    leading: Number(p.printLeading) || 1.42,
     justify: p.printJustify !== false
   };
 }
@@ -2220,6 +2228,7 @@ function ctx() {
   return {
     prefs: state.prefs,
     setPrefs,
+    resetPrefs,
     platform: api.platform,
     frontMatter: () => frontMatter(view.state.doc.toString()).meta,
     setFrontMatter: (entries) => writeFrontMatter(entries),

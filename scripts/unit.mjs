@@ -145,6 +145,13 @@ ok('print uses leading', html.includes('line-height: 1.5'));
 ok('ragged when not justified', html.includes('text-align: left'));
 ok('title page included', html.includes('title-page') && html.includes('>T<'));
 ok('front matter not in body', !html.includes('Title: T'));
+const book = M.printHtml('# One\n\nbody', {}, { template: { pageSize: '6x9', margin: 1, fontSize: 11, leading: 1.42 } });
+ok('a book trim is given to the printer in inches', book.includes('size: 6in 9in'));
+ok('the title page is exactly the text box tall', book.includes('height: calc(9in - 2in)'));
+ok('the print sets like the preview: italic chapter heads', /h1 \{[^}]*font-style: italic/.test(book));
+ok('and hyphenates', /body \{[^}]*hyphens: auto/.test(book));
+ok('and the same paragraph indent', book.includes('text-indent: .28in'));
+ok('default trim is 6x9', M.printHtml('x', {}, {}).includes('size: 6in 9in'));
 
 /* ------------------------------------------------------------ strip markup */
 eq('strip heading', M.stripMarkup('# Chapter **One**'), 'Chapter One');

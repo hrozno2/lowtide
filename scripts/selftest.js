@@ -11,6 +11,12 @@ const PROFILE = path.join(os.tmpdir(), `low-tide-test-profile-${process.pid}`);
 const WORK = path.join(os.tmpdir(), `low-tide-test-files-${process.pid}`);
 app.setPath('userData', PROFILE);
 fs.mkdirSync(WORK, { recursive: true });
+// A settings file as an earlier version would have left it: every default of
+// the day written out in full, plus one thing the user actually chose.
+fs.mkdirSync(PROFILE, { recursive: true });
+fs.writeFileSync(path.join(PROFILE, 'preferences.json'), JSON.stringify({
+  pageSize: 'letter', printFontSize: 12, printLeading: 1.8, readingSpeed: 310
+}));
 
 process.env.LOWTIDE_HARNESS = '1';
 // Run from source, app.getVersion() reports Electron's own version, which beats
@@ -879,6 +885,35 @@ app.whenReady().then(async () => {
     await js(`window.__setPref('pageMarkers', true)`);
     await wait(900);
     ok('and back on', (await js(`document.querySelectorAll('.cm-line.page-start').length`)) >= 1);
+  });
+
+  await test('page layout follows the current defaults', async () => {
+    const p = await js(`(async () => (await window.api.prefs.get()))()`);
+    eq('an old default left on disk does not stick', [p.pageSize, p.printFontSize, p.printLeading], ['6x9', 11, 1.42]);
+    eq('a value the user chose does', p.readingSpeed, 310);
+
+    await js(`window.__setPref('printLeading', 2)`);
+    await wait(700);
+    const disk = JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8'));
+    eq('a change is written', disk.printLeading, 2);
+    ok('but nothing that merely equals a default is', !('pageSize' in disk) && !('fontFamily' in disk));
+
+    await click('#btn-prefs');
+    await wait(400);
+    const before = await js(`[...document.querySelectorAll('.prefs-body .row')]
+      .find(r => r.textContent.startsWith('Print leading')).querySelector('.val').textContent`);
+    eq('the panel shows the changed leading', before, '2.00');
+    await js(`document.getElementById('reset-page-layout').click()`);
+    await wait(700);
+    eq('reset puts the leading back',
+      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.42);
+    const after = await js(`[...document.querySelectorAll('.prefs-body .row')]
+      .find(r => r.textContent.startsWith('Print leading')).querySelector('.val').textContent`);
+    eq('and the panel shows it', after, '1.42');
+    eq('the file no longer carries it',
+      'printLeading' in JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')), false);
+    await click('#btn-prefs');
+    await wait(300);
   });
 
   await test('the title page is a form', async () => {

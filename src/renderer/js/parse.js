@@ -321,14 +321,22 @@ export function previewBody(text, opts = {}) {
   return out.join('\n');
 }
 
+const PRINT_SHEETS = {
+  '6x9': { css: '6in 9in', h: 9 },
+  '5.5x8.5': { css: '5.5in 8.5in', h: 8.5 },
+  letter: { css: 'Letter', h: 11 },
+  a4: { css: 'A4', h: 11.69 }
+};
+
 /** Stand-alone HTML for print / PDF / HTML export. */
 export function printHtml(text, docMeta = {}, opts = {}) {
   const { meta } = frontMatter(stripComments(text));
   const title = meta.title || docMeta.title || 'Untitled';
   const tpl = Object.assign(
-    { pageSize: 'letter', margin: 1, fontSize: 12, leading: 1.6, justify: true },
+    { pageSize: '6x9', margin: 1, fontSize: 11, leading: 1.42, justify: true },
     opts.template || {});
-  const sheet = tpl.pageSize === 'a4' ? 'A4' : 'Letter';
+  const sheet = PRINT_SHEETS[tpl.pageSize] || PRINT_SHEETS.letter;
+  const textHeight = `calc(${sheet.h}in - ${2 * tpl.margin}in)`;
   const pages = pagesHtml(text, opts);
 
   let n = 0;
@@ -344,32 +352,39 @@ export function printHtml(text, docMeta = {}, opts = {}) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-  @page { size: ${sheet}; margin: ${tpl.margin}in; }
+  @page { size: ${sheet.css}; margin: ${tpl.margin}in; }
   html { background: #fff; }
+  /* The same setting as the preview's page, so what prints is what was shown. */
   body { margin: 0; color: #000; font-family: "Iowan Old Style", Palatino, Georgia, "Liberation Serif", serif;
-         font-size: ${tpl.fontSize}pt; line-height: ${tpl.leading}; }
+         font-size: ${tpl.fontSize}pt; line-height: ${tpl.leading};
+         hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;
+         text-rendering: optimizeLegibility; font-kerning: normal; }
   .sheet { page-break-after: always; position: relative; }
   .sheet:last-child { page-break-after: auto; }
-  h1 { font-size: 15pt; font-weight: 700; text-align: center; margin: 1.6in 0 .5in; letter-spacing: .04em; }
-  .sheet.first h1 { margin-top: .3in; }
-  h2 { font-size: 12.5pt; text-align: center; margin: .4in 0 .18in; }
-  h3 { font-size: 12pt; margin: .3in 0 .1in; }
-  p  { margin: 0; text-indent: .5in; text-align: ${tpl.justify ? 'justify' : 'left'};
+  h1 { font-size: 14pt; font-weight: 400; font-style: italic; text-align: center;
+       margin: 1.1in 0 .5in; letter-spacing: .01em; }
+  .sheet.first h1, h1.first { margin-top: .5in; }
+  h2 { font-size: 12.5pt; font-weight: 400; text-align: center; margin: .45in 0 .28in; }
+  h3 { font-size: 11.5pt; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
+  h1 + p, h2 + p, h3 + p { text-indent: 0; }
+  h1 + p::first-line, h2 + p::first-line { font-variant-caps: small-caps; }
+  p  { margin: 0; text-indent: .28in; text-align: ${tpl.justify ? 'justify' : 'left'};
        orphans: 2; widows: 2; }
   p.cont { text-indent: 0; }
   p.flush { text-indent: 0; }
   p.center { text-align: center; text-indent: 0; }
   p.right { text-align: right; text-indent: 0; }
   p.list { text-indent: -.22in; padding-left: .5in; text-align: left; }
-  hr { border: 0; text-align: center; margin: .25in 0; }
+  hr { border: 0; text-align: center; margin: .3in 0; }
   hr::before { content: '#'; }
   .note { color: #7a6a2a; font-style: italic; }
   .title-page { display: flex; flex-direction: column; justify-content: center;
-                min-height: 8.5in; text-align: center; page-break-after: always; }
+                height: ${textHeight}; text-align: center; page-break-after: always; }
+  .title-page h1 { font-style: normal; }
   .title-page h1.title { margin: 0 0 .5in; font-size: 18pt; letter-spacing: .06em; }
-  .title-page .by { margin: 0; font-size: 12pt; }
-  .title-page .author { margin: .1in 0 0; font-size: 13pt; }
-  .title-foot { margin-top: 1.4in; font-size: 11pt; line-height: 1.5; }
+  .title-page .by { margin: 0; font-size: 12pt; text-indent: 0; }
+  .title-page .author { margin: .1in 0 0; font-size: 13pt; text-indent: 0; }
+  .title-foot { margin-top: 1.2in; font-size: 11pt; line-height: 1.5; }
   .title-foot p { text-indent: 0; text-align: center; margin: 0; }
 </style></head>
 <body>

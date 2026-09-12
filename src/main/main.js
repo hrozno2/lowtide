@@ -493,14 +493,16 @@ function defaultSaveDir() {
 /* ---------------------------------------------------------------------- ipc */
 
 ipcMain.handle('prefs:get', () => getPrefs().all);
-ipcMain.handle('prefs:set', (e, patch) => {
-  const p = getPrefs().set(patch);
-  // Broadcast so every window stays in sync.
+ipcMain.handle('prefs:set', (e, patch) => broadcastPrefs(e, getPrefs().set(patch)));
+ipcMain.handle('prefs:reset', (e, keys) => broadcastPrefs(e, getPrefs().reset(keys)));
+
+// Every other window gets the new state so they all stay in sync.
+function broadcastPrefs(e, p) {
   BrowserWindow.getAllWindows().forEach((w) => {
     if (w.webContents !== e.sender) w.webContents.send('prefs:changed', p);
   });
   return p;
-});
+}
 
 ipcMain.handle('doc:state', (e, state) => {
   const win = BrowserWindow.fromWebContents(e.sender);
@@ -592,12 +594,18 @@ ipcMain.handle('file:export', async (e, { content, html, format, suggested, runn
   return result.filePath;
 });
 
-function headerTemplate(runningHead) {
+function headerTemplate(runningHead, margin) {
   const safe = String(runningHead || '').replace(/[&<>]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   return `<div style="width:100%;font:9px Georgia,'Times New Roman',serif;color:#000;` +
-         `padding:0 1in;text-align:right;">${safe}&nbsp;&middot;&nbsp;` +
+         `padding:0 ${margin}in;text-align:right;">${safe}&nbsp;&middot;&nbsp;` +
          `<span class="pageNumber"></span></div>`;
+}
+
+// Chromium knows the manuscript papers by name; the book trims are given as
+// inches.
+function pdfSheet(id) {
+  return { '6x9': { width: 6, height: 9 }, '5.5x8.5': { width: 5.5, height: 8.5 }, a4: 'A4' }[id] || 'Letter';
 }
 
 async function exportPdf(html, target, runningHead, pageSetup) {
@@ -609,7 +617,7 @@ async function exportPdf(html, target, runningHead, pageSetup) {
     await printer.loadFile(tmp);
     const data = await printer.webContents.printToPDF({
       printBackground: false,
-      pageSize: (pageSetup && pageSetup.pageSize === 'a4') ? 'A4' : 'Letter',
+      pageSize: pdfSheet(pageSetup && pageSetup.pageSize),
       margins: {
         marginType: 'custom',
         top: m, bottom: m, left: m, right: m
@@ -617,7 +625,7 @@ async function exportPdf(html, target, runningHead, pageSetup) {
       // Chromium paginates the HTML itself, so the running head has to come
       // from the print engine rather than from the document.
       displayHeaderFooter: !!runningHead,
-      headerTemplate: headerTemplate(runningHead),
+      headerTemplate: headerTemplate(runningHead, m),
       footerTemplate: '<div></div>'
     });
     fs.writeFileSync(target, data);

@@ -83,6 +83,19 @@ function migrateOldProfile() {
 
 let migrated = false;
 
+// Values earlier versions wrote to disk as defaults. A stored value equal to
+// one of these was never chosen, so it is dropped on read and the current
+// default applies. (A deliberate pick of the same value is indistinguishable
+// and is dropped too; that is the price of the older, whole-object writes.)
+const RETIRED_DEFAULTS = {
+  pageSize: 'letter',
+  printFontSize: 12,
+  printLeading: 1.8
+};
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+
 class JsonFile {
   constructor(name, defaults) {
     if (!migrated) { migrated = true; migrateOldProfile(); }
@@ -94,6 +107,9 @@ class JsonFile {
   _read() {
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      for (const [k, v] of Object.entries(RETIRED_DEFAULTS)) {
+        if (same(raw[k], v)) delete raw[k];
+      }
       return Object.assign({}, this.defaults, raw);
     } catch {
       return Object.assign({}, this.defaults);
@@ -106,6 +122,15 @@ class JsonFile {
     this.flushLater();
     return this.data;
   }
+  /** Put the named keys back to their defaults. */
+  reset(keys) {
+    for (const k of keys) {
+      if (k in this.defaults) this.data[k] = clone(this.defaults[k]);
+      else delete this.data[k];
+    }
+    this.flushLater();
+    return this.data;
+  }
   flushLater() {
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this.flush(), 400);
@@ -114,7 +139,15 @@ class JsonFile {
     clearTimeout(this._timer);
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+      // Only what differs from the defaults goes to disk. Writing the whole
+      // object froze every default at whatever it was the first time any
+      // preference was touched, so a later change of default never reached
+      // an existing install.
+      const sparse = {};
+      for (const [k, v] of Object.entries(this.data)) {
+        if (!same(v, this.defaults[k])) sparse[k] = v;
+      }
+      fs.writeFileSync(this.file, JSON.stringify(sparse, null, 2));
     } catch (err) {
       console.error('[low-tide] could not write', this.file, err.message);
     }

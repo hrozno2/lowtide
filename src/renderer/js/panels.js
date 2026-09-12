@@ -356,11 +356,17 @@ function toggle(value, onPick) {
   return b;
 }
 
+const PAGE_LAYOUT_KEYS = ['pageSize', 'printMargin', 'printFontSize', 'printLeading', 'printJustify'];
+
 export function showPreferences(ctx) {
+  openPanel('prefs', panelShell('Preferences', preferencesBody(ctx)));
+}
+
+function preferencesBody(ctx) {
   const p = ctx.prefs;
   const set = ctx.setPrefs;
 
-  const body = h('div', {},
+  const body = h('div', { class: 'prefs-body' },
     row('Typeface', null, h('select', {
       onchange: (e) => set({ fontFamily: e.target.value })
     }, ...[['serif', 'Serif'], ['sans', 'Sans'], ['mono', 'Typewriter']].map(([v, l]) =>
@@ -412,17 +418,24 @@ export function showPreferences(ctx) {
       segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
         p.pageSize || '6x9', (v) => set({ pageSize: v }))),
 
-    row('Margins', null, slider(p.printMargin || 0.75, 0.5, 1.5, 0.05, (v) => `${v.toFixed(2)}"`,
+    row('Margins', null, slider(p.printMargin || 1, 0.5, 1.5, 0.05, (v) => `${v.toFixed(2)}"`,
       (v) => set({ printMargin: v }))),
 
-    row('Print type size', null, slider(p.printFontSize || 12, 9, 16, 0.5, (v) => `${v}pt`,
+    row('Print type size', null, slider(p.printFontSize || 11, 9, 16, 0.5, (v) => `${v}pt`,
       (v) => set({ printFontSize: v }))),
 
     row('Print leading', 'Book typesetting runs 120–145% of the type size',
-      slider(p.printLeading || 1.4, 1.2, 2.4, 0.05,
+      slider(p.printLeading || 1.42, 1.2, 2.4, 0.05,
       (v) => v.toFixed(2), (v) => set({ printLeading: v }))),
 
     row('Justify text', null, toggle(p.printJustify !== false, (v) => set({ printJustify: v }))),
+
+    row('Reset page layout', 'Back to the book defaults: 6×9, 1" margins, 11pt at 142%',
+      h('button', { class: 'btn', id: 'reset-page-layout', onclick: async () => {
+        const prefs = await ctx.resetPrefs(PAGE_LAYOUT_KEYS);
+        // Rebuild the body so the sliders show the values they now hold.
+        body.replaceWith(preferencesBody(Object.assign({}, ctx, { prefs })));
+      } }, 'Reset')),
 
     row('YouTube in the music pane', 'Off means no browser view at all',
       toggle(p.youtubeEnabled !== false, (v) => set({ youtubeEnabled: v }))),
@@ -456,8 +469,7 @@ export function showPreferences(ctx) {
       onchange: (e) => set({ readingSpeed: Math.max(100, Math.min(600, +e.target.value || 275)) })
     }))
   );
-
-  openPanel('prefs', panelShell('Preferences', body));
+  return body;
 }
 
 /* ------------------------------------------------------------------ sprint */
