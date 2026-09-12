@@ -1,7 +1,7 @@
 {
   "name": "low-tide",
   "productName": "Low Tide",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "A fast, minimal novel writing app.",
   "main": "src/main/main.js",
   "author": "hrozno2",
@@ -87,7 +87,7 @@
       ]
     },
     "dmg": {
-      "title": "${productName}",
+      "title": "${productName} ${version}${arch}",
       "writeUpdateInfo": false,
       "contents": [
         {
