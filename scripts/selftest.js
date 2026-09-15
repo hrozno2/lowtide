@@ -1077,11 +1077,13 @@ app.whenReady().then(async () => {
     /* Ratios rather than pixels, so the check survives a different font. The
        blank line above a heading in the source already separates it; the
        padding only has to make the break read as one. */
-    const r = (x) => Math.round((x / body) * 100) / 100;
-    eq('chapter ratio', r(h1), 1.71);
-    eq('section ratio', r(h2), 1.54);
-    eq('sub-section ratio', r(h3), 1.43);
-    eq('fourth-level ratio', r(h4), 1.36);
+    // To a hundredth, give or take one: Linux rounds a line box a pixel
+    // differently and lands on 1.42 where macOS lands on 1.43.
+    const near = (what, x, want) => eq(what, Math.abs(x / body - want) < 0.016 ? want : +(x / body).toFixed(3), want);
+    near('chapter ratio', h1, 1.71);
+    near('section ratio', h2, 1.54);
+    near('sub-section ratio', h3, 1.43);
+    near('fourth-level ratio', h4, 1.36);
     ok('no heading is more than twice a line of prose', h1 < body * 2);
   });
 
@@ -1144,10 +1146,11 @@ app.whenReady().then(async () => {
       for (const el of document.querySelectorAll('body *')) {
         if (el.closest('.sprite') || el.tagName === 'svg' || el.tagName === 'use') continue;
         if (!el.offsetParent) continue;
-        // Chromium pins <select> to normal in its own stylesheet and ignores
-        // any override; that control is sized by the platform, not by a line
-        // of text, so it is not what this check is looking for.
-        if (el.tagName === 'SELECT') continue;
+        // Chromium pins <select> (and, on Linux, its <option>s) to normal
+        // in its own stylesheet and ignores any override; that control is
+        // sized by the platform, not by a line of text, so it is not what
+        // this check is looking for.
+        if (el.tagName === 'SELECT' || el.tagName === 'OPTION') continue;
         if (getComputedStyle(el).lineHeight === 'normal') {
           out.push(el.tagName.toLowerCase() +
             (typeof el.className === 'string' && el.className.trim()
