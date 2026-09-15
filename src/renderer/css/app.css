@@ -901,14 +901,14 @@ input[type="range"]::-webkit-slider-thumb {
   width: var(--page-w, 8.27in);
   min-height: var(--page-h, 11.69in);
   margin: 0 auto 24px;
-  padding: var(--page-margin, 1in) var(--page-margin-x, 1.45in);
+  padding: var(--page-margin, 1in) var(--page-margin-x, 1.46in) var(--page-margin-b, 1in);
   background: #f7f5f0;
   color: #16191a;
   box-shadow: var(--shadow-2);
   border-radius: 2px;
   font-family: var(--font-serif);
-  font-size: var(--print-size, 12.75pt);
-  line-height: var(--print-leading, 1.65);
+  font-size: var(--print-size, 13pt);
+  line-height: var(--print-leading, 1.6);
   text-rendering: optimizeLegibility;
   font-kerning: normal;
 }
@@ -921,11 +921,11 @@ input[type="range"]::-webkit-slider-thumb {
 .page { position: relative; }
 .page .page-head {
   position: absolute;
-  top: calc(var(--page-margin, 1in) * .55);
-  left: var(--page-margin-x, 1.45in);
-  right: var(--page-margin-x, 1.45in);
+  top: calc(var(--page-margin, 1in) * .45);
+  left: var(--page-margin-x, 1.46in);
+  right: var(--page-margin-x, 1.46in);
   text-align: center;
-  font-size: 11pt; line-height: 1.4;
+  font-size: 1em; line-height: 1.4;
   font-variant-caps: all-small-caps; letter-spacing: .04em;
   color: #16191a;
 }
@@ -934,15 +934,17 @@ input[type="range"]::-webkit-slider-thumb {
    chapter head roman and unemphasised, and the opening words of a chapter in
    small caps — which is how a printed novel signals a beginning without
    needing a rule or extra space. */
+/* Measured off Highland's page: the title 24pt with its box 2.71in down the
+   sheet, the subtitle 18pt, the text beginning 4.15in down. Amiri's own line
+   box is 1.76em, which is what both heads sit in. */
 .page h1 {
-  font-size: 2em; font-weight: 400; font-style: italic;
-  text-align: center; margin: 1.9in 0 .5in; letter-spacing: .01em; line-height: 1.2;
+  font-size: 1.846em; font-weight: 400; font-style: italic;
+  text-align: center; margin: 1.71in 0 .77em; letter-spacing: 0; line-height: 1.76;
 }
 .page h2 {
-  font-size: 1.35em; font-weight: 400; text-align: center;
-  margin: .45in 0 .3in; line-height: 1.3;
+  font-size: 1.385em; font-weight: 400; text-align: center;
+  margin: 0 0 .63em; line-height: 1.76;
 }
-.page h1 + h2 { margin-top: 0; }
 .page h3 { font-size: 1.1em; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
 
 /* The first line after a chapter or section head. */
@@ -954,7 +956,7 @@ input[type="range"]::-webkit-slider-thumb {
 .page-measure h2 + p::first-line, .page-measure h1 + p::first-line {
   font-variant-caps: small-caps;
 }
-.page p { margin: 0; text-indent: .3in; text-align: justify; }
+.page p { margin: 0; text-indent: .25in; text-align: justify; }
 .page.ragged p, .page-measure.ragged p { text-align: left; }
 .page p.flush { text-indent: 0; }
 .page p.center { text-align: center; text-indent: 0; }
@@ -977,7 +979,7 @@ input[type="range"]::-webkit-slider-thumb {
   contain: layout style;
 }
 .page hr { border: 0; text-align: center; margin: .3in 0; }
-.page hr::before { content: '#'; color: #16191a; }
+.page hr::before { content: '***'; color: #16191a; letter-spacing: .1em; }
 .page .note { color: #7a6a2a; font-style: italic; }
 .page.title-page {
   display: flex; flex-direction: column; justify-content: center;

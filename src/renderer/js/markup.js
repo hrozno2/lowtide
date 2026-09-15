@@ -32,8 +32,10 @@ const RE_HEADING = /^(#{1,4})([ \t]+)(.*)$/;
 const RE_HEADING_BARE = /^(#{1,4})([ \t]*)$/;
 const RE_CENTER = /^(>)([ \t]*)(.*?)([ \t]*)(<)[ \t]*$/;
 const RE_RIGHT = /^(>)([ \t]+)(\S.*?)[ \t]*$/;
-const RE_PAGEBREAK = /^(?:={3,}|-{3,})[ \t]*$/;
-const RE_DIVIDER = /^(?:\*[ \t]*){3,}[ \t]*$|^~{3,}[ \t]*$/;
+// === is Fountain's page break; --- is Markdown's rule, which Highland sets as
+// a scene divider, so it is one here too.
+const RE_PAGEBREAK = /^={3,}[ \t]*$/;
+const RE_DIVIDER = /^(?:\*[ \t]*){3,}[ \t]*$|^~{3,}[ \t]*$|^-{3,}[ \t]*$/;
 const RE_LIST = /^([ \t]*)([-+*\u2022\u2013\u2014]|\d{1,3}[.)])([ \t]+)(.*)$/;
 
 /** Classify one line. Returns the block type plus any leading marker span. */

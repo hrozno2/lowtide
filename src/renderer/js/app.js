@@ -175,9 +175,9 @@ function applyPrefs(p, prev) {
     if (changed('smartTypography')) editor.setSmartTypography(p.smartTypography !== false);
     if (changed('spellcheck')) editor.setSpellcheck(p.spellcheck !== false);
   }
-  if (changed('pageSize') || changed('printMargin') || changed('printSideMargin') ||
-      changed('printFontSize') || changed('printLeading') || changed('printJustify') ||
-      changed('printHyphenate') || !prev) {
+  if (changed('pageSize') || changed('printMargin') || changed('printBottomMargin') ||
+      changed('printSideMargin') || changed('printFontSize') || changed('printLeading') ||
+      changed('printJustify') || changed('printHyphenate') || !prev) {
     applyPageTemplate(p);
   }
   if (changed('youtubeEnabled')) {
@@ -185,8 +185,9 @@ function applyPrefs(p, prev) {
     if (musicPanelBody()) renderMusicDock({ rebuild: true });
   }
   if (changed('previewNotes') || changed('previewTitlePage') ||
-      changed('pageSize') || changed('printMargin') || changed('printSideMargin') ||
-      changed('printFontSize') || changed('printLeading') || changed('printHyphenate')) {
+      changed('pageSize') || changed('printMargin') || changed('printBottomMargin') ||
+      changed('printSideMargin') || changed('printFontSize') || changed('printLeading') ||
+      changed('printHyphenate')) {
     repaginate();
   }
 }
@@ -200,8 +201,9 @@ function applyPageTemplate(p) {
   css.setProperty('--page-h', `${geo.sheet.h}in`);
   css.setProperty('--page-margin', `${geo.margin}in`);
   css.setProperty('--page-margin-x', `${geo.side}in`);
-  css.setProperty('--print-size', `${p.printFontSize || 12.75}pt`);
-  css.setProperty('--print-leading', String(p.printLeading || 1.65));
+  css.setProperty('--page-margin-b', `${geo.bottom}in`);
+  css.setProperty('--print-size', `${p.printFontSize || 13}pt`);
+  css.setProperty('--print-leading', String(p.printLeading || 1.6));
   css.setProperty('--page-text-w', `${geo.width}px`);
 
   const ragged = p.printJustify === false;
@@ -1051,9 +1053,10 @@ function printTemplate() {
   return {
     pageSize: p.pageSize || 'a4',
     margin: Number(p.printMargin) || 1,
+    bottomMargin: Number(p.printBottomMargin) || Number(p.printMargin) || 1,
     sideMargin: Number(p.printSideMargin) || Number(p.printMargin) || 1,
-    fontSize: Number(p.printFontSize) || 12.75,
-    leading: Number(p.printLeading) || 1.65,
+    fontSize: Number(p.printFontSize) || 13,
+    leading: Number(p.printLeading) || 1.6,
     justify: p.printJustify !== false,
     hyphenate: !!p.printHyphenate
   };

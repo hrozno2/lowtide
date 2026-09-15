@@ -827,10 +827,11 @@ app.whenReady().then(async () => {
   await test('the page is set the way Highland sets it', async () => {
     const p = await js(`(async () => (await window.api.prefs.get()))()`);
     ok('paper follows the region', ['a4', 'letter'].includes(p.pageSize));
-    eq('17px type', p.printFontSize, 12.75);
-    eq('on 28px lines', p.printLeading, 1.65);
-    eq('an inch top and bottom', p.printMargin, 1);
-    eq('and wide side margins', p.printSideMargin, 1.45);
+    eq('13pt type', p.printFontSize, 13);
+    eq('at 160%', p.printLeading, 1.6);
+    eq('an inch above', p.printMargin, 1);
+    eq('and below', p.printBottomMargin, 1);
+    eq('and 1.46in at the sides', p.printSideMargin, 1.46);
 
     await js(`window.__setPref('pageSize', 'a4')`);
     await load(NOVEL);
@@ -843,21 +844,22 @@ app.whenReady().then(async () => {
       const cs = getComputedStyle(el), ps = getComputedStyle(p);
       const head = document.querySelectorAll('.page')[1].querySelector('.page-head');
       const hs = getComputedStyle(head);
-      return { w: cs.width, padX: cs.paddingLeft, padY: cs.paddingTop, size: cs.fontSize, lh: cs.lineHeight,
+      return { w: cs.width, padX: cs.paddingLeft, padY: cs.paddingTop, padB: cs.paddingBottom, size: cs.fontSize, lh: cs.lineHeight,
                hyph: ps.hyphens || ps.webkitHyphens, align: ps.textAlign, indent: ps.textIndent,
-               face: document.fonts.check('17px "Libertinus Serif"'),
+               face: document.fonts.check('17px Amiri'),
                h1: getComputedStyle(document.querySelector('.page h1')).fontStyle,
                headAlign: hs.textAlign, headCaps: hs.fontVariantCaps,
                no: head.querySelector('.page-no').textContent }; })()`);
     ok('the sheet is A4', Math.abs(parseFloat(page.w) - 793.92) < 0.1);
-    eq('with 1.45in at the sides', page.padX, '139.2px');
-    eq('and an inch above', page.padY, '96px');
-    eq('type is 17px', page.size, '17px');
-    eq('on 28px lines', page.lh, '28.05px');
+    ok('with 1.46in at the sides', Math.abs(parseFloat(page.padX) - 140.16) < 0.1);
+    eq('an inch above', page.padY, '96px');
+    eq('and below', page.padB, '96px');
+    ok('type is 13pt', Math.abs(parseFloat(page.size) - 17.333) < 0.01);
+    ok('on 20.8pt lines', Math.abs(parseFloat(page.lh) - 27.733) < 0.01);
     eq('not hyphenated', page.hyph, 'manual');
     eq('justified', page.align, 'justify');
-    eq('paragraphs indented .3in', page.indent, '28.8px');
-    ok('set in Libertinus Serif', page.face);
+    eq('paragraphs indented a quarter inch', page.indent, '24px');
+    ok('set in Amiri', page.face);
     eq('the chapter title is italic', page.h1, 'italic');
     eq('the running head is centred', page.headAlign, 'center');
     eq('in small capitals', page.headCaps, 'all-small-caps');
@@ -922,7 +924,7 @@ app.whenReady().then(async () => {
 
   await test('page layout follows the current defaults', async () => {
     const p = await js(`(async () => (await window.api.prefs.get()))()`);
-    ok('an old default left on disk does not stick', ['a4', 'letter'].includes(p.pageSize) && p.printFontSize === 12.75 && p.printLeading === 1.65);
+    ok('an old default left on disk does not stick', ['a4', 'letter'].includes(p.pageSize) && p.printFontSize === 13 && p.printLeading === 1.6);
     eq('a value the user chose does', p.readingSpeed, 310);
     eq('and the file is stamped so it is not migrated twice', p.settingsVersion, 2);
 
@@ -931,7 +933,7 @@ app.whenReady().then(async () => {
     await wait(700);
     eq('a retired default chosen deliberately is kept on disk',
       JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')).printFontSize, 12);
-    await js(`window.__setPref('printFontSize', 12.75)`);
+    await js(`window.__setPref('printFontSize', 13)`);
     await wait(500);
 
     await js(`window.__setPref('printLeading', 2)`);
@@ -948,10 +950,10 @@ app.whenReady().then(async () => {
     await js(`document.getElementById('reset-page-layout').click()`);
     await wait(700);
     eq('reset puts the leading back',
-      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.65);
+      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.6);
     const after = await js(`[...document.querySelectorAll('.prefs-body .row')]
       .find(r => r.textContent.startsWith('Print leading')).querySelector('.val').textContent`);
-    eq('and the panel shows it', after, '1.65');
+    eq('and the panel shows it', after, '1.60');
     eq('the file no longer carries it',
       'printLeading' in JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')), false);
     await click('#btn-prefs');

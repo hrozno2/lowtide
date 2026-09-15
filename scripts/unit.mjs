@@ -66,7 +66,7 @@ eq('centered', type('> middle <'), 'center');
 eq('right aligned', type('> later'), 'right');
 eq('lone > is body', type('>'), 'body');
 eq('page break equals', type('==='), 'pagebreak');
-eq('page break dashes', type('---'), 'pagebreak');
+eq('dashes are a scene divider, as in Highland', type('---'), 'divider');
 eq('two dashes is body', type('--'), 'body');
 eq('divider stars', type('***'), 'divider');
 eq('bullet list', type('- item'), 'list');
@@ -123,7 +123,8 @@ eq('outline of empty doc', M.outline('').length, 0);
 /* ----------------------------------------------------------------- pages */
 const sec = (t, o) => M.pagesHtml(t, o);
 eq('page break splits sections', sec('a\n\n===\n\nb').length, 2);
-eq('chapter starts a section', sec('# A\n\nx\n\n# B\n\ny').length, 2);
+eq('a chapter head flows on, as Highland sets it', sec('# A\n\nx\n\n# B\n\ny').length, 1);
+ok('but changes the running head', sec('# A\n\nx\n\n===\n\n# B\n\ny')[1].chapter === 'B');
 // Every block also names the source line it came from, for the page markers.
 ok('first paragraph is flush', /<p class="flush" data-line="\d+">one<\/p>/.test(sec('# A\n\none\n\ntwo')[0].html));
 ok('second paragraph indents', /<p data-line="\d+">two<\/p>/.test(sec('# A\n\none\n\ntwo')[0].html));
@@ -139,7 +140,7 @@ eq('chapter tracked on the page', sec('# Ch\n\nx')[0].chapter, 'Ch');
 const html = M.printHtml('Title: T\nAuthor: A\n\n# One\n\nbody', { title: 'T' },
   { titlePage: true, template: { pageSize: 'a4', margin: 1.25, fontSize: 11, leading: 1.5, justify: false } });
 ok('print uses A4', html.includes('size: A4'));
-ok('print uses margin', html.includes('margin: 1.25in 1.25in'));
+ok('print uses margin', html.includes('margin: 1.25in 1.25in 1.25in'));
 ok('print uses type size', html.includes('font-size: 11pt'));
 ok('print uses leading', html.includes('line-height: 1.5'));
 ok('ragged when not justified', html.includes('text-align: left'));
@@ -147,18 +148,19 @@ ok('title page included', html.includes('title-page') && html.includes('>T<'));
 ok('front matter not in body', !html.includes('Title: T'));
 const book = M.printHtml('# One\n\nbody', {}, { template: { pageSize: '6x9', margin: 1, sideMargin: 0.8, fontSize: 11, leading: 1.42, hyphenate: true } });
 ok('a book trim is given to the printer in inches', book.includes('size: 6in 9in'));
-ok('side margins are their own number', book.includes('margin: 1in 0.8in'));
+ok('side margins are their own number', book.includes('margin: 1in 0.8in 1in'));
 ok('the title page is exactly the text box tall', book.includes('height: calc(9in - 2in)'));
 ok('the print sets like the preview: italic chapter heads', /h1 \{[^}]*font-style: italic/.test(book));
 ok('hyphenates when asked', /body \{[^}]*hyphens: auto/.test(book));
 ok('and not otherwise', !/hyphens: auto/.test(M.printHtml('x', {}, {})));
-ok('and the same paragraph indent', book.includes('text-indent: .3in'));
+ok('and the same paragraph indent', book.includes('text-indent: .25in'));
 const dflt = M.printHtml('x', {}, {});
-ok('the default page is A4 at 17px on 28px lines', dflt.includes('size: A4') && dflt.includes('font-size: 12.75pt') && dflt.includes('line-height: 1.65'));
-ok('set in the bundled face', dflt.includes('"Libertinus Serif"'));
+ok('the default page is A4, 13pt Amiri at 160%', dflt.includes('size: A4') && dflt.includes('font-size: 13pt') && dflt.includes('line-height: 1.6'));
+ok('with Highland\'s margins', dflt.includes('margin: 1in 1.46in 1in'));
+ok('set in the bundled face', /font-family: Amiri,/.test(dflt));
 ok('an HTML export carries no font files', !dflt.includes('@font-face'));
 const pdf = M.printHtml('x', {}, { fontBase: 'file:///app/fonts/' });
-ok('a PDF gets the face by absolute URL', pdf.includes('src: url("file:///app/fonts/ls-400.woff2")') && pdf.includes('ls-italic-700.woff2'));
+ok('a PDF gets the face by absolute URL', pdf.includes('src: url("file:///app/fonts/am-400.woff2")') && pdf.includes('am-italic-700.woff2'));
 
 /* ------------------------------------------------------------ strip markup */
 eq('strip heading', M.stripMarkup('# Chapter **One**'), 'Chapter One');

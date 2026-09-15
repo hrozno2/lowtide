@@ -157,6 +157,7 @@ function stylesXml(opts) {
 function buildDocx(blocks, meta = {}, opts = {}) {
   const margin = Math.round((opts.margin || 1) * 1440);   // twips
   const side = Math.round((opts.sideMargin || opts.margin || 1) * 1440);
+  const bottom = Math.round((opts.bottomMargin || opts.margin || 1) * 1440);
   const body = [];
 
   if (opts.titlePage && (meta.title || meta.author)) {
@@ -176,7 +177,7 @@ function buildDocx(blocks, meta = {}, opts = {}) {
   const document = `${XML}<w:document xmlns:w="${W}"><w:body>
 ${body.join('\n')}
 <w:sectPr><w:pgSz w:w="12240" w:h="15840"/>
-<w:pgMar w:top="${margin}" w:right="${side}" w:bottom="${margin}" w:left="${side}"/>
+<w:pgMar w:top="${margin}" w:right="${side}" w:bottom="${bottom}" w:left="${side}"/>
 </w:sectPr></w:body></w:document>`;
 
   const contentTypes = `${XML}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

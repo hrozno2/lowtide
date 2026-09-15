@@ -35,12 +35,14 @@ export function pageStartLine(html) {
 export function geometryFor(prefs = {}) {
   const sheet = SHEETS[prefs.pageSize] || SHEETS.a4;
   const margin = Number(prefs.printMargin) || 1;
+  const bottom = Number(prefs.printBottomMargin) || margin;
   const side = Number(prefs.printSideMargin) || margin;
   return {
     width: Math.round((sheet.w - side * 2) * DPI),
-    height: Math.round((sheet.h - margin * 2) * DPI),
+    height: Math.round((sheet.h - margin - bottom) * DPI),
     sheet,
     margin,
+    bottom,
     side
   };
 }
@@ -100,8 +102,10 @@ function lineBoxes(block) {
   const lines = [];
   for (const r of rects) {
     const last = lines[lines.length - 1];
-    // Inline spans produce several rects on one line; merge by vertical band.
-    if (last && r.top < last.bottom - 1) {
+    // Inline spans produce several rects on one line; those share a top.
+    // (Overlap is not the test: a face whose glyph box is taller than the
+    // line pitch — Amiri's is — overlaps every line with the next.)
+    if (last && Math.abs(r.top - last.top) < r.height / 2) {
       last.top = Math.min(last.top, r.top);
       last.bottom = Math.max(last.bottom, r.bottom);
     } else {
@@ -211,15 +215,32 @@ export function paginate(sections, geometry) {
       continue;
     }
 
-    // Cut before any line whose bottom would fall past the page.
+    // Cut before any line whose bottom would fall past the page. A section
+    // head that would be left as the last thing on a page goes over with the
+    // block it introduces — the way Highland does it, which leaves a chapter
+    // head where it falls. Cutting earlier only moves lines down, never
+    // re-wraps them, so the single layout still holds.
+    const isSubhead = (i) => i >= 0 && /^H[23]$/.test(blocks[i].tagName);
     const breaks = [];
-    let pageTop = lines[0].top;
-    for (const line of lines) {
-      if (line.bottom - pageTop > pageHeight + 0.5 && (line.i || line.j)) {
-        breaks.push({ i: line.i, j: line.j });
-        pageTop = line.top;
-        if (pages.length + breaks.length > MAX_PAGES) break;
+    // The first page of a section starts at the top of the text box, not at
+    // its first line: the space above a chapter title counts. Later pages
+    // start at their first line, as a margin against a page break collapses.
+    let pageTop = host.getBoundingClientRect().top;
+    let pageStart = 0;                       // index in `lines` of the page's first line
+    for (let k = 0; k < lines.length; k++) {
+      const line = lines[k];
+      if (line.bottom - pageTop <= pageHeight + 0.5 || k === pageStart) continue;
+      let cut = k;
+      // The first line of a block whose previous block is a section head:
+      // take the head along, unless the head itself opened this page.
+      if (line.j === 0 && isSubhead(line.i - 1)) {
+        const head = lines.findIndex((l) => l.i === line.i - 1);
+        if (head > pageStart) cut = head;
       }
+      breaks.push({ i: lines[cut].i, j: lines[cut].j });
+      pageTop = lines[cut].top;
+      pageStart = cut;
+      if (pages.length + breaks.length > MAX_PAGES) break;
     }
 
     // Offsets are read from the laid-out originals before anything is cloned.

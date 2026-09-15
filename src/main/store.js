@@ -35,17 +35,21 @@ const DEFAULTS = {
      how a trade paperback is actually set — inside every range typesetters
      work to, and close to what Highland draws. Letter and A4 are still there
      for a manuscript you are posting to someone. */
-  // The page is set the way Highland's Novel template sets it: 17px type on
-  // 28px lines, wide side margins, no hyphenation. The paper follows the
-  // locale (see getPrefs); the rest is measured from Highland's own output.
+  // The page is set the way Highland's Novel template sets it, measured
+  // from a PDF it produced: Amiri at 13pt on 20.8pt lines in a 385pt column,
+  // an inch above and below, no hyphenation. Highland's own paginator fits
+  // 32–34 lines to a page (it estimates rather than measures); 33 is its
+  // average, and a page count that agrees with it. The paper follows the
+  // locale (see getPrefs).
   pageSize: 'a4',            // '6x9' | '5.5x8.5' | 'letter' | 'a4'
-  printFontSize: 12.75,      // pt (17px)
-  printLeading: 1.65,        // multiple of the font size (28px)
-  printSideMargin: 1.45,     // inches, left and right
+  printFontSize: 13,         // pt
+  printLeading: 1.6,         // multiple of the font size
+  printSideMargin: 1.46,     // inches, left and right: a 385pt column on A4
   printHyphenate: false,
   theme: 'material',
   saveTo: 'documents',      // 'documents' | 'dropbox'
-  printMargin: 1,            // inches, top and bottom
+  printMargin: 1,            // inches, top
+  printBottomMargin: 1,      // inches; 33 lines a page, Highland's average
   printJustify: true,
   pageMarkers: true,         // page numbers in the margin of the writing view
   goal: null,
@@ -97,8 +101,9 @@ let migrated = false;
 const SETTINGS_VERSION = 2;
 const RETIRED_DEFAULTS = {
   pageSize: ['letter', '6x9'],
-  printFontSize: [12, 11],
-  printLeading: [1.8, 1.42]
+  printFontSize: [12, 11, 12.75],
+  printLeading: [1.8, 1.42, 1.65],
+  printSideMargin: [1.45]
 };
 
 // Letter is the paper of the US and a few of its neighbours; everywhere else

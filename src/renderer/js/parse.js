@@ -242,10 +242,12 @@ export function pagesHtml(text, opts = {}) {
         break;
 
       case LINE.heading: {
+        // A chapter head does not start a new page: Highland flows it on,
+        // with its own space above (see the h1 margin), and the running head
+        // changes from the next page.
         if (info.level === 1) {
-          if (page.length) flush();
           chapter = info.title || '';
-          pageChapter = chapter;
+          if (!page.length) pageChapter = chapter;
         }
         const tag = `h${Math.min(info.level, 3)}`;
         const cls = info.level === 1 && firstOnPage ? ' class="first"' : '';
@@ -332,19 +334,22 @@ const PRINT_SHEETS = {
 export function printHtml(text, docMeta = {}, opts = {}) {
   const { meta } = frontMatter(stripComments(text));
   const title = meta.title || docMeta.title || 'Untitled';
+  const given = opts.template || {};
   const tpl = Object.assign(
-    { pageSize: 'a4', margin: 1, fontSize: 12.75, leading: 1.65, justify: true, hyphenate: false },
-    opts.template || {});
-  if (tpl.sideMargin == null) tpl.sideMargin = tpl.margin;
+    { pageSize: 'a4', margin: 1, fontSize: 13, leading: 1.6, justify: true, hyphenate: false }, given);
+  // A template that names only `margin` means it for every side; the
+  // defaults are Highland's page, wider at the sides and shorter below.
+  if (tpl.sideMargin == null) tpl.sideMargin = given.margin != null ? tpl.margin : 1.46;
+  if (tpl.bottomMargin == null) tpl.bottomMargin = given.margin != null ? tpl.margin : 1;
   const sheet = PRINT_SHEETS[tpl.pageSize] || PRINT_SHEETS.a4;
-  const textHeight = `calc(${sheet.h}in - ${2 * tpl.margin}in)`;
+  const textHeight = `calc(${sheet.h}in - ${tpl.margin + tpl.bottomMargin}in)`;
   // The PDF is printed from a file on this machine, so it can reach the
   // bundled face; an HTML file may travel, so it is left to the reader's fonts.
   const faces = opts.fontBase ? [
-    ['ls-400', 'normal', 400], ['ls-700', 'normal', 700],
-    ['ls-italic-400', 'italic', 400], ['ls-italic-700', 'italic', 700]
+    ['am-400', 'normal', 400], ['am-700', 'normal', 700],
+    ['am-italic-400', 'italic', 400], ['am-italic-700', 'italic', 700]
   ].map(([f, style, weight]) =>
-    `@font-face { font-family: "Libertinus Serif"; font-style: ${style}; font-weight: ${weight}; src: url("${opts.fontBase}${f}.woff2") format("woff2"); }`
+    `@font-face { font-family: "Amiri"; font-style: ${style}; font-weight: ${weight}; src: url("${opts.fontBase}${f}.woff2") format("woff2"); }`
   ).join('\n  ') : '';
   const pages = pagesHtml(text, opts);
 
@@ -362,24 +367,23 @@ export function printHtml(text, docMeta = {}, opts = {}) {
 <html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   ${faces}
-  @page { size: ${sheet.css}; margin: ${tpl.margin}in ${tpl.sideMargin}in; }
+  @page { size: ${sheet.css}; margin: ${tpl.margin}in ${tpl.sideMargin}in ${tpl.bottomMargin}in; }
   html { background: #fff; }
   /* The same setting as the preview's page, so what prints is what was shown. */
   body { margin: 0; color: #000;
-         font-family: "Libertinus Serif", "Hoefler Text", "Iowan Old Style", Palatino, Georgia, "Liberation Serif", serif;
+         font-family: Amiri, "Hoefler Text", "Iowan Old Style", Palatino, Georgia, "Liberation Serif", serif;
          font-size: ${tpl.fontSize}pt; line-height: ${tpl.leading};
          ${tpl.hyphenate ? 'hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 3;' : ''}
          text-rendering: optimizeLegibility; font-kerning: normal; }
   .sheet { page-break-after: always; position: relative; }
   .sheet:last-child { page-break-after: auto; }
-  h1 { font-size: 2em; font-weight: 400; font-style: italic; text-align: center;
-       margin: 1.9in 0 .5in; letter-spacing: .01em; line-height: 1.2; }
-  h2 { font-size: 1.35em; font-weight: 400; text-align: center; margin: .45in 0 .3in; line-height: 1.3; }
-  h1 + h2 { margin-top: 0; }
+  h1 { font-size: 1.846em; font-weight: 400; font-style: italic; text-align: center;
+       margin: 1.71in 0 .77em; line-height: 1.76; }
+  h2 { font-size: 1.385em; font-weight: 400; text-align: center; margin: 0 0 .63em; line-height: 1.76; }
   h3 { font-size: 1.1em; font-weight: 400; font-style: italic; margin: .3in 0 .1in; }
   h1 + p, h2 + p, h3 + p { text-indent: 0; }
   h1 + p::first-line, h2 + p::first-line { font-variant-caps: small-caps; }
-  p  { margin: 0; text-indent: .3in; text-align: ${tpl.justify ? 'justify' : 'left'};
+  p  { margin: 0; text-indent: .25in; text-align: ${tpl.justify ? 'justify' : 'left'};
        orphans: 2; widows: 2; }
   p.cont { text-indent: 0; }
   p.flush { text-indent: 0; }
@@ -387,7 +391,7 @@ export function printHtml(text, docMeta = {}, opts = {}) {
   p.right { text-align: right; text-indent: 0; }
   p.list { text-indent: -.22in; padding-left: .5in; text-align: left; }
   hr { border: 0; text-align: center; margin: .3in 0; }
-  hr::before { content: '#'; }
+  hr::before { content: '***'; letter-spacing: .1em; }
   .note { color: #7a6a2a; font-style: italic; }
   .title-page { display: flex; flex-direction: column; justify-content: center;
                 height: ${textHeight}; text-align: center; page-break-after: always; }

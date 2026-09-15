@@ -82,11 +82,13 @@ outline belongs to its document and stays open in both the text and pages views.
 ![The outline open beside the finished pages](docs/screen-outline-pages.png)
 
 **Pages.** The pages view sets the manuscript the way Highland's Novel
-template does — 17px type on 28px lines with wide side margins, a centred
-running head, each chapter opening a third of the way down the page — so the
-page count is the one you are used to. The face is Libertinus Serif, which sets
-the same text to the same lines as Highland's Hoefler Text and, unlike it, can
-ship on every platform. Letter or A4 follows your region; book trims, margins,
+template does, measured from a PDF it produced: Amiri at 13pt on 20.8pt lines
+in a 5.35in column, an inch above and below, a centred running head, each
+chapter opening 2.7in down the page and flowing on rather than forcing a new
+one. On the same manuscript it gives the same page count, and the same page
+breaks to the line for as long as Highland's own paginator holds a steady 33
+lines. Amiri is bundled, so the page is the same on macOS, Windows and Linux,
+and the PDF embeds it. Letter or A4 follows your region; book trims, margins,
 type size, leading, justification and hyphenation are in Preferences, with a
 Reset. Where each printed page begins is marked in the margin of the writing
 view. Zoom the pages with ⌘+ and ⌘−, ⌘-scroll, or the −/+ under them; ⌘0 fits
@@ -163,8 +165,8 @@ The taskbar/dock icon follows along too, its mark recoloured to match.
 | `_underline_` `~~struck~~` | Underline, strikethrough |
 | `[[a note to self]]` | Note — never printed, never counted |
 | `/* … */` | Comment — hidden from the manuscript |
-| `---` or `===` | Page break |
-| `***` | Scene break |
+| `===` | Page break |
+| `***` or `---` | Scene break |
 | `> centered <` | Centered line |
 | `- item` | Bulleted list |
 
@@ -225,8 +227,8 @@ src/renderer/css/  theme.css holds every palette token
 
 MIT — see `LICENSE`. Everything bundled is permissively licensed, with the full
 text in `THIRD-PARTY-NOTICES.md`. CodeMirror, Electron, esbuild and
-electron-builder are MIT; Courier Prime and Libertinus Serif are under the SIL
-Open Font License, Libertinus subset to the Latin ranges.
+electron-builder are MIT; Courier Prime and Amiri are under the SIL Open Font
+License, Amiri subset to the Latin ranges.
 
 Every icon, style and string here was written for this project; it is not
 derived from any other application's code or assets. Fountain is an open syntax.
