@@ -51,7 +51,7 @@ const DEFAULTS = {
   printMargin: 1,            // inches, top
   printBottomMargin: 1,      // inches; 33 lines a page, Highland's average
   printJustify: true,
-  pageMarkers: true,         // page numbers in the margin of the writing view
+  pageMarkers: false,        // page numbers in the margin of the writing view
   goal: null,
   goalHistory: [],
   sidebarTab: 'navigator',

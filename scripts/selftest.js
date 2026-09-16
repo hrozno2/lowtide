@@ -903,6 +903,8 @@ app.whenReady().then(async () => {
 
   await test('page markers sit in the margin of the writing view', async () => {
     await load(NOVEL);
+    eq('off unless asked for', await js(`document.querySelectorAll('.cm-line.page-start').length`), 0);
+    await js(`window.__setPref('pageMarkers', true)`);
     await wait(1500);
     const marks = await js(`(() => {
       const m = [...document.querySelectorAll('.cm-content .cm-line.page-start')];
@@ -920,6 +922,8 @@ app.whenReady().then(async () => {
     await js(`window.__setPref('pageMarkers', true)`);
     await wait(900);
     ok('and back on', (await js(`document.querySelectorAll('.cm-line.page-start').length`)) >= 1);
+    await js(`window.__setPref('pageMarkers', false)`);
+    await wait(600);
   });
 
   await test('page layout follows the current defaults', async () => {

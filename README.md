@@ -90,8 +90,8 @@ breaks to the line for as long as Highland's own paginator holds a steady 33
 lines. Amiri is bundled, so the page is the same on macOS, Windows and Linux,
 and the PDF embeds it. Letter or A4 follows your region; book trims, margins,
 type size, leading, justification and hyphenation are in Preferences, with a
-Reset. Where each printed page begins is marked in the margin of the writing
-view. Zoom the pages with ⌘+ and ⌘−, ⌘-scroll, or the −/+ under them; ⌘0 fits
+Reset. Page markers, off by default, show where each printed page begins in
+the margin of the writing view. Zoom the pages with ⌘+ and ⌘−, ⌘-scroll, or the −/+ under them; ⌘0 fits
 the page. The PDF is the preview, at the trim you chose.
 
 **Reference.** Definitions, synonyms and antonyms in the sidebar. Click a

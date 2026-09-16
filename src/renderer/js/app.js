@@ -928,7 +928,7 @@ const repaginate = debounce(() => {
 
   /* Where each page after the first begins, for the markers in the margin.
      Page one starts at the top, which needs no mark. */
-  const starts = state.prefs.pageMarkers === false ? [] : state.pages
+  const starts = !state.prefs.pageMarkers ? [] : state.pages
     .map((pg, i) => ({ line: pg.line, page: i + 1 }))
     .filter((m) => m.page > 1 && m.line != null);
   showPageMarks(view, starts);

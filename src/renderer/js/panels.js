@@ -404,9 +404,6 @@ function preferencesBody(ctx) {
         ? h('span', { class: 'val' }, 'System')
         : languagePicker(ctx)),
 
-    row('Page markers', 'Page numbers in the margin as you write',
-      toggle(p.pageMarkers !== false, (v) => set({ pageMarkers: v }))),
-
     row('Status bar', null, toggle(p.statusBar !== false, (v) => set({ statusBar: v }))),
 
     h('div', { class: 'theme-group' }, 'Toolbar'),
@@ -437,6 +434,8 @@ function preferencesBody(ctx) {
     row('Justify text', null, toggle(p.printJustify !== false, (v) => set({ printJustify: v }))),
     row('Hyphenate', 'Break words at the margin, as a printed book does',
       toggle(!!p.printHyphenate, (v) => set({ printHyphenate: v }))),
+    row('Page markers', 'Where each printed page begins, in the margin as you write',
+      toggle(!!p.pageMarkers, (v) => set({ pageMarkers: v }))),
 
     row('Reset page layout', 'Back to Highland\'s page: 13pt Amiri at 160% in a 5.35in column',
       h('button', { class: 'btn', id: 'reset-page-layout', onclick: async () => {
