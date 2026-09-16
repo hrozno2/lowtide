@@ -2069,14 +2069,17 @@ function wireToolbarReorder(host) {
       clearTimeout(hold.timer); hold = null;     // a move: not a hold
     }
     if (!drag) return;
-    // Slide the held button past whichever neighbour the pointer has crossed.
+    // Slide whichever neighbour the pointer has crossed to the other side of
+    // the held button. The neighbours move, never the held button: taking it
+    // out of the document, even to put it straight back, releases the
+    // pointer capture and ends the drag.
     const others = [...host.querySelectorAll('.icon-btn')].filter((b) => b !== drag.btn);
     for (const other of others) {
       const r = other.getBoundingClientRect();
       const mid = r.left + r.width / 2;
-      const before = drag.btn.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING;
-      if (before && e.clientX > mid) other.after(drag.btn);
-      else if (!before && e.clientX < mid) other.before(drag.btn);
+      const follows = drag.btn.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING;
+      if (follows && e.clientX > mid) drag.btn.before(other);
+      else if (!follows && e.clientX < mid) drag.btn.after(other);
     }
   });
 

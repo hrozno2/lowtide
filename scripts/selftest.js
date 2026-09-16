@@ -1780,13 +1780,17 @@ app.whenReady().then(async () => {
     await wait(520);
     ok('held long enough, the toolbar shakes', await js(`document.getElementById('tb-buttons').classList.contains('reordering')`));
     ok('and the held button is picked up', await js(`document.getElementById('btn-export').classList.contains('dragging')`));
-    const past = (await mid('#btn-music')) + 2;
-    await pe('pointermove', '#btn-export', past);
+    // Across the whole row, one neighbour at a time, still held throughout.
+    for (const over of ['#btn-theme', '#btn-music', '#btn-sprint', '#btn-focus']) {
+      await pe('pointermove', '#btn-export', (await mid(over)) + 2);
+      ok(`still held after crossing ${over}`, await js(`document.getElementById('btn-export').classList.contains('dragging')`));
+    }
+    const past = (await mid('#btn-focus')) + 2;
     await pe('pointerup', '#btn-export', past);
     await wait(400);
     ok('let go, it stops shaking', !(await js(`document.getElementById('tb-buttons').classList.contains('reordering')`)));
     const after = await ids();
-    ok('and the button has moved past the ones it was dragged over', after.indexOf('btn-export') > after.indexOf('btn-music'));
+    ok('and the button has moved past every one it was dragged over', after.indexOf('btn-export') > after.indexOf('btn-focus'));
     eq('the order is saved', await js(`(async () => (await window.api.prefs.get()).toolbarOrder.indexOf('export'))()`), after.indexOf('btn-export'));
     ok('without the button firing', !(await js(`!!document.querySelector('.panel')`)));
     await js(`window.__setPref('toolbarOrder', ['search','export','theme','music','sprint','focus','prefs'])`);
