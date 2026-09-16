@@ -51,6 +51,7 @@ document.addEventListener('pointerdown', (e) => {
    happening. */
 const ANCHOR_BY_NAME = {
   prefs: 'btn-prefs',
+  search: 'btn-search',
   sprint: 'btn-sprint',
   theme: 'btn-theme',
   export: 'btn-export',
@@ -358,125 +359,417 @@ function toggle(value, onPick) {
 
 const PAGE_LAYOUT_KEYS = ['pageSize', 'printMargin', 'printBottomMargin', 'printSideMargin', 'printFontSize', 'printLeading', 'printJustify', 'printHyphenate'];
 
-export function showPreferences(ctx) {
-  openPanel('prefs', panelShell('Preferences', preferencesBody(ctx)));
-}
+const PREF_SECTIONS = [
+  { id: 'writing', title: 'Writing' },
+  { id: 'words', title: 'Spelling & words' },
+  { id: 'page', title: 'Page' },
+  { id: 'window', title: 'Window' },
+  { id: 'music', title: 'Music' },
+  { id: 'files', title: 'Files & updates' }
+];
 
-function preferencesBody(ctx) {
+/* Every setting, as words: what the row says, and the other words people
+   reach for. The controls are built separately (see prefControls), so this
+   list can be searched without building a panel. */
+export const PREF_CATALOGUE = [
+  { id: 'fontFamily', section: 'writing', label: 'Typeface', keys: 'font serif sans mono courier typewriter' },
+  { id: 'fontSize', section: 'writing', label: 'Text size', keys: 'font size zoom bigger smaller' },
+  { id: 'lineHeight', section: 'writing', label: 'Line spacing', keys: 'leading height' },
+  { id: 'pageWidth', section: 'writing', label: 'Column width', keys: 'measure margin narrow wide' },
+  { id: 'paragraphStyle', section: 'writing', label: 'Paragraphs', hint: 'How body text is laid out', keys: 'indent spacing blank line' },
+  { id: 'typewriter', section: 'writing', label: 'Typewriter scrolling', hint: 'Keep the caret centred', keys: 'cursor centre scroll' },
+  { id: 'focusScope', section: 'writing', label: 'Focus scope', hint: 'What stays lit in Focus Mode', keys: 'dim highlight distraction' },
+  { id: 'smartTypography', section: 'writing', label: 'Smart punctuation', hint: 'Curly quotes, — and …', keys: 'quotes dashes ellipsis apostrophe' },
+  { id: 'spellcheck', section: 'words', label: 'Check spelling', keys: 'spell misspelling underline' },
+  { id: 'spellLanguages', section: 'words', label: 'Dictionary', hint: 'Right-click a misspelling for corrections', keys: 'language spelling english' },
+  { id: 'onlineLookup', section: 'words', label: 'Look up words online', hint: 'Sends only the word, to dictionaryapi.dev and datamuse.com', keys: 'thesaurus synonyms definition reference privacy' },
+  { id: 'readingSpeed', section: 'words', label: 'Reading speed', hint: 'Words per minute', keys: 'wpm reading time minutes stats' },
+  { id: 'pageSize', section: 'page', label: 'Paper', hint: 'Letter and A4 are manuscript paper; the first two are book trims', keys: 'size trim a4 letter book print pdf' },
+  { id: 'printSideMargin', section: 'page', label: 'Side margins', keys: 'left right column width print' },
+  { id: 'printMargin', section: 'page', label: 'Top margin', keys: 'print' },
+  { id: 'printBottomMargin', section: 'page', label: 'Bottom margin', keys: 'print lines per page' },
+  { id: 'printFontSize', section: 'page', label: 'Print type size', keys: 'font pt pdf' },
+  { id: 'printLeading', section: 'page', label: 'Print leading', hint: 'Book typesetting runs 120–170% of the type size', keys: 'line spacing height pdf' },
+  { id: 'printJustify', section: 'page', label: 'Justify text', keys: 'ragged align flush' },
+  { id: 'printHyphenate', section: 'page', label: 'Hyphenate', hint: 'Break words at the margin, as a printed book does', keys: 'hyphens break' },
+  { id: 'pageMarkers', section: 'page', label: 'Page markers', hint: 'Where each printed page begins, in the margin as you write', keys: 'numbers breaks editor' },
+  { id: 'resetPage', section: 'page', label: 'Reset page layout', hint: 'Back to Highland\'s page: 13pt Amiri at 160% in a 5.35in column', keys: 'default defaults highland' },
+  { id: 'statusBar', section: 'window', label: 'Status bar', keys: 'word count footer bottom' },
+  { id: 'menuStyle', section: 'window', label: 'Menu', hint: 'A button in the title bar, or the menus written out along it', keys: 'menubar title bar', notOn: 'darwin' },
+  { id: 'toolbar', section: 'window', label: 'Toolbar', hint: 'Drag to reorder; switch buttons off', keys: 'buttons icons order hide', block: true },
+  { id: 'youtubeEnabled', section: 'music', label: 'YouTube in the music pane', hint: 'Off means no browser view at all', keys: 'video sound audio browser' },
+  { id: 'youtubeMinimal', section: 'music', label: 'Hide the distractions', hint: 'Comments, likes, recommendations and the shorts bar', keys: 'youtube comments recommendations shorts' },
+  { id: 'saveTo', section: 'files', label: 'Save new documents to', keys: 'folder location dropbox' },
+  { id: 'updateCheck', section: 'files', label: 'Check for updates on launch', hint: 'Asks GitHub for the newest release; installs nothing', keys: 'upgrade version github' }
+];
+
+export const prefSectionTitle = (id) => (PREF_SECTIONS.find((s) => s.id === id) || {}).title || '';
+
+/** The control for each row, built against the live prefs. */
+function prefControls(ctx, rebuild) {
   const p = ctx.prefs;
   const set = ctx.setPrefs;
-
-  const body = h('div', { class: 'prefs-body' },
-    row('Typeface', null, h('select', {
-      onchange: (e) => set({ fontFamily: e.target.value })
-    }, ...[['serif', 'Serif'], ['sans', 'Sans'], ['mono', 'Typewriter']].map(([v, l]) =>
-      h('option', { value: v, selected: p.fontFamily === v }, l)))),
-
-    row('Text size', null, slider(p.fontSize, 13, 30, 1, (v) => `${v}px`,
-      (v) => set({ fontSize: v }))),
-
-    row('Line spacing', null, slider(p.lineHeight, 1.2, 2.4, 0.05, (v) => v.toFixed(2),
-      (v) => set({ lineHeight: v }))),
-
-    row('Column width', null, slider(p.pageWidth, 460, 1100, 10, (v) => `${v}px`,
-      (v) => set({ pageWidth: v }))),
-
-    row('Paragraphs', 'How body text is laid out', segmented(
-      [['none', 'Plain'], ['indent', 'Indented'], ['spaced', 'Spaced']], p.paragraphStyle || 'none',
-      (v) => set({ paragraphStyle: v }))),
-
-    row('Focus scope', 'What stays lit in Focus Mode', segmented(
-      [['paragraph', 'Paragraph'], ['line', 'Line']], p.focusScope,
-      (v) => set({ focusScope: v }))),
-
-    row('Typewriter scrolling', 'Keep the caret centred', toggle(p.typewriter,
-      (v) => set({ typewriter: v }))),
-
-    row('Smart punctuation', 'Curly quotes, — and …', toggle(p.smartTypography !== false,
-      (v) => set({ smartTypography: v }))),
-
-    row('Check spelling', null, toggle(p.spellcheck !== false, (v) => set({ spellcheck: v }))),
-
-    row('Dictionary', ctx.spelling && ctx.spelling.managedByOS
-      ? 'macOS uses the languages set in System Settings'
-      : 'Right-click a misspelling for corrections',
-      ctx.spelling && ctx.spelling.managedByOS
-        ? h('span', { class: 'val' }, 'System')
-        : languagePicker(ctx)),
-
-    row('Status bar', null, toggle(p.statusBar !== false, (v) => set({ statusBar: v }))),
-
-    h('div', { class: 'theme-group' }, 'Toolbar'),
-    toolbarEditor(ctx),
-
-    h('div', { class: 'theme-group' }, 'Page layout'),
-
-    row('Paper', 'Letter and A4 are manuscript paper; the first two are book trims',
-      segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
-        p.pageSize || 'a4', (v) => set({ pageSize: v }))),
-
-    row('Side margins', null, slider(p.printSideMargin || 1.46, 0.5, 2, 0.01, (v) => `${v.toFixed(2)}"`,
-      (v) => set({ printSideMargin: v }))),
-
-    row('Top margin', null, slider(p.printMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`,
-      (v) => set({ printMargin: v }))),
-
-    row('Bottom margin', null, slider(p.printBottomMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`,
-      (v) => set({ printBottomMargin: v }))),
-
-    row('Print type size', null, slider(p.printFontSize || 13, 9, 16, 0.25, (v) => `${v}pt`,
-      (v) => set({ printFontSize: v }))),
-
-    row('Print leading', 'Book typesetting runs 120–170% of the type size',
-      slider(p.printLeading || 1.6, 1.2, 2.4, 0.05,
-      (v) => v.toFixed(2), (v) => set({ printLeading: v }))),
-
-    row('Justify text', null, toggle(p.printJustify !== false, (v) => set({ printJustify: v }))),
-    row('Hyphenate', 'Break words at the margin, as a printed book does',
-      toggle(!!p.printHyphenate, (v) => set({ printHyphenate: v }))),
-    row('Page markers', 'Where each printed page begins, in the margin as you write',
-      toggle(!!p.pageMarkers, (v) => set({ pageMarkers: v }))),
-
-    row('Reset page layout', 'Back to Highland\'s page: 13pt Amiri at 160% in a 5.35in column',
-      h('button', { class: 'btn', id: 'reset-page-layout', onclick: async () => {
-        const prefs = await ctx.resetPrefs(PAGE_LAYOUT_KEYS);
-        // Rebuild the body so the sliders show the values they now hold.
-        body.replaceWith(preferencesBody(Object.assign({}, ctx, { prefs })));
-      } }, 'Reset')),
-
-    row('YouTube in the music pane', 'Off means no browser view at all',
-      toggle(p.youtubeEnabled !== false, (v) => set({ youtubeEnabled: v }))),
-    row('Hide the distractions', 'Comments, likes, recommendations and the shorts bar',
-      toggle(p.youtubeMinimal !== false, (v) => set({ youtubeMinimal: v }))),
-
-    ...(ctx.platform === 'darwin' ? [] : [
-      row('Menu', 'A button in the title bar, or the menus written out along it',
-        segmented([['button', 'Button'], ['bar', 'Menu bar']],
-          p.menuStyle === 'bar' ? 'bar' : 'button', (v) => set({ menuStyle: v })))
-    ]),
-
-    row('Check for updates on launch', 'Asks GitHub for the newest release; installs nothing',
-      toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))),
-
-    row('Look up words online', 'Sends only the word, to dictionaryapi.dev and datamuse.com',
-      toggle(p.onlineLookup !== false, (v) => set({ onlineLookup: v }))),
-
-    h('div', { class: 'theme-group' }, 'Files'),
-
-    row('Save new documents to', ctx.dropbox || 'Dropbox folder not found',
-      segmented([['documents', 'Documents'], ['dropbox', 'Dropbox']],
-        p.saveTo || 'documents',
-        (v) => set({ saveTo: ctx.dropbox ? v : 'documents' }))),
-
-    h('div', { class: 'theme-group' }, 'Other'),
-
-    row('Reading speed', 'Words per minute', h('input', {
-      type: 'number', min: 100, max: 600, step: 25, value: p.readingSpeed || 275,
-      style: 'width:74px',
+  const managed = ctx.spelling && ctx.spelling.managedByOS;
+  return {
+    fontFamily: () => h('select', { onchange: (e) => set({ fontFamily: e.target.value }) },
+      ...[['serif', 'Serif'], ['sans', 'Sans'], ['mono', 'Typewriter']].map(([v, l]) =>
+        h('option', { value: v, selected: p.fontFamily === v }, l))),
+    fontSize: () => slider(p.fontSize, 13, 30, 1, (v) => `${v}px`, (v) => set({ fontSize: v })),
+    lineHeight: () => slider(p.lineHeight, 1.2, 2.4, 0.05, (v) => v.toFixed(2), (v) => set({ lineHeight: v })),
+    pageWidth: () => slider(p.pageWidth, 460, 1100, 10, (v) => `${v}px`, (v) => set({ pageWidth: v })),
+    paragraphStyle: () => segmented([['none', 'Plain'], ['indent', 'Indented'], ['spaced', 'Spaced']],
+      p.paragraphStyle || 'none', (v) => set({ paragraphStyle: v })),
+    typewriter: () => toggle(p.typewriter, (v) => set({ typewriter: v })),
+    focusScope: () => segmented([['paragraph', 'Paragraph'], ['line', 'Line']], p.focusScope, (v) => set({ focusScope: v })),
+    smartTypography: () => toggle(p.smartTypography !== false, (v) => set({ smartTypography: v })),
+    spellcheck: () => toggle(p.spellcheck !== false, (v) => set({ spellcheck: v })),
+    spellLanguages: () => (managed ? h('span', { class: 'val' }, 'System') : languagePicker(ctx)),
+    onlineLookup: () => toggle(p.onlineLookup !== false, (v) => set({ onlineLookup: v })),
+    readingSpeed: () => h('input', {
+      type: 'number', min: 100, max: 600, step: 25, value: p.readingSpeed || 275, style: 'width:74px',
       onchange: (e) => set({ readingSpeed: Math.max(100, Math.min(600, +e.target.value || 275)) })
-    }))
-  );
+    }),
+    pageSize: () => segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
+      p.pageSize || 'a4', (v) => set({ pageSize: v })),
+    printSideMargin: () => slider(p.printSideMargin || 1.46, 0.5, 2, 0.01, (v) => `${v.toFixed(2)}"`, (v) => set({ printSideMargin: v })),
+    printMargin: () => slider(p.printMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`, (v) => set({ printMargin: v })),
+    printBottomMargin: () => slider(p.printBottomMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`, (v) => set({ printBottomMargin: v })),
+    printFontSize: () => slider(p.printFontSize || 13, 9, 16, 0.25, (v) => `${v}pt`, (v) => set({ printFontSize: v })),
+    printLeading: () => slider(p.printLeading || 1.6, 1.2, 2.4, 0.05, (v) => v.toFixed(2), (v) => set({ printLeading: v })),
+    printJustify: () => toggle(p.printJustify !== false, (v) => set({ printJustify: v })),
+    printHyphenate: () => toggle(!!p.printHyphenate, (v) => set({ printHyphenate: v })),
+    pageMarkers: () => toggle(!!p.pageMarkers, (v) => set({ pageMarkers: v })),
+    resetPage: () => h('button', { class: 'btn', id: 'reset-page-layout', onclick: async () => {
+      const prefs = await ctx.resetPrefs(PAGE_LAYOUT_KEYS);
+      rebuild(Object.assign({}, ctx, { prefs }));   // so the sliders show what they now hold
+    } }, 'Reset'),
+    statusBar: () => toggle(p.statusBar !== false, (v) => set({ statusBar: v })),
+    menuStyle: () => segmented([['button', 'Button'], ['bar', 'Menu bar']],
+      p.menuStyle === 'bar' ? 'bar' : 'button', (v) => set({ menuStyle: v })),
+    toolbar: () => toolbarEditor(ctx),
+    youtubeEnabled: () => toggle(p.youtubeEnabled !== false, (v) => set({ youtubeEnabled: v })),
+    youtubeMinimal: () => toggle(p.youtubeMinimal !== false, (v) => set({ youtubeMinimal: v })),
+    saveTo: () => segmented([['documents', 'Documents'], ['dropbox', 'Dropbox']],
+      p.saveTo || 'documents', (v) => set({ saveTo: ctx.dropbox ? v : 'documents' })),
+    updateCheck: () => toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))
+  };
+}
+
+/** Rows shown on this platform, with hints that depend on the machine. */
+export function prefRows(ctx) {
+  return PREF_CATALOGUE.filter((r) => !r.notOn || r.notOn !== ctx.platform).map((r) => {
+    if (r.id === 'spellLanguages' && ctx.spelling && ctx.spelling.managedByOS) {
+      return Object.assign({}, r, { hint: 'macOS uses the languages set in System Settings' });
+    }
+    if (r.id === 'saveTo') return Object.assign({}, r, { hint: ctx.dropbox || 'Dropbox folder not found' });
+    return r;
+  });
+}
+
+/**
+ * @param opts.focus  a row id: its section opens, the row scrolls into view
+ *                    and is picked out for a moment. How Search lands here.
+ */
+export function showPreferences(ctx, opts = {}) {
+  const el = openPanel('prefs', panelShell('Preferences', preferencesBody(ctx, opts)));
+  if (el && opts.focus) revealPref(el, opts.focus);
+}
+
+function revealPref(panel, id) {
+  const row = panel.querySelector(`[data-pref="${id}"]`);
+  if (!row) return;
+  row.scrollIntoView({ block: 'center' });
+  row.classList.add('picked');
+  setTimeout(() => row.classList.remove('picked'), 1600);
+}
+
+function preferencesBody(ctx, opts = {}) {
+  const set = ctx.setPrefs;
+  const collapsed = new Set(ctx.prefs.prefsCollapsed || PREF_SECTIONS.slice(1).map((s) => s.id));
+  if (opts.focus) {
+    const r = PREF_CATALOGUE.find((x) => x.id === opts.focus);
+    if (r) collapsed.delete(r.section);
+  }
+
+  let body;
+  const rebuild = (ctx2) => {
+    const next = preferencesBody(ctx2, opts);
+    body.replaceWith(next);
+    body = next;
+  };
+  const controls = prefControls(ctx, rebuild);
+  const rows = prefRows(ctx);
+
+  body = h('div', { class: 'prefs-body' });
+  for (const sec of PREF_SECTIONS) {
+    const list = h('div', { class: 'prefs-rows' });
+    for (const r of rows.filter((x) => x.section === sec.id)) {
+      const control = controls[r.id]();
+      const el = r.block
+        ? h('div', { class: 'row block' },
+            h('div', {}, h('div', {}, r.label), r.hint ? h('span', { class: 'hint' }, r.hint) : null), control)
+        : row(r.label, r.hint, control);
+      el.dataset.pref = r.id;
+      list.append(el);
+    }
+    const isOpen = !collapsed.has(sec.id);
+    const head = h('button', { class: 'prefs-section-head', type: 'button', 'aria-expanded': String(isOpen) },
+      h('span', { class: 'chev' }), h('span', {}, sec.title));
+    const el = h('section', { class: `prefs-section${isOpen ? '' : ' collapsed'}`, 'data-section': sec.id }, head, list);
+    head.onclick = () => {
+      const closing = !el.classList.contains('collapsed');
+      el.classList.toggle('collapsed', closing);
+      head.setAttribute('aria-expanded', String(!closing));
+      if (closing) collapsed.add(sec.id); else collapsed.delete(sec.id);
+      set({ prefsCollapsed: [...collapsed] });
+    };
+    body.append(el);
+  }
   return body;
+}
+
+/* ------------------------------------------------------------------ search */
+
+/* Words people reach for that are not the words on anything. Each maps to
+   the ids of things it should find. */
+const RELATED = {
+  font: ['fontFamily', 'printFontSize'], fonts: ['fontFamily', 'printFontSize'],
+  zoom: ['fontSize', 'printFontSize', 'go:pages'], bigger: ['fontSize', 'printFontSize'], smaller: ['fontSize', 'printFontSize'],
+  width: ['pageWidth', 'printSideMargin'], narrow: ['pageWidth', 'printSideMargin'], wide: ['pageWidth', 'printSideMargin'],
+  spacing: ['lineHeight', 'printLeading', 'paragraphStyle'], leading: ['lineHeight', 'printLeading'],
+  indent: ['paragraphStyle'], indentation: ['paragraphStyle'],
+  quotes: ['smartTypography'], dashes: ['smartTypography'], punctuation: ['smartTypography'],
+  language: ['spellLanguages'], languages: ['spellLanguages'], spell: ['spellcheck', 'spellLanguages'],
+  print: ['pageSize', 'printFontSize', 'go:export'], pdf: ['go:export', 'pageSize'],
+  page: ['pageSize', 'pageMarkers', 'go:pages'], pages: ['go:pages', 'pageSize', 'pageMarkers'],
+  numbers: ['pageMarkers'], count: ['go:stats', 'pageMarkers'],
+  a4: ['pageSize'], letter: ['pageSize'], trim: ['pageSize'], book: ['pageSize', 'printHyphenate'],
+  sound: ['go:music', 'youtubeEnabled'], audio: ['go:music'], video: ['go:music', 'youtubeEnabled'], song: ['go:music'], playlist: ['go:music'],
+  distraction: ['youtubeMinimal', 'go:focus'], distractions: ['youtubeMinimal', 'go:focus'],
+  dim: ['focusScope', 'go:focus'], concentrate: ['go:focus', 'go:sprint'],
+  update: ['updateCheck', 'go:updates'], updates: ['updateCheck', 'go:updates'], upgrade: ['go:updates'],
+  dropbox: ['saveTo'], folder: ['saveTo'], location: ['saveTo'], where: ['saveTo'],
+  wpm: ['readingSpeed'], minutes: ['readingSpeed', 'go:sprint'], time: ['readingSpeed', 'go:sprint'],
+  privacy: ['onlineLookup', 'updateCheck'], online: ['onlineLookup', 'updateCheck'], internet: ['onlineLookup', 'updateCheck', 'youtubeEnabled'],
+  buttons: ['toolbar'], icons: ['toolbar'], order: ['toolbar'],
+  colour: ['go:themes'], colours: ['go:themes'], color: ['go:themes'], colors: ['go:themes'],
+  dark: ['go:themes'], light: ['go:themes'], appearance: ['go:themes'], background: ['go:themes'], look: ['go:themes'], wallpaper: ['go:themes'], skin: ['go:themes'], mode: ['go:themes', 'go:focus'],
+  goal: ['go:stats'], goals: ['go:stats'], target: ['go:stats'], daily: ['go:stats'], progress: ['go:stats'],
+  timer: ['go:sprint'], pomodoro: ['go:sprint'], stopwatch: ['go:sprint'],
+  shortcut: ['go:help'], shortcuts: ['go:help'], keyboard: ['go:help'], hotkey: ['go:help'], hotkeys: ['go:help'], syntax: ['go:help'], markdown: ['go:help'], fountain: ['go:help'],
+  backup: ['go:revisions'], backups: ['go:revisions'], autosave: ['go:revisions'], versions: ['go:revisions'], history: ['go:revisions'], undo: ['go:revisions'],
+  stats: ['go:stats'], statistics: ['go:stats'], words: ['go:stats', 'readingSpeed'],
+  notes: ['go:scratch', 'go:outline'], ideas: ['go:scratch'], todo: ['go:scratch'], plan: ['go:outline'], structure: ['go:outline', 'go:navigator'], beats: ['go:outline'],
+  chapters: ['go:navigator'], scenes: ['go:navigator'], contents: ['go:navigator'],
+  synonym: ['go:reference'], synonyms: ['go:reference'], thesaurus: ['go:reference'], dictionary: ['go:reference', 'spellLanguages'], definition: ['go:reference'],
+  cover: ['go:title'], author: ['go:title'], copyright: ['go:title'],
+  open: ['go:home'], recent: ['go:home'], new: ['go:home'], files: ['go:home', 'saveTo'],
+  settings: ['go:prefs'], options: ['go:prefs'], config: ['go:prefs']
+};
+
+/* Edit distance with transpositions, capped so it stays cheap. */
+function editDistance(a, b, cap) {
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  let prev = null, cur = Array.from({ length: b.length + 1 }, (_, j) => j), prev2 = null;
+  for (let i = 1; i <= a.length; i++) {
+    prev2 = prev; prev = cur; cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+      cur.push(v); if (v < best) best = v;
+    }
+    if (best > cap) return cap + 1;
+  }
+  return cur[b.length];
+}
+
+const tolerance = (word) => (word.length <= 3 ? 0 : word.length <= 5 ? 1 : 2);
+const wordsOf = (text) => String(text).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/** Everything Search can find: places in the app, settings, and the menu. */
+function searchIndex(ctx, menu) {
+  const go = ctx.open || {};
+  const places = [
+    ['go:navigator', 'Navigator', 'Chapters and sections, in the sidebar', 'chapters sections outline contents structure', () => go.tab && go.tab('navigator')],
+    ['go:stats', 'Statistics and word goal', 'In the sidebar', 'words pages reading time goal target count', () => go.tab && go.tab('stats')],
+    ['go:scratch', 'Scratchpad', 'Notes beside the manuscript', 'notes ideas todo scratch', () => go.tab && go.tab('scratch')],
+    ['go:revisions', 'Revisions', 'Saved versions and backups', 'versions history backup compare', () => go.tab && go.tab('revisions')],
+    ['go:reference', 'Dictionary and thesaurus', 'Definitions and synonyms, in the sidebar', 'lookup synonyms definition words', () => go.tab && go.tab('reference')],
+    ['go:outline', 'Outline', 'A second editor beside the manuscript', 'plan structure beats story circle acts', () => go.outline && go.outline()],
+    ['go:pages', 'Pages view', 'The manuscript as it prints', 'preview print pdf zoom', () => go.preview && go.preview(true)],
+    ['go:text', 'Text view', 'Back to writing', 'editor write', () => go.preview && go.preview(false)],
+    ['go:focus', 'Focus mode', 'Dim everything but where you are', 'concentrate distraction dim', () => go.focus && go.focus()],
+    ['go:music', 'Music', 'Your files, or YouTube', 'sound audio youtube playlist', () => go.music && go.music()],
+    ['go:themes', 'Themes', 'Colours of the window', 'dark light colour appearance', () => showThemes(ctx)],
+    ['go:sprint', 'Writing sprint', 'A timer and a word target', 'timer pomodoro', () => showSprint(ctx)],
+    ['go:export', 'Export', 'PDF, HTML, Word or plain text', 'print save share', () => showExport(ctx)],
+    ['go:title', 'Title page', 'Title, author, contact, draft date', 'cover front matter copyright', () => showTitlePage(ctx)],
+    ['go:help', 'Markup and shortcuts', 'What the symbols mean; every key', 'help keyboard syntax markdown fountain', () => showHelp()],
+    ['go:prefs', 'Preferences', 'Every setting', 'settings options', () => showPreferences(ctx)],
+    ['go:home', 'Home', 'Open, create, recent documents', 'open recent new files templates', () => go.home && go.home()],
+    ['go:updates', 'Check for updates', 'Asks GitHub for the newest release', 'upgrade version', () => go.updates && go.updates()]
+  ].map(([id, label, hint, keys, run]) => ({ id, kind: 'Go to', label, hint, keys, run }));
+
+  const settings = prefRows(ctx).map((r) => ({
+    id: r.id, kind: 'Setting', label: r.label, hint: `${prefSectionTitle(r.section)} · Preferences`,
+    keys: `${r.hint || ''} ${r.keys}`, run: () => showPreferences(ctx, { focus: r.id })
+  }));
+
+  const commands = [];
+  const walk = (items, path) => {
+    for (const it of items || []) {
+      if (!it || it.type === 'separator' || !it.label) continue;
+      if (it.submenu) { walk(it.submenu, path.concat(it.label)); continue; }
+      if (!it.id || it.enabled === false) continue;
+      const trail = path.filter((x) => x && !/^(Low Tide|Window)$/.test(x));
+      commands.push({ id: `menu:${it.id}`, kind: 'Command', label: it.label.replace(/…$/, ''),
+        hint: trail.join(' › ') + (it.accelerator ? `  ${prettyAccelerator(it.accelerator, ctx.platform)}` : ''),
+        keys: trail.join(' '), run: () => ctx.menu && ctx.menu.invoke(it.id) });
+    }
+  };
+  walk(menu, []);
+  // A menu item that only opens a place already listed says nothing new.
+  const named = new Set([...places, ...settings].map((e) => e.label.toLowerCase()));
+  return [...places, ...settings, ...commands.filter((c) => !named.has(c.label.toLowerCase()))];
+}
+
+function prettyAccelerator(acc, platform) {
+  const mac = platform === 'darwin';
+  return acc.replace('CmdOrCtrl', mac ? '⌘' : 'Ctrl').replace('Shift', mac ? '⇧' : 'Shift').replace('Alt', mac ? '⌥' : 'Alt')
+    .replace(/\+/g, mac ? '' : '+').replace('Plus', '+');
+}
+
+let menuCache = null;
+
+/** The search popover: everything in the app, a keystroke away. */
+export async function showSearch(ctx) {
+  if (!menuCache && ctx.menu) {
+    try { menuCache = await ctx.menu.describe(); } catch { menuCache = []; }
+  }
+  const index = searchIndex(ctx, menuCache || []);
+  const allWords = [...new Set(index.flatMap((e) => wordsOf(`${e.label} ${e.keys}`)).filter((w) => w.length > 2))];
+
+  const input = h('input', { class: 'search-input', type: 'search', placeholder: 'Search settings, places and commands',
+    'aria-label': 'Search', autocomplete: 'off', spellcheck: 'false' });
+  const results = h('div', { class: 'search-results', role: 'listbox' });
+  const body = h('div', { class: 'search-body' }, input, results);
+  let selected = 0;
+
+  // A token matches a word outright, or within a typo or two of the word
+  // or of the word's opening — so "margn" reaches "margins".
+  const hits = (token, text) => {
+    if (text.includes(token)) return 0;
+    const tol = tolerance(token);
+    return tol > 0 && wordsOf(text).some((w) =>
+      editDistance(token, w, tol) <= tol ||
+      (token.length >= 5 && w.length > token.length && editDistance(token, w.slice(0, token.length), tol) <= tol)) ? 1 : -1;
+  };
+
+  // The ids a token reaches through RELATED, allowing for a typo in it.
+  const relatedTo = (t) => {
+    const out = new Set();
+    for (const w of Object.keys(RELATED)) {
+      if (w === t || editDistance(t, w, tolerance(t)) <= tolerance(t)) RELATED[w].forEach((id) => out.add(id));
+    }
+    return out;
+  };
+
+  // How well an entry answers the query: how many of its words it meets,
+  // and how directly (a label is better than a hint is better than a typo).
+  const score = (e, tokens, related) => {
+    const label = e.label.toLowerCase();
+    const rest = `${e.hint || ''} ${e.keys || ''}`.toLowerCase();
+    let total = 0, met = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      met++;
+      if (label.startsWith(t)) { total += 0; continue; }
+      if (label.includes(t)) { total += 1; continue; }
+      if (related[i].has(e.id)) { total += 1.5; continue; }
+      const inRest = hits(t, rest);
+      if (inRest === 0) { total += 2; continue; }
+      if (hits(t, label) === 1) { total += 3; continue; }
+      if (inRest === 1) { total += 4; continue; }
+      met--;
+    }
+    return { met, total: total + (e.kind === 'Go to' ? 0 : e.kind === 'Setting' ? 0.5 : 1) };
+  };
+
+  const render = () => {
+    const tokens = wordsOf(input.value);
+    results.textContent = '';
+    if (!tokens.length) {
+      results.append(h('div', { class: 'search-tip' }, 'Type a setting, a place in the app, or a menu command. ↑↓ to choose, Enter to go.'));
+      return;
+    }
+    const related = tokens.map(relatedTo);
+    // Everything that meets every word; failing that, anything meeting some.
+    const scored = index.map((e) => ({ e, s: score(e, tokens, related) })).filter((x) => x.s.met > 0);
+    const best = Math.max(0, ...scored.map((x) => x.s.met));
+    const ranked = scored.filter((x) => x.s.met === best)
+      .sort((a, b) => a.s.total - b.s.total).slice(0, 12).map((x) => x.e);
+    selected = 0;
+    if (ranked.length) {
+      ranked.forEach((e, i) => {
+        results.append(h('button', { class: `search-hit${i === 0 ? ' selected' : ''}`, type: 'button', role: 'option',
+          'data-id': e.id, onclick: () => choose(e), onmousemove: () => select(i) },
+          h('span', { class: 'kind' }, e.kind),
+          h('span', { class: 'text' }, h('span', { class: 'label' }, e.label), e.hint ? h('span', { class: 'hint' }, e.hint) : null)));
+      });
+      return;
+    }
+    // Nothing: the nearest real words, and anything related.
+    const near = [];
+    for (const t of tokens) for (const w of allWords) {
+      if (w.length < 4) continue;
+      const d = editDistance(t, w, 2);
+      if (d <= 2 && d < t.length) near.push({ w, d });
+    }
+    near.sort((a, b) => a.d - b.d || a.w.length - b.w.length);
+    const suggestions = [...new Set(near.map((n) => n.w))].filter((w) => !tokens.includes(w)).slice(0, 4);
+    const relatedIds = new Set(related.flatMap((set) => [...set]));
+    results.append(h('div', { class: 'search-empty' }, `Nothing for “${input.value.trim()}”`));
+    if (suggestions.length) {
+      results.append(h('div', { class: 'search-line' }, 'Did you mean ',
+        ...suggestions.flatMap((w, i) => [i ? ', ' : '', h('button', { class: 'prefs-chip', type: 'button',
+          onclick: () => { input.value = w; render(); input.focus(); } }, w)]), '?'));
+    }
+    const rel = [...relatedIds].map((id) => index.find((e) => e.id === id)).filter(Boolean);
+    if (rel.length) {
+      results.append(h('div', { class: 'search-line' }, 'Related'));
+      rel.slice(0, 6).forEach((e, i) => results.append(h('button', { class: `search-hit${i === 0 ? ' selected' : ''}`, type: 'button',
+        'data-id': e.id, onclick: () => choose(e), onmousemove: () => select(i) },
+        h('span', { class: 'kind' }, e.kind),
+        h('span', { class: 'text' }, h('span', { class: 'label' }, e.label), e.hint ? h('span', { class: 'hint' }, e.hint) : null))));
+    }
+    if (!suggestions.length && !rel.length) {
+      results.append(h('div', { class: 'search-line' }, 'Try the name of a setting, a sidebar tab, or a menu item.'));
+    }
+  };
+
+  const hitEls = () => [...results.querySelectorAll('.search-hit')];
+  const select = (i) => {
+    const els = hitEls();
+    if (!els.length) return;
+    selected = Math.max(0, Math.min(els.length - 1, i));
+    els.forEach((el, k) => el.classList.toggle('selected', k === selected));
+    els[selected].scrollIntoView({ block: 'nearest' });
+  };
+  const choose = (e) => { closePanel(); e.run(); };
+
+  input.addEventListener('input', render);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown') { select(selected + 1); ev.preventDefault(); }
+    else if (ev.key === 'ArrowUp') { select(selected - 1); ev.preventDefault(); }
+    else if (ev.key === 'Enter') {
+      const el = hitEls()[selected];
+      if (el) { const e = index.find((x) => x.id === el.dataset.id); if (e) choose(e); }
+      ev.preventDefault();
+    }
+  });
+  render();
+  openPanel('search', h('div', { class: 'panel search-panel' }, body), { focus: input });
 }
 
 /* ------------------------------------------------------------------ sprint */

@@ -1973,6 +1973,7 @@ function renderMusicWeb(body, service) {
    hiding the way back into settings would be a trap. */
 function toolbarItems() {
   return [
+    { id: 'search', title: 'Search (⌘K)', icon: 'i-search', run: () => ui.showSearch(ctx()) },
     { id: 'export', title: 'Export', icon: 'i-export', run: () => ui.showExport(ctx()) },
     { id: 'theme', title: 'Editor Theme', icon: 'i-theme', run: () => ui.showThemes(ctx()) },
     { id: 'music', title: 'Music', icon: 'i-music', run: () => toggleMusicPanel() },
@@ -1991,7 +1992,11 @@ export function orderedToolbar(prefs) {
   for (const id of prefs.toolbarOrder || []) {
     if (known.has(id)) { out.push(known.get(id)); known.delete(id); }
   }
+  // A button this version added goes in before a pinned one at the end, so
+  // Preferences keeps its place as the last button.
+  const tail = out.length && out[out.length - 1].pinned ? out.pop() : null;
   for (const item of items) if (known.has(item.id)) out.push(item);
+  if (tail) out.push(tail);
   return out;
 }
 
@@ -2261,6 +2266,17 @@ function ctx() {
     prefs: state.prefs,
     setPrefs,
     resetPrefs,
+    // Where Search can send someone.
+    open: {
+      tab: (name) => setSidebarTab(name),
+      outline: () => dockToggle('outline'),
+      preview: (on) => togglePreview(on),
+      focus: () => setPrefs({ focusMode: !state.prefs.focusMode }),
+      music: () => toggleMusicPanel(),
+      home: () => api.home.show(),
+      updates: () => checkForUpdate({ force: true })
+    },
+    menu: api.menu,
     platform: api.platform,
     frontMatter: () => frontMatter(view.state.doc.toString()).meta,
     setFrontMatter: (entries) => writeFrontMatter(entries),
@@ -2342,6 +2358,7 @@ function wireMenu() {
     'tools:replace-next': () => { view.focus(); replaceNextMatch(view); },
     'tools:replace-all': () => { view.focus(); replaceEveryMatch(view); },
     'tools:prefs': () => ui.showPreferences(ctx()),
+    'tools:search': () => ui.showSearch(ctx()),
     'view:theme': () => ui.showThemes(ctx()),
     'view:outline': () => dockToggle('outline'),
     'view:reference': () => setSidebarTab('reference'),

@@ -604,6 +604,111 @@ app.whenReady().then(async () => {
   });
 
   /* ======================================================= side panels == */
+  group = 'Search';
+
+  const typeSearch = async (q) => {
+    await js(`(() => { const s = document.querySelector('.search-input'); s.value = ${JSON.stringify(q)};
+      s.dispatchEvent(new Event('input')); return true; })()`);
+    await wait(120);
+  };
+  const hitLabels = () => js(`[...document.querySelectorAll('.search-hit .label')].map(x => x.textContent)`);
+
+  await test('search opens from its button and from ⌘K', async () => {
+    await load('# One\n\nWords.');
+    await click('#btn-search');
+    await wait(400);
+    ok('the panel is open with the field focused',
+      await js(`document.activeElement && document.activeElement.classList.contains('search-input')`));
+    await js(`document.querySelector('.search-input').blur()`);
+    await menu('tools:search');   // the same button, so this closes it
+    await wait(300);
+    await menu('tools:search');
+    await wait(400);
+    ok('the menu command opens it too', await js(`!!document.querySelector('.search-panel')`));
+  });
+
+  await test('a misspelling still finds the setting', async () => {
+    await typeSearch('margn');
+    const labels = await hitLabels();
+    ok('the margin rows come first', labels.slice(0, 3).every((l) => /margin/i.test(l)));
+    ok('and Side margins is among them', labels.includes('Side margins'));
+  });
+
+  await test('a related word reaches a place that has no such word', async () => {
+    await typeSearch('colr');
+    eq('colour finds Themes', (await hitLabels())[0], 'Themes');
+    await typeSearch('pomodoro');
+    eq('pomodoro finds the sprint', (await hitLabels())[0], 'Writing sprint');
+    await typeSearch('dark mode');
+    eq('two words meet on the best match', (await hitLabels())[0], 'Themes');
+  });
+
+  await test('nothing found says so and suggests', async () => {
+    await typeSearch('fnt sze');
+    ok('it says nothing matched', await js(`!!document.querySelector('.search-empty')`));
+    const chips = await js(`[...document.querySelectorAll('.prefs-chip')].map(c => c.textContent)`);
+    ok('and offers the words it thinks were meant', chips.includes('font') && chips.includes('size'));
+    await js(`[...document.querySelectorAll('.prefs-chip')].find(c => c.textContent === 'font').click()`);
+    await wait(150);
+    ok('choosing one searches for it', (await hitLabels()).includes('Typeface'));
+    await typeSearch('xyzzy');
+    ok('gibberish gets a plain answer', await js(`!!document.querySelector('.search-empty')`));
+  });
+
+  await test('choosing a result goes there', async () => {
+    await typeSearch('scratchpad');
+    eq('the place comes first', (await hitLabels())[0], 'Scratchpad');
+    eq('and the menu item that opens the same place is not repeated', (await hitLabels()).filter((l) => l === 'Scratchpad').length, 1);
+    await js(`document.querySelector('.search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    await wait(400);
+    ok('the panel closed', !(await js(`!!document.querySelector('.search-panel')`)));
+    ok('and the scratchpad tab is up', await js(`document.querySelector('.side-tab[data-tab="scratch"]').classList.contains('on')`));
+
+    await menu('tools:search');
+    await wait(400);
+    await typeSearch('top margin');
+    await js(`document.querySelector('.search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))`);
+    await js(`document.querySelector('.search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))`);
+    await js(`document.querySelector('.search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    await wait(500);
+    ok('a setting opens Preferences', await js(`!!document.querySelector('.prefs-body')`));
+    ok('with its section open', await js(`!document.querySelector('.prefs-section[data-section="page"]').classList.contains('collapsed')`));
+    ok('and the row picked out', await js(`document.querySelector('[data-pref="printMargin"]').classList.contains('picked')`));
+
+    await menu('tools:search');
+    await wait(400);
+    await typeSearch('bold');
+    await js(`document.querySelector('.search-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    await wait(400);
+    ok('a command runs', /\*\*/.test(await content()));
+    await load('# One\n\nWords.');
+  });
+
+  group = 'Preferences';
+
+  await test('settings sit in sections that open and close', async () => {
+    await click('#btn-prefs');
+    await wait(400);
+    const state = () => js(`[...document.querySelectorAll('.prefs-section')].map(s => s.dataset.section + ':' + (s.classList.contains('collapsed') ? 'closed' : 'open'))`);
+    const first = await state();
+    eq('six of them', first.length, 6);
+    eq('the first is open', first[0], 'writing:open');
+    ok('the rest are closed', first.slice(1).every((x) => x.endsWith(':closed')));
+    await js(`document.querySelector('.prefs-section[data-section="music"] .prefs-section-head').click()`);
+    await wait(200);
+    ok('a click opens one', (await state()).includes('music:open'));
+    ok('and its rows show', await js(`document.querySelector('[data-pref="youtubeEnabled"]').offsetParent !== null`));
+    await click('#btn-prefs');
+    await wait(300);
+    await click('#btn-prefs');
+    await wait(400);
+    ok('which is remembered', (await state()).includes('music:open'));
+    await js(`document.querySelector('.prefs-section[data-section="music"] .prefs-section-head').click()`);
+    await wait(200);
+    await click('#btn-prefs');
+    await wait(300);
+  });
+
   group = 'Panels';
 
   await test('a panel hangs off the control that opened it', async () => {
@@ -1634,6 +1739,7 @@ app.whenReady().then(async () => {
     const before = await ids();
     ok('the toolbar is drawn from preferences', before.length >= 5);
     eq('preferences sits last', before[before.length - 1], 'btn-prefs');
+    ok('a button added since the order was saved still comes before it', before.includes('btn-search'));
 
     await js(`window.api.prefs.set({toolbarHidden:['sprint']})`);
     await js(`window.__setPref('toolbarHidden', ['sprint'])`);
@@ -1652,7 +1758,7 @@ app.whenReady().then(async () => {
   });
 
   await test('preferences cannot be hidden away', async () => {
-    await js(`window.__setPref('toolbarHidden', ['prefs','export','theme','music','sprint','focus'])`);
+    await js(`window.__setPref('toolbarHidden', ['prefs','search','export','theme','music','sprint','focus'])`);
     await wait(300);
     const ids = await js(`[...document.querySelectorAll('#tb-buttons .icon-btn')].map(b => b.id)`);
     eq('only preferences remains', ids, ['btn-prefs']);

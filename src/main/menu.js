@@ -114,6 +114,7 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
         { label: 'Focus Mode', accelerator: 'CmdOrCtrl+Shift+F', click: send('view:focus') },
         { label: 'Typewriter Mode', accelerator: 'CmdOrCtrl+Shift+T', click: send('view:typewriter') },
         { label: 'Sprint…', accelerator: 'CmdOrCtrl+Shift+R', click: send('tools:sprint') },
+        { label: 'Search Everything…', accelerator: 'CmdOrCtrl+K', click: send('tools:search') },
         { label: 'Scratchpad', accelerator: 'CmdOrCtrl+Shift+K', click: send('tools:scratch') },
         { label: 'New Revision…', accelerator: 'CmdOrCtrl+Shift+V', click: send('tools:revision') },
         { type: 'separator' },
