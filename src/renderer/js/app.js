@@ -2009,12 +2009,85 @@ function renderToolbar() {
   for (const item of orderedToolbar(state.prefs)) {
     if (hidden.has(item.id) && !item.pinned) continue;
     host.append(ui.h('button', {
-      class: 'icon-btn', id: `btn-${item.id}`, title: item.title,
+      class: 'icon-btn', id: `btn-${item.id}`, title: item.title, 'data-item': item.id,
       html: `<svg><use href="#${item.icon}"/></svg>`,
-      onclick: item.run
+      onclick: (e) => { if (host.dataset.reordered) { e.preventDefault(); return; } item.run(e); }
     }));
   }
   syncToolbarState();
+  wireToolbarReorder(host);
+}
+
+/* Press a button and hold it, and the buttons start to shake; while they
+   shake, the one under the finger can be dragged to a new place, and letting
+   go settles the order. A press that lets go, or moves, before the hold is
+   up is an ordinary click. */
+const HOLD_MS = 380;
+const HOLD_SLOP = 5;
+
+function wireToolbarReorder(host) {
+  if (host.dataset.reorderWired) return;
+  host.dataset.reorderWired = '1';
+
+  let hold = null;          // { btn, x, y, timer }
+  let drag = null;          // { btn, pointerId }
+
+  const settle = (commit) => {
+    if (!drag) return;
+    const { btn, pointerId } = drag;
+    drag = null;
+    host.classList.remove('reordering');
+    btn.classList.remove('dragging');
+    try { btn.releasePointerCapture(pointerId); } catch { /* already released */ }
+    if (commit) {
+      const order = [...host.querySelectorAll('.icon-btn')].map((b) => b.dataset.item);
+      const hiddenNow = (state.prefs.toolbarHidden || []).filter((id) => !order.includes(id));
+      const full = orderedToolbar(state.prefs).map((i) => i.id).filter((id) => !order.includes(id));
+      setPrefs({ toolbarOrder: order.concat(full.filter((id) => hiddenNow.includes(id))) });
+    }
+    // The click that follows the release must not fire the button.
+    host.dataset.reordered = '1';
+    setTimeout(() => { delete host.dataset.reordered; }, 0);
+  };
+
+  host.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('.icon-btn');
+    if (!btn || e.button !== 0) return;
+    hold = { btn, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    hold.timer = setTimeout(() => {
+      if (!hold) return;
+      drag = { btn: hold.btn, pointerId: hold.pointerId };
+      hold = null;
+      host.classList.add('reordering');
+      btn.classList.add('dragging');
+      try { btn.setPointerCapture(drag.pointerId); } catch { /* a synthetic pointer */ }
+    }, HOLD_MS);
+  });
+
+  host.addEventListener('pointermove', (e) => {
+    if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > HOLD_SLOP) {
+      clearTimeout(hold.timer); hold = null;     // a move: not a hold
+    }
+    if (!drag) return;
+    // Slide the held button past whichever neighbour the pointer has crossed.
+    const others = [...host.querySelectorAll('.icon-btn')].filter((b) => b !== drag.btn);
+    for (const other of others) {
+      const r = other.getBoundingClientRect();
+      const mid = r.left + r.width / 2;
+      const before = drag.btn.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING;
+      if (before && e.clientX > mid) other.after(drag.btn);
+      else if (!before && e.clientX < mid) other.before(drag.btn);
+    }
+  });
+
+  const release = (e) => {
+    if (hold) { clearTimeout(hold.timer); hold = null; }
+    if (drag && (e.type !== 'pointerup' || e.pointerId === drag.pointerId)) settle(e.type === 'pointerup');
+  };
+  host.addEventListener('pointerup', release);
+  host.addEventListener('pointercancel', release);
+  host.addEventListener('lostpointercapture', (e) => { if (drag && e.target === drag.btn) settle(true); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drag) { renderToolbar(); settle(false); } });
 }
 
 function syncToolbarState() {

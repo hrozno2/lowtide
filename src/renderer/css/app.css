@@ -153,6 +153,19 @@ body.dirty .tb-title .dot { opacity: .85; }
 }
 .icon-btn:hover { background: var(--surface-3); color: var(--text-2); }
 .icon-btn:active { background: var(--surface-4); }
+/* Held long enough, the toolbar shakes like a phone's home screen and the
+   held button can be dragged to a new place. */
+#tb-buttons.reordering .icon-btn { animation: jiggle .22s ease-in-out infinite; }
+#tb-buttons.reordering .icon-btn:nth-child(even) { animation-delay: -.11s; }
+#tb-buttons.reordering .icon-btn.dragging {
+  animation: none; transform: scale(1.12); background: var(--surface-4); color: var(--text);
+  box-shadow: var(--shadow-2); cursor: grabbing; position: relative; z-index: 1;
+}
+@keyframes jiggle {
+  0% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+  100% { transform: rotate(-3deg); }
+}
 .icon-btn.on { color: var(--primary); background: var(--primary-ghost); }
 
 .win-controls { display: flex; margin-left: 6px; }

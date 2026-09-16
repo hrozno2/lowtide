@@ -69,6 +69,13 @@ comments are coloured as you type, and the markup characters stay visible so the
 page never reflows under your hands. Smart quotes, em dashes and ellipses.
 Spellcheck with right-click corrections; choose your dictionaries in Preferences.
 
+**Search.** The magnifying glass (or ⌘K) finds anything: a setting, a place
+in the app — the scratchpad, the outline, themes, the pages view — or a menu
+command, and choosing it goes there. It forgives typos, knows that *colour*
+means Themes and *pomodoro* means the sprint, and when nothing matches it
+offers the words it thinks you meant. Preferences itself is six folding
+sections. Hold a toolbar button until the row shakes, then drag it to reorder.
+
 **Structure.** The Navigator lists every chapter and section with its word
 count, filters as you type, and jumps you there. Nesting is drawn with one rule
 per level, and dragging a chapter reorders the manuscript — the text goes with
@@ -189,6 +196,7 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
 | `⇧⌘/Ctrl D` | Dictionary and thesaurus |
 | `⇧⌘/Ctrl M` | Music |
 | `⇧⌘/Ctrl E` | Pages view |
+| `⌘/Ctrl K` | Search everything |
 | `⇧⌘/Ctrl F` | Focus Mode |
 | `⇧⌘/Ctrl T` | Typewriter scrolling |
 | `⇧⌘/Ctrl R` | Sprint |

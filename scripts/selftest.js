@@ -1757,6 +1757,42 @@ app.whenReady().then(async () => {
     eq('restored', (await ids())[0], 'btn-export');
   });
 
+  await test('hold a button and the toolbar shakes; drag it and the order changes', async () => {
+    const ids = () => js(`[...document.querySelectorAll('#tb-buttons .icon-btn')].map(b => b.id)`);
+    await js(`window.__setPref('toolbarOrder', ['search','export','theme','music','sprint','focus','prefs'])`);
+    await wait(300);
+    const pe = (type, el, x, extra = '') => js(`(() => { const el = document.querySelector('${el}'); const r = el.getBoundingClientRect();
+      el.dispatchEvent(new PointerEvent('${type}', { bubbles: true, pointerId: 7, button: 0, clientX: ${x}, clientY: r.top + r.height / 2 ${extra} })); return true; })()`);
+    const mid = (el) => js(`(() => { const r = document.querySelector('${el}').getBoundingClientRect(); return r.left + r.width / 2; })()`);
+
+    // A quick press is a click.
+    await pe('pointerdown', '#btn-export', await mid('#btn-export'));
+    await wait(80);
+    await pe('pointerup', '#btn-export', await mid('#btn-export'));
+    await click('#btn-export');
+    await wait(300);
+    ok('a short press still opens the button', await js(`!!document.querySelector('.panel')`));
+    await menu('tools:search'); await menu('tools:search');   // opening another closes it; then close that
+    await wait(200);
+
+    // A hold shakes; a drag past the next button swaps them.
+    await pe('pointerdown', '#btn-export', await mid('#btn-export'));
+    await wait(520);
+    ok('held long enough, the toolbar shakes', await js(`document.getElementById('tb-buttons').classList.contains('reordering')`));
+    ok('and the held button is picked up', await js(`document.getElementById('btn-export').classList.contains('dragging')`));
+    const past = (await mid('#btn-music')) + 2;
+    await pe('pointermove', '#btn-export', past);
+    await pe('pointerup', '#btn-export', past);
+    await wait(400);
+    ok('let go, it stops shaking', !(await js(`document.getElementById('tb-buttons').classList.contains('reordering')`)));
+    const after = await ids();
+    ok('and the button has moved past the ones it was dragged over', after.indexOf('btn-export') > after.indexOf('btn-music'));
+    eq('the order is saved', await js(`(async () => (await window.api.prefs.get()).toolbarOrder.indexOf('export'))()`), after.indexOf('btn-export'));
+    ok('without the button firing', !(await js(`!!document.querySelector('.panel')`)));
+    await js(`window.__setPref('toolbarOrder', ['search','export','theme','music','sprint','focus','prefs'])`);
+    await wait(300);
+  });
+
   await test('preferences cannot be hidden away', async () => {
     await js(`window.__setPref('toolbarHidden', ['prefs','search','export','theme','music','sprint','focus'])`);
     await wait(300);
