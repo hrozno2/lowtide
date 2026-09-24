@@ -342,6 +342,59 @@ app.whenReady().then(async () => {
   });
 
   /* ========================================================== counting == */
+  group = 'Typewriter scrolling';
+
+  await test('the caret line is centred, but not while the mouse is selecting', async () => {
+    const LONG = Array.from({ length: 200 }, (_, i) => `Line ${i + 1} of a manuscript long enough to scroll a great deal.`).join('\n\n');
+    await load(LONG);
+    await js(`window.__setPref('typewriter', true)`);
+    await wait(500);
+
+    const scroller = `document.querySelector('.cm-scroller')`;
+    const top = () => js(`${scroller}.scrollTop`);
+    const centred = () => js(`(() => {
+      const v = window.__lowTideView, s = document.querySelector('.cm-scroller');
+      const box = v.coordsAtPos(v.state.selection.main.head), r = s.getBoundingClientRect();
+      return Math.abs((box.top + box.bottom) / 2 - (r.top + r.bottom) / 2) < 60; })()`);
+
+    // A caret put down by the keyboard centres, which is what the mode is for.
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.line(120).from }, userEvent: 'select' }); return true; })()`);
+    await wait(400);
+    ok('a caret moved by keyboard is centred', await centred());
+
+    // The press that begins a mouse selection must leave the view alone, or
+    // the text moves out from under the pointer before the drag starts.
+    const before = await top();
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.line(126).from }, userEvent: 'select.pointer' }); return true; })()`);
+    await wait(400);
+    eq('a press does not scroll the page away', await top(), before);
+
+    // Nor may any step of the drag.
+    for (const line of [128, 130, 132]) {
+      await js(`(() => { const v = window.__lowTideView;
+        v.dispatch({ selection: { anchor: v.state.doc.line(126).from, head: v.state.doc.line(${line}).from }, userEvent: 'select.pointer' }); return true; })()`);
+      await wait(150);
+    }
+    eq('nor does dragging out a selection', await top(), before);
+
+    // A range selected any other way is left alone too.
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.line(140).from, head: v.state.doc.line(150).from }, userEvent: 'select' }); return true; })()`);
+    await wait(400);
+    eq('a selected range is not hauled to the middle', await top(), before);
+
+    // Typing centres again, selection or no selection.
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ changes: { from: v.state.doc.line(150).from, insert: 'Now ' }, selection: { anchor: v.state.doc.line(150).from + 4 }, userEvent: 'input.type' }); return true; })()`);
+    await wait(400);
+    ok('typing centres the caret again', await centred());
+
+    await js(`window.__setPref('typewriter', false)`);
+    await wait(300);
+  });
+
   group = 'Counting';
 
   await test('word and character counts', async () => {

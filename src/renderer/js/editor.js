@@ -62,6 +62,18 @@ function smartTypography(enabled) {
   });
 }
 
+/* Typewriter scrolling keeps the caret's line in the middle of the window —
+ * but only the caret's. Centring on every selection change made selecting
+ * with the mouse impossible: the press itself re-centred, moving the text out
+ * from under the pointer, and every step of the drag hauled the view after
+ * it. So: nothing while the mouse is choosing a selection, and nothing while
+ * a range is selected, which leaves CodeMirror's own edge scrolling to do
+ * what it is for. */
+function wantsCentring(update) {
+  if (!update.state.selection.main.empty) return false;
+  return !update.transactions.some((tr) => tr.isUserEvent('select.pointer'));
+}
+
 /* --------------------------------------------------------------- creation */
 
 export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs }) {
@@ -103,7 +115,8 @@ export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs })
       EditorView.updateListener.of((update) => {
         if (update.docChanged) onChange(update);
         if (update.selectionSet || update.docChanged) onCursor(update);
-        if (typewriterOn && (update.docChanged || update.selectionSet) && !scrollPending) {
+        if (typewriterOn && (update.docChanged || update.selectionSet) && !scrollPending &&
+            wantsCentring(update)) {
           scrollPending = true;
           requestAnimationFrame(() => {
             scrollPending = false;

@@ -377,7 +377,7 @@ export const PREF_CATALOGUE = [
   { id: 'lineHeight', section: 'writing', label: 'Line spacing', keys: 'leading height' },
   { id: 'pageWidth', section: 'writing', label: 'Column width', keys: 'measure margin narrow wide' },
   { id: 'paragraphStyle', section: 'writing', label: 'Paragraphs', hint: 'How body text is laid out', keys: 'indent spacing blank line' },
-  { id: 'typewriter', section: 'writing', label: 'Typewriter scrolling', hint: 'Keep the caret centred', keys: 'cursor centre scroll' },
+  { id: 'typewriter', section: 'writing', label: 'Typewriter scrolling', hint: 'Keeps the line you are writing in the middle', keys: 'cursor centre scroll' },
   { id: 'focusScope', section: 'writing', label: 'Focus scope', hint: 'What stays lit in Focus Mode', keys: 'dim highlight distraction' },
   { id: 'smartTypography', section: 'writing', label: 'Smart punctuation', hint: 'Curly quotes, — and …', keys: 'quotes dashes ellipsis apostrophe' },
   { id: 'spellcheck', section: 'words', label: 'Check spelling', keys: 'spell misspelling underline' },
