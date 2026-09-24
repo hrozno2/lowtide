@@ -14,11 +14,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-/* What is kept. Every version of recent work, and beyond that one a day for
-   as long as there have been days — a manuscript's history should outlive the
-   week it was written in, and a version of a novel is tens of kilobytes. */
-const KEEP_RECENT = 80;                // the newest, whatever their dates
-const KEEP_TOTAL = 400;                // with a day's best kept beyond them
+/* How much history to hold, set in Preferences. Recent work is kept version
+   by version; beyond that only a day's last survives, so an old manuscript
+   keeps a day-by-day past rather than an hour of one afternoon. A version of
+   a novel is tens of kilobytes, so the default is generous. */
+const DEFAULT_KEEP = 200;
+const recentShare = (keep) => Math.max(20, Math.round(keep * 0.4));
 const MIN_GAP_MS = 90 * 1000;          // never snapshot more often than this
 
 function backupsRoot() {
@@ -106,13 +107,14 @@ function listBackups(filePath) {
 
 const dayOf = (time) => new Date(time).toISOString().slice(0, 10);
 
-function prune(dir) {
+function prune(dir, total) {
   const all = listIn(dir);                        // newest first
-  const keep = new Set(all.slice(0, KEEP_RECENT).map((e) => e.file));
+  const recent = recentShare(total);
+  const keep = new Set(all.slice(0, recent).map((e) => e.file));
   const days = new Set();
-  for (const entry of all.slice(KEEP_RECENT)) {
+  for (const entry of all.slice(recent)) {
     const day = dayOf(entry.time);
-    if (days.has(day) || keep.size >= KEEP_TOTAL) continue;
+    if (days.has(day) || keep.size >= total) continue;
     days.add(day);
     keep.add(entry.file);                          // the last of that day
   }
@@ -126,7 +128,7 @@ function prune(dir) {
  * last version, or when the last one is very recent, so a stream of autosaves
  * does not flood the store.
  */
-function snapshot(filePath, content, { force = false } = {}) {
+function snapshot(filePath, content, { force = false, keep = DEFAULT_KEEP } = {}) {
   if (!filePath || typeof content !== 'string') return null;
   const dir = dirFor(filePath);
   try {
@@ -146,7 +148,7 @@ function snapshot(filePath, content, { force = false } = {}) {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '');
     const target = path.join(dir, `${stamp}.txt`);
     writeAtomic(target, content);
-    prune(dir);
+    prune(dir, Math.max(10, Math.round(keep) || DEFAULT_KEEP));
     return target;
   } catch (err) {
     console.error('[low-tide] backup failed:', err.message);
@@ -158,4 +160,4 @@ function readBackup(file) {
   return fs.readFileSync(file, 'utf8');
 }
 
-module.exports = { writeAtomic, snapshot, listBackups, readBackup, dirFor, KEEP_RECENT, KEEP_TOTAL };
+module.exports = { writeAtomic, snapshot, listBackups, readBackup, dirFor, DEFAULT_KEEP, recentShare };

@@ -1758,6 +1758,50 @@ app.whenReady().then(async () => {
     await wait(300);
   });
 
+  await test('how many versions are kept is a setting, and old days survive', async () => {
+    const backups = require(path.join(base, 'src', 'main', 'backups.js'));
+    const file = path.join(WORK, 'thinning.fountain');
+    fs.writeFileSync(file, 'x\n', 'utf8');
+    const dir = backups.dirFor(file);
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'source.txt'), file, 'utf8');
+
+    // Twelve versions a day across six days, oldest first.
+    for (let day = 1; day <= 6; day++) {
+      for (let n = 0; n < 12; n++) {
+        const stamp = `2026-07-0${day}T0${n < 10 ? n : 9}-${String(n * 5).padStart(2, '0')}-00-000`;
+        fs.writeFileSync(path.join(dir, `${stamp}.txt`), `day ${day} version ${n}\n`, 'utf8');
+      }
+    }
+    eq('seventy-two to begin with', backups.listBackups(file).length, 72);
+
+    // A cap of 50 keeps the newest 20 whole, then one for each older day.
+    backups.snapshot(file, 'newest\n', { force: true, keep: 50 });
+    const kept = backups.listBackups(file);
+    ok('the cap is what was asked for, not forty', kept.length <= 50 && kept.length > 20);
+    const days = new Set(kept.map((e) => new Date(e.time).toISOString().slice(0, 10)));
+    eq('and every day is still represented', days.size, 7);
+    ok('the newest is the one just written', fs.readFileSync(kept[0].file, 'utf8').includes('newest'));
+
+    // Raising it does not resurrect what was thinned, but keeps more from now.
+    backups.snapshot(file, 'later\n', { force: true, keep: 500 });
+    ok('a bigger cap keeps everything it has', backups.listBackups(file).length === kept.length + 1);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  await test('the default kept is two hundred, and Preferences sets it', async () => {
+    const backups = require(path.join(base, 'src', 'main', 'backups.js'));
+    eq('two hundred by default', backups.DEFAULT_KEEP, 200);
+    eq('with the recent share of it kept whole', backups.recentShare(200), 80);
+    eq('a setting carries it', await js(`(async () => (await window.api.prefs.get()).versionsKept)()`), 200);
+    await js(`window.__setPref('versionsKept', 400)`);
+    await wait(300);
+    eq('and can be changed', await js(`(async () => (await window.api.prefs.get()).versionsKept)()`), 400);
+    await js(`window.__setPref('versionsKept', 200)`);
+    await wait(200);
+  });
+
   await test('overwriting keeps a backup', async () => {
     const file = path.join(WORK, 'backup.fountain');
     fs.writeFileSync(file, 'first version\n', 'utf8');

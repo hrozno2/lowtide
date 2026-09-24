@@ -401,6 +401,7 @@ export const PREF_CATALOGUE = [
   { id: 'youtubeMinimal', section: 'music', label: 'Hide the distractions', hint: 'Comments, likes, recommendations and the shorts bar', keys: 'youtube comments recommendations shorts' },
   { id: 'autosave', section: 'files', label: 'Save as you write', hint: 'Quietly, with nothing to dismiss', keys: 'autosave automatic save disk' },
   { id: 'autosaveSeconds', section: 'files', label: 'Save every', hint: 'At most; pausing saves sooner', keys: 'autosave interval seconds frequency how often' },
+  { id: 'versionsKept', section: 'files', label: 'Versions kept', hint: 'Every recent one, then a day\'s last beyond them', keys: 'history backup versions limit cap how many' },
   { id: 'saveTo', section: 'files', label: 'Save new documents to', keys: 'folder location dropbox' },
   { id: 'updateCheck', section: 'files', label: 'Check for updates on launch', hint: 'Asks GitHub for the newest release; installs nothing', keys: 'upgrade version github' }
 ];
@@ -454,6 +455,8 @@ function prefControls(ctx, rebuild) {
     autosave: () => toggle(p.autosave !== false, (v) => set({ autosave: v })),
     autosaveSeconds: () => slider(p.autosaveSeconds || 15, 5, 120, 5,
       (v) => (v >= 60 ? `${v / 60} min` : `${v}s`), (v) => set({ autosaveSeconds: v })),
+    versionsKept: () => slider(p.versionsKept || 200, 50, 1000, 50, (v) => String(v),
+      (v) => set({ versionsKept: v })),
     saveTo: () => segmented([['documents', 'Documents'], ['dropbox', 'Dropbox']],
       p.saveTo || 'documents', (v) => set({ saveTo: ctx.dropbox ? v : 'documents' })),
     updateCheck: () => toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))

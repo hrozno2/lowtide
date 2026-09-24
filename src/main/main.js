@@ -47,6 +47,23 @@ ipcMain.handle('theme:set-icon', (e, id) => {
 
 const HARNESS = !!process.env.LOWTIDE_HARNESS;
 
+// A test run should not appear in the Dock or come to the front at all.
+if (HARNESS) app.dock?.hide();
+
+/* Show a window without taking the keyboard from whatever the person at the
+   machine is doing. The test run opens and closes a great many windows, and
+   on a machine someone is writing on, each one it fronted swallowed the next
+   few keystrokes. Input in the tests is delivered to the page directly, so
+   none of it needs the window to be frontmost. */
+function reveal(win) {
+  if (HARNESS) win.showInactive(); else win.show();
+}
+
+/** Bringing a window forward, which a test run has no business doing. */
+function focusWindow(win) {
+  if (!HARNESS) win.focus();
+}
+
 /** Report a problem without blocking an automated run behind a modal. */
 function reportProblem(win, message, detail) {
   if (HARNESS) {
@@ -123,7 +140,7 @@ function createWindow(opts = {}) {
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   win.once('ready-to-show', () => {
-    win.show();
+    reveal(win);
     if (opts.filePath) openInWindow(win, opts.filePath);
     else if (opts.restore) win.webContents.send('doc:load', opts.restore);
   });
@@ -262,7 +279,7 @@ function windowForPath(filePath) {
 
 function openFile(filePath, fromWindow) {
   const existing = windowForPath(filePath);
-  if (existing) { existing.focus(); return existing; }
+  if (existing) { focusWindow(existing); return existing; }
   const target = fromWindow && docs.get(fromWindow.id);
   // Reuse a pristine, empty, untitled window; otherwise open a new one.
   if (target && !target.path && !target.dirty && target.content.trim() === '') {
@@ -299,7 +316,7 @@ async function saveDocument(win, content, filePath) {
   try {
     // Keep the version that is about to be replaced, then write atomically.
     if (fs.existsSync(target)) {
-      try { backups.snapshot(target, fs.readFileSync(target, 'utf8')); } catch {}
+      try { backups.snapshot(target, fs.readFileSync(target, 'utf8'), { keep: getPrefs().get('versionsKept') }); } catch {}
     }
     backups.writeAtomic(target, content);
   } catch (err) {
@@ -360,7 +377,7 @@ let homeWindow = null;
 
 function createHomeWindow() {
   if (homeWindow && !homeWindow.isDestroyed()) {
-    homeWindow.focus();
+    focusWindow(homeWindow);
     return homeWindow;
   }
   homeWindow = new BrowserWindow({
@@ -383,7 +400,7 @@ function createHomeWindow() {
     }
   });
   homeWindow.loadFile(path.join(__dirname, '..', 'renderer', 'home.html'));
-  homeWindow.once('ready-to-show', () => homeWindow.show());
+  homeWindow.once('ready-to-show', () => reveal(homeWindow));
   homeWindow.on('closed', () => { homeWindow = null; });
   return homeWindow;
 }
@@ -542,7 +559,7 @@ ipcMain.handle('backup:open', async (e, { file, sourcePath }) => {
 
 ipcMain.handle('backup:snapshot', (e, { path: filePath, content }) => {
   if (!filePath) return null;
-  return backups.snapshot(filePath, content, { force: true });
+  return backups.snapshot(filePath, content, { force: true, keep: getPrefs().get('versionsKept') });
 });
 
 ipcMain.handle('doc:extras', (e, path) => (path ? docEntry(path) : {}));
