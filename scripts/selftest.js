@@ -1395,6 +1395,42 @@ app.whenReady().then(async () => {
   });
 
   /* ============================================================= themes == */
+  group = 'Notes';
+
+  await test('a note is the theme\'s own colour, brackets and all', async () => {
+    await load('The lamp was lit. [[check the date]] She counted the steps.\n\n/* a scene not yet written */');
+    await wait(600);
+    for (const theme of ['material', 'nord', 'solarized-light']) {
+      await js(`window.__applyTheme(${JSON.stringify(theme)})`);
+      await wait(350);
+      const seen = await js(`(() => {
+        const note = getComputedStyle(document.querySelector('.m-note:not(.m-note-marker)')).color;
+        const mark = getComputedStyle(document.querySelector('.m-note-marker')).color;
+        // [0-9] rather than \d: this is a template literal, which would eat
+        // the backslash and leave a regex matching the letter d.
+        const rgb = (c) => (c.match(/[0-9.]+/g) || []).slice(0, 3).map(Number);
+        const srgb = (c) => c.startsWith('color(') ? rgb(c.replace('color(srgb', '')).map((v) => Math.round(v * 255)) : rgb(c);
+        return { note: srgb(note), mark: srgb(mark),
+                 text: srgb(getComputedStyle(document.querySelector('.cm-content')).color) }; })()`);
+      const near = (a, b) => a.length === 3 && b.length === 3 && a.every((v, i) => Math.abs(v - b[i]) <= 2);
+      ok(`${theme}: the brackets take the note's hue`, near(seen.note, seen.mark));
+      ok(`${theme}: and a note is not the colour of prose`, !near(seen.note, seen.text));
+    }
+    await js(`window.__applyTheme('material')`);
+    await wait(300);
+  });
+
+  await test('notes and comments are not in the word count', async () => {
+    await load('One two three four five.');
+    await wait(500);
+    const counted = () => js(`Number(document.getElementById('stat-words').textContent.replace(/\\D/g, ''))`);
+    const plain = await counted();
+    await load('One two three four five. [[six seven eight nine ten]]\n\n/* eleven twelve thirteen */');
+    await wait(700);
+    const withNotes = await counted();
+    eq('a note adds nothing to the count', withNotes, plain);
+  });
+
   group = 'Themes';
 
   await test('every theme applies', async () => {

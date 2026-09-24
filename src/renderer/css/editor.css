@@ -137,7 +137,10 @@ body.focus-mode .cm-editor .cm-line.page-start::after { opacity: .35; }
 .cm-editor .m-strike      { text-decoration: line-through; color: var(--text-3); }
 .cm-editor .m-note        { color: var(--note); background: var(--note-ghost);
                             border-radius: 3px; padding: .5px 0; }
-.cm-editor .m-note-marker { color: rgba(224, 180, 76, .45); }
+/* The brackets themselves, quieter than the note they hold. Derived from the
+   theme's own note colour — this was Material's yellow, hard-coded, so every
+   other theme wrote its notes in one hue and bracketed them in another. */
+.cm-editor .m-note-marker { color: color-mix(in srgb, var(--note) 55%, transparent); }
 .cm-editor .m-comment     { color: var(--text-4); font-style: italic; }
 
 /* revision marks */

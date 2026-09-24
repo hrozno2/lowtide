@@ -50,13 +50,15 @@ const HARNESS = !!process.env.LOWTIDE_HARNESS;
 // A test run should not appear in the Dock or come to the front at all.
 if (HARNESS) app.dock?.hide();
 
-/* Show a window without taking the keyboard from whatever the person at the
-   machine is doing. The test run opens and closes a great many windows, and
-   on a machine someone is writing on, each one it fronted swallowed the next
-   few keystrokes. Input in the tests is delivered to the page directly, so
-   none of it needs the window to be frontmost. */
+/* A test run opens and closes a great many windows. On a machine someone is
+   writing on, each one that appeared took the keyboard with it and swallowed
+   the next few keystrokes — one of them landed in a manuscript. Under the
+   harness the windows are never shown at all: they lay out and paint the same
+   (background throttling is off), and every input the tests send goes to the
+   page rather than through the window, so none of it needs a window on screen
+   and nothing is taken from whoever is at the keyboard. */
 function reveal(win) {
-  if (HARNESS) win.showInactive(); else win.show();
+  if (!HARNESS) win.show();
 }
 
 /** Bringing a window forward, which a test run has no business doing. */
@@ -396,7 +398,8 @@ function createHomeWindow() {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      backgroundThrottling: false
     }
   });
   homeWindow.loadFile(path.join(__dirname, '..', 'renderer', 'home.html'));
