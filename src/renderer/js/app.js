@@ -51,7 +51,8 @@ let outlineEditor = null;
 
 const debounce = (fn, ms) => {
   let t;
-  const wrapped = (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  const delay = () => (typeof ms === 'function' ? ms() : ms);
+  const wrapped = (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay()); };
   wrapped.flush = (...args) => { clearTimeout(t); fn(...args); };
   wrapped.cancel = () => clearTimeout(t);
   return wrapped;
@@ -172,6 +173,8 @@ function applyPrefs(p, prev) {
       });
     }
     if (changed('typewriter')) editor.setTypewriter(!!p.typewriter);
+    // Switched on with work outstanding, catch up rather than wait a cycle.
+    if (changed('autosave') && p.autosave !== false && state.dirty) autosave();
     if (changed('smartTypography')) editor.setSmartTypography(p.smartTypography !== false);
     if (changed('spellcheck')) editor.setSpellcheck(p.spellcheck !== false);
   }
@@ -316,26 +319,34 @@ function setPath(path) {
 
 /* ------------------------------------------------------------------ save */
 
-const AUTOSAVE_IDLE = 1400;      // save this long after you stop typing
-const AUTOSAVE_MAX_WAIT = 15000; // ...and at least this often while you don't
+/* Saving as you work. The knob in Preferences is "save every N seconds",
+   which is the longest it will go while you keep writing; pausing saves
+   sooner — a tenth of that — so a pause still feels immediate whatever the
+   setting. Every autosave is silent: the status bar is the only word of it. */
+const autosaveOn = () => state.prefs.autosave !== false;
+const autosaveEvery = () =>
+  Math.max(5, Math.min(300, Number(state.prefs.autosaveSeconds) || 15)) * 1000;
+const autosaveIdle = () => Math.max(800, Math.min(5000, autosaveEvery() / 10));
 
 const autosave = debounce(() => {
-  if (state.path && state.dirty) save(false, true);
-}, AUTOSAVE_IDLE);
+  if (autosaveOn() && state.path && state.dirty) save(false, true);
+}, autosaveIdle);
 
 let dirtySince = 0;
 
 // Typing without pausing would otherwise defer the debounce indefinitely.
 setInterval(() => {
-  if (!state.dirty || !state.path) return;
-  if (dirtySince && Date.now() - dirtySince >= AUTOSAVE_MAX_WAIT) save(false, true);
-}, 5000);
+  if (!autosaveOn() || !state.dirty || !state.path) return;
+  if (dirtySince && Date.now() - dirtySince >= autosaveEvery()) save(false, true);
+}, 1000);
 
-// A periodic snapshot protects unsaved drafts too: the session store holds the
-// buffer, and named documents get a version in the backup store.
+/* A version of the manuscript as it stands, every few minutes — the working
+   text, not the last thing written to disk, so the history protects what has
+   not been saved as well as what has. Identical text is never stored twice. */
+const BACKUP_EVERY = 5 * 60 * 1000;
 setInterval(() => {
-  if (state.path && state.savedText) api.backup.snapshot(state.path, state.savedText);
-}, 5 * 60 * 1000);
+  if (state.path && view) api.backup.snapshot(state.path, view.state.doc.toString());
+}, BACKUP_EVERY);
 
 async function save(saveAs = false, silent = false) {
   const text = view.state.doc.toString();
@@ -2350,7 +2361,8 @@ function ctx() {
       focus: () => setPrefs({ focusMode: !state.prefs.focusMode }),
       music: () => toggleMusicPanel(),
       home: () => api.home.show(),
-      updates: () => checkForUpdate({ force: true })
+      updates: () => checkForUpdate({ force: true }),
+      history: () => showBackups()
     },
     menu: api.menu,
     platform: api.platform,

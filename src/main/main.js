@@ -520,7 +520,7 @@ ipcMain.handle('doc:state', (e, state) => {
 ipcMain.handle('backup:list', (e, filePath) => {
   if (!filePath) return [];
   return backups.listBackups(filePath).map((b) => ({
-    name: b.name, file: b.file, size: b.size, time: b.time
+    name: b.name, file: b.file, size: b.size, time: b.time, from: b.from || null
   }));
 });
 

@@ -47,7 +47,7 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
         { label: 'Save', accelerator: 'CmdOrCtrl+S', click: send('file:save') },
         { label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', click: send('file:save-as') },
         { type: 'separator' },
-        { label: 'Revert to Backup…', click: send('file:backups') },
+        { label: 'Version History…', click: send('file:backups') },
         { label: 'Move to Dropbox', click: send('file:dropbox') },
         { type: 'separator' },
         { label: 'Title Page…', click: send('file:title-page') },

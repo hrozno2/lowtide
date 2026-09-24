@@ -14,7 +14,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const KEEP = 40;                       // versions retained per document
+/* What is kept. Every version of recent work, and beyond that one a day for
+   as long as there have been days — a manuscript's history should outlive the
+   week it was written in, and a version of a novel is tens of kilobytes. */
+const KEEP_RECENT = 80;                // the newest, whatever their dates
+const KEEP_TOTAL = 400;                // with a day's best kept beyond them
 const MIN_GAP_MS = 90 * 1000;          // never snapshot more often than this
 
 function backupsRoot() {
@@ -73,13 +77,47 @@ function listIn(dir) {
     .sort((a, b) => b.time - a.time);
 }
 
-function listBackups(filePath) {
-  return listIn(dirFor(filePath));
+function sourceOf(dir) {
+  try { return fs.readFileSync(path.join(dir, 'source.txt'), 'utf8').trim(); } catch { return ''; }
 }
 
+/**
+ * Versions of a document — including the ones kept while it lived somewhere
+ * else. The store is keyed by the document's path, so moving or renaming a
+ * manuscript would otherwise orphan everything written before the move. Those
+ * carry the folder they were kept under, so the panel can say where they came
+ * from and nobody confuses two files of the same name.
+ */
+function listBackups(filePath) {
+  const mine = dirFor(filePath);
+  const base = path.basename(filePath);
+  const out = listIn(mine);
+  let keys = [];
+  try { keys = fs.readdirSync(backupsRoot()); } catch { return out; }
+  for (const key of keys) {
+    const dir = path.join(backupsRoot(), key);
+    if (dir === mine) continue;
+    const src = sourceOf(dir);
+    if (!src || path.basename(src) !== base) continue;
+    for (const entry of listIn(dir)) out.push(Object.assign({ from: path.dirname(src) }, entry));
+  }
+  return out.sort((a, b) => b.time - a.time);
+}
+
+const dayOf = (time) => new Date(time).toISOString().slice(0, 10);
+
 function prune(dir) {
-  for (const entry of listIn(dir).slice(KEEP)) {
-    try { fs.unlinkSync(entry.file); } catch {}
+  const all = listIn(dir);                        // newest first
+  const keep = new Set(all.slice(0, KEEP_RECENT).map((e) => e.file));
+  const days = new Set();
+  for (const entry of all.slice(KEEP_RECENT)) {
+    const day = dayOf(entry.time);
+    if (days.has(day) || keep.size >= KEEP_TOTAL) continue;
+    days.add(day);
+    keep.add(entry.file);                          // the last of that day
+  }
+  for (const entry of all) {
+    if (!keep.has(entry.file)) { try { fs.unlinkSync(entry.file); } catch {} }
   }
 }
 
@@ -120,4 +158,4 @@ function readBackup(file) {
   return fs.readFileSync(file, 'utf8');
 }
 
-module.exports = { writeAtomic, snapshot, listBackups, readBackup, dirFor, KEEP };
+module.exports = { writeAtomic, snapshot, listBackups, readBackup, dirFor, KEEP_RECENT, KEEP_TOTAL };

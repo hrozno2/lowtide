@@ -12,6 +12,8 @@ const DEFAULTS = {
   focusMode: false,
   focusScope: 'paragraph', // 'paragraph' | 'line' | 'sentence'
   typewriter: false,
+  autosave: true,            // write to disk as you work, without a word about it
+  autosaveSeconds: 15,       // at least this often while you keep writing
   navigatorOpen: true,
   spellcheck: true,
   spellLanguages: [],

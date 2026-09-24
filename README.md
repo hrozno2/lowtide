@@ -139,10 +139,17 @@ than HTML in disguise), Markdown, plain text or HTML, with an optional title
 page.
 
 **Nothing gets lost.** Saves are atomic, so a crash cannot truncate your file.
-Autosave fires when you pause and at least every 15 seconds while you keep
-typing. Every save keeps a version, and `File ▸ Revert to Backup` opens any of
-them in a new window. Unsaved drafts survive a restart. `File ▸ Move to Dropbox`
-moves a document into Dropbox with its outline, scratchpad and revisions intact.
+It saves as you write — silently, with nothing to dismiss — when you pause and
+at least every fifteen seconds while you keep going; both the switch and the
+interval are in Preferences. A version of the manuscript is kept every few
+minutes and whenever the file is saved over, and `File ▸ Version History` opens
+any of them in a new window, the current document untouched. The store holds
+every recent version and a day's last beyond those, so a history outlives the
+week it was written in; it lives beside your settings, not in the app, so
+updating never touches it, and versions kept before you moved or renamed a
+manuscript are listed with it. Unsaved drafts survive a restart.
+`File ▸ Move to Dropbox` moves a document into Dropbox with its outline,
+scratchpad and revisions intact.
 
 **Updates.** On launch it asks GitHub whether a newer release exists and, if so,
 shows a dismissible notice with a download link. It never installs anything by

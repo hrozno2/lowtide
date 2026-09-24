@@ -399,6 +399,8 @@ export const PREF_CATALOGUE = [
   { id: 'toolbar', section: 'window', label: 'Toolbar', hint: 'Drag to reorder; switch buttons off', keys: 'buttons icons order hide', block: true },
   { id: 'youtubeEnabled', section: 'music', label: 'YouTube in the music pane', hint: 'Off means no browser view at all', keys: 'video sound audio browser' },
   { id: 'youtubeMinimal', section: 'music', label: 'Hide the distractions', hint: 'Comments, likes, recommendations and the shorts bar', keys: 'youtube comments recommendations shorts' },
+  { id: 'autosave', section: 'files', label: 'Save as you write', hint: 'Quietly, with nothing to dismiss', keys: 'autosave automatic save disk' },
+  { id: 'autosaveSeconds', section: 'files', label: 'Save every', hint: 'At most; pausing saves sooner', keys: 'autosave interval seconds frequency how often' },
   { id: 'saveTo', section: 'files', label: 'Save new documents to', keys: 'folder location dropbox' },
   { id: 'updateCheck', section: 'files', label: 'Check for updates on launch', hint: 'Asks GitHub for the newest release; installs nothing', keys: 'upgrade version github' }
 ];
@@ -449,6 +451,9 @@ function prefControls(ctx, rebuild) {
     toolbar: () => toolbarEditor(ctx),
     youtubeEnabled: () => toggle(p.youtubeEnabled !== false, (v) => set({ youtubeEnabled: v })),
     youtubeMinimal: () => toggle(p.youtubeMinimal !== false, (v) => set({ youtubeMinimal: v })),
+    autosave: () => toggle(p.autosave !== false, (v) => set({ autosave: v })),
+    autosaveSeconds: () => slider(p.autosaveSeconds || 15, 5, 120, 5,
+      (v) => (v >= 60 ? `${v / 60} min` : `${v}s`), (v) => set({ autosaveSeconds: v })),
     saveTo: () => segmented([['documents', 'Documents'], ['dropbox', 'Dropbox']],
       p.saveTo || 'documents', (v) => set({ saveTo: ctx.dropbox ? v : 'documents' })),
     updateCheck: () => toggle(p.updateCheck !== false, (v) => set({ updateCheck: v }))
@@ -557,7 +562,9 @@ const RELATED = {
   goal: ['go:stats'], goals: ['go:stats'], target: ['go:stats'], daily: ['go:stats'], progress: ['go:stats'],
   timer: ['go:sprint'], pomodoro: ['go:sprint'], stopwatch: ['go:sprint'],
   shortcut: ['go:help'], shortcuts: ['go:help'], keyboard: ['go:help'], hotkey: ['go:help'], hotkeys: ['go:help'], syntax: ['go:help'], markdown: ['go:help'], fountain: ['go:help'],
-  backup: ['go:revisions'], backups: ['go:revisions'], autosave: ['go:revisions'], versions: ['go:revisions'], history: ['go:revisions'], undo: ['go:revisions'],
+  backup: ['go:history'], backups: ['go:history'], versions: ['go:history'], history: ['go:history'],
+  revert: ['go:history'], restore: ['go:history'], recover: ['go:history'], lost: ['go:history'], crash: ['go:history'],
+  autosave: ['autosave', 'autosaveSeconds'], saving: ['autosave', 'autosaveSeconds'], save: ['autosave', 'autosaveSeconds', 'saveTo'],
   stats: ['go:stats'], statistics: ['go:stats'], words: ['go:stats', 'readingSpeed'],
   notes: ['go:scratch', 'go:outline'], ideas: ['go:scratch'], todo: ['go:scratch'], plan: ['go:outline'], structure: ['go:outline', 'go:navigator'], beats: ['go:outline'],
   chapters: ['go:navigator'], scenes: ['go:navigator'], contents: ['go:navigator'],
@@ -594,7 +601,8 @@ function searchIndex(ctx, menu) {
     ['go:navigator', 'Navigator', 'Chapters and sections, in the sidebar', 'chapters sections outline contents structure', () => go.tab && go.tab('navigator')],
     ['go:stats', 'Statistics and word goal', 'In the sidebar', 'words pages reading time goal target count', () => go.tab && go.tab('stats')],
     ['go:scratch', 'Scratchpad', 'Notes beside the manuscript', 'notes ideas todo scratch', () => go.tab && go.tab('scratch')],
-    ['go:revisions', 'Revisions', 'Saved versions and backups', 'versions history backup compare', () => go.tab && go.tab('revisions')],
+    ['go:revisions', 'Revisions', 'Mark and colour your rewrites, in the sidebar', 'draft colour compare marks', () => go.tab && go.tab('revisions')],
+    ['go:history', 'Version history', 'Earlier copies of this document, kept as you work', 'backup backups revert restore undo versions earlier copy', () => go.history && go.history()],
     ['go:reference', 'Dictionary and thesaurus', 'Definitions and synonyms, in the sidebar', 'lookup synonyms definition words', () => go.tab && go.tab('reference')],
     ['go:outline', 'Outline', 'A second editor beside the manuscript', 'plan structure beats story circle acts', () => go.outline && go.outline()],
     ['go:pages', 'Pages view', 'The manuscript as it prints', 'preview print pdf zoom', () => go.preview && go.preview(true)],
@@ -1060,15 +1068,18 @@ export function showBackups(ctx) {
 
   if (!ctx.list.length) {
     body.append(h('div', { class: 'rev-empty' },
-      'No versions kept yet. One is stored each time the document is saved over.'));
+      'No versions kept yet. One is stored every few minutes as you write, and whenever the document is saved over.'));
   } else {
     const list = h('div', { class: 'goto-list' });
     for (const entry of ctx.list) {
+      // A version kept while the document lived elsewhere says so.
+      const where = entry.from ? entry.from.replace(/^.*[\\/]/, '') : '';
       list.append(h('button', {
         class: 'goto-item',
+        title: entry.from ? `Kept while the document was in ${entry.from}` : '',
         onclick: () => { ctx.open(entry); closePanel(); }
       },
-        h('span', {}, whenLabel(entry.time)),
+        h('span', {}, whenLabel(entry.time), where ? h('span', { class: 'hint' }, `  in ${where}`) : null),
         h('span', { class: 'count' }, `${Math.max(1, Math.round(entry.size / 1024))} KB`)));
     }
     body.append(list);
@@ -1076,7 +1087,7 @@ export function showBackups(ctx) {
       'A version opens in a new window so the document you are editing is never overwritten.'));
   }
 
-  openPanel('backups', panelShell('Revert to Backup', body));
+  openPanel('backups', panelShell('Version History', body));
 }
 
 /* ------------------------------------------------------------------ export */

@@ -1675,6 +1675,89 @@ app.whenReady().then(async () => {
     eq('status shows saved', (await text('save-state')).startsWith('Saved'), true);
   });
 
+  await test('autosave is silent, and can be switched off', async () => {
+    const file = path.join(WORK, 'quiet.fountain');
+    fs.writeFileSync(file, 'body\n', 'utf8');
+    await load('body\n', file);
+    await js(`document.getElementById('toast').hidden = true`);
+
+    await select(4, 4);
+    await type(' one');
+    await wait(2600);
+    ok('the edit reached the file', fs.readFileSync(file, 'utf8').includes('one'));
+    eq('and nothing was popped up about it', await js(`document.getElementById('toast').hidden`), true);
+
+    // Asking for a save is a different matter: that gets an answer.
+    await select(4, 4);
+    await type('!');
+    await menu('file:save');
+    await wait(600);
+    eq('asking for a save says so', await js(`document.getElementById('toast').hidden`), false);
+    await js(`document.getElementById('toast').hidden = true`);
+
+    await js(`window.__setPref('autosave', false)`);
+    await wait(200);
+    const before = fs.readFileSync(file, 'utf8');
+    await select(4, 4);
+    await type(' two');
+    await wait(3000);
+    eq('switched off, nothing is written', fs.readFileSync(file, 'utf8'), before);
+    ok('and the status bar says so', (await text('save-state')).toLowerCase().includes('unsaved'));
+
+    await js(`window.__setPref('autosave', true)`);
+    await wait(2600);
+    ok('switched back on, it catches up', fs.readFileSync(file, 'utf8').includes('two'));
+  });
+
+  await test('how often it saves is a setting', async () => {
+    const file = path.join(WORK, 'cadence.fountain');
+    fs.writeFileSync(file, 'body\n', 'utf8');
+    await load('body\n', file);
+
+    // Two minutes between saves: a pause saves a tenth of that, not sooner.
+    await js(`window.__setPref('autosaveSeconds', 120)`);
+    await wait(200);
+    await select(4, 4);
+    await type(' slow');
+    await wait(2000);
+    ok('a long interval holds off', !fs.readFileSync(file, 'utf8').includes('slow'));
+    await wait(4000);
+    ok('and saves when its pause is up', fs.readFileSync(file, 'utf8').includes('slow'));
+
+    // Five seconds: half a second's pause is enough.
+    await js(`window.__setPref('autosaveSeconds', 5)`);
+    await wait(200);
+    await select(4, 4);
+    await type(' quick');
+    await wait(1500);
+    ok('a short interval writes promptly', fs.readFileSync(file, 'utf8').includes('quick'));
+    await js(`window.__setPref('autosaveSeconds', 15)`);
+    await wait(200);
+  });
+
+  await test('the version history holds the working text, and opens', async () => {
+    const file = path.join(WORK, 'history.fountain');
+    fs.writeFileSync(file, 'first\n', 'utf8');
+    await load('first\n', file);
+    await select(5, 5);
+    await type(' and second');
+    await wait(2600);
+
+    // The periodic snapshot keeps what is in the editor, not what was saved.
+    await js(`window.api.backup.snapshot(${JSON.stringify(file)}, window.__lowTideContent())`);
+    await wait(400);
+    const list = await js(`window.api.backup.list(${JSON.stringify(file)})`);
+    ok('a version is there', list.length >= 1);
+    ok('holding the text as it stands', fs.readFileSync(list[0].file, 'utf8').includes('and second'));
+
+    await menu('file:backups');
+    await wait(600);
+    eq('the panel is the version history', await js(`document.querySelector('.panel .panel-head span').textContent`), 'Version History');
+    ok('with a version listed', (await js(`document.querySelectorAll('.panel .goto-item').length`)) >= 1);
+    await js(`window.__closePanel ? window.__closePanel() : document.querySelector('.panel .text-btn').click()`);
+    await wait(300);
+  });
+
   await test('overwriting keeps a backup', async () => {
     const file = path.join(WORK, 'backup.fountain');
     fs.writeFileSync(file, 'first version\n', 'utf8');
