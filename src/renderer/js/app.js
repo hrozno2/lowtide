@@ -159,6 +159,7 @@ function applyPrefs(p, prev) {
   document.body.classList.toggle('status-on', p.statusBar !== false);
   document.body.classList.toggle('focus-mode', !!p.focusMode);
   document.body.classList.toggle('typewriter', !!p.typewriter);
+  document.body.classList.toggle('notes-dim', p.noteStyle === 'dim');
 
   $('btn-navigator').classList.toggle('on', p.navigatorOpen !== false);
   if (changed('toolbarOrder') || changed('toolbarHidden') || !prev) renderToolbar();
@@ -1989,8 +1990,7 @@ function toolbarItems() {
     { id: 'theme', title: 'Editor Theme', icon: 'i-theme', run: () => ui.showThemes(ctx()) },
     { id: 'music', title: 'Music', icon: 'i-music', run: () => toggleMusicPanel() },
     { id: 'sprint', title: 'Sprint', icon: 'i-sprint', run: () => ui.showSprint(ctx()) },
-    { id: 'focus', title: 'Focus Mode', icon: 'i-focus',
-      run: () => setPrefs({ focusMode: !state.prefs.focusMode }) },
+    { id: 'focus', title: 'Focus', icon: 'i-focus', run: () => ui.showFocus(ctx()) },
     { id: 'prefs', title: 'Preferences', icon: 'i-prefs', pinned: true,
       run: () => ui.showPreferences(ctx()) }
   ];

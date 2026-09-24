@@ -11,6 +11,7 @@ const DEFAULTS = {
   paragraphStyle: 'none', // 'none' | 'indent' | 'spaced'
   focusMode: false,
   focusScope: 'paragraph', // 'paragraph' | 'line' | 'sentence'
+  noteStyle: 'highlight',  // 'highlight' | 'dim' — notes lit, or out of the way
   typewriter: false,
   autosave: true,            // write to disk as you work, without a word about it
   autosaveSeconds: 15,       // at least this often while you keep writing

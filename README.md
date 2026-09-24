@@ -129,8 +129,16 @@ Sprints run a countdown with an optional word goal.
 
 ![The goal ring and document statistics](docs/screen-stats.png)
 
-**Focus.** Focus Mode dims everything but the paragraph or line you are on.
-Typewriter scrolling keeps the caret centred.
+**Focus.** The focus button opens a small panel over the toolbar: dim
+everything but where you are, choose whether the paragraph or the line stays
+lit, and say whether the notes in your text are picked out in colour or dimmed
+until you want them. Typewriter scrolling keeps the caret centred — the caret
+only, so selecting with the mouse is left alone.
+
+**Notes to yourself.** `[[a note in double brackets]]` and `/* a comment
+block */` sit in the manuscript without ever being counted or printed. They
+take a colour of their own from the theme, and dim out of the way when you
+would rather not see them.
 
 **Preview and export.** Real page breaking — the manuscript is laid out
 offscreen at print geometry and cut where the lines actually fall, so the page

@@ -52,6 +52,7 @@ document.addEventListener('pointerdown', (e) => {
 const ANCHOR_BY_NAME = {
   prefs: 'btn-prefs',
   search: 'btn-search',
+  focus: 'btn-focus',
   sprint: 'btn-sprint',
   theme: 'btn-theme',
   export: 'btn-export',
@@ -379,6 +380,7 @@ export const PREF_CATALOGUE = [
   { id: 'paragraphStyle', section: 'writing', label: 'Paragraphs', hint: 'How body text is laid out', keys: 'indent spacing blank line' },
   { id: 'typewriter', section: 'writing', label: 'Typewriter scrolling', hint: 'Keeps the line you are writing in the middle', keys: 'cursor centre scroll' },
   { id: 'focusScope', section: 'writing', label: 'Focus scope', hint: 'What stays lit in Focus Mode', keys: 'dim highlight distraction' },
+  { id: 'noteStyle', section: 'writing', label: 'Notes in the text', hint: 'Picked out in colour, or dimmed until you want them', keys: 'note notes comment comments dim highlight bracket' },
   { id: 'smartTypography', section: 'writing', label: 'Smart punctuation', hint: 'Curly quotes, — and …', keys: 'quotes dashes ellipsis apostrophe' },
   { id: 'spellcheck', section: 'words', label: 'Check spelling', keys: 'spell misspelling underline' },
   { id: 'spellLanguages', section: 'words', label: 'Dictionary', hint: 'Right-click a misspelling for corrections', keys: 'language spelling english' },
@@ -424,6 +426,8 @@ function prefControls(ctx, rebuild) {
       p.paragraphStyle || 'none', (v) => set({ paragraphStyle: v })),
     typewriter: () => toggle(p.typewriter, (v) => set({ typewriter: v })),
     focusScope: () => segmented([['paragraph', 'Paragraph'], ['line', 'Line']], p.focusScope, (v) => set({ focusScope: v })),
+    noteStyle: () => segmented([['highlight', 'Highlighted'], ['dim', 'Dimmed']],
+      p.noteStyle === 'dim' ? 'dim' : 'highlight', (v) => set({ noteStyle: v })),
     smartTypography: () => toggle(p.smartTypography !== false, (v) => set({ smartTypography: v })),
     spellcheck: () => toggle(p.spellcheck !== false, (v) => set({ spellcheck: v })),
     spellLanguages: () => (managed ? h('span', { class: 'val' }, 'System') : languagePicker(ctx)),
@@ -554,6 +558,7 @@ const RELATED = {
   a4: ['pageSize'], letter: ['pageSize'], trim: ['pageSize'], book: ['pageSize', 'printHyphenate'],
   sound: ['go:music', 'youtubeEnabled'], audio: ['go:music'], video: ['go:music', 'youtubeEnabled'], song: ['go:music'], playlist: ['go:music'],
   distraction: ['youtubeMinimal', 'go:focus'], distractions: ['youtubeMinimal', 'go:focus'],
+  note: ['noteStyle'], notes: ['noteStyle'], comment: ['noteStyle'], comments: ['noteStyle'],
   dim: ['focusScope', 'go:focus'], concentrate: ['go:focus', 'go:sprint'],
   update: ['updateCheck', 'go:updates'], updates: ['updateCheck', 'go:updates'], upgrade: ['go:updates'],
   dropbox: ['saveTo'], folder: ['saveTo'], location: ['saveTo'], where: ['saveTo'],
@@ -781,6 +786,28 @@ export async function showSearch(ctx) {
   });
   render();
   openPanel('search', h('div', { class: 'panel search-panel' }, body), { focus: input });
+}
+
+/* What the focus button opens: whether to dim the page around you, how much
+   of it to keep lit, and whether the notes in the text are lit with it or put
+   out of the way until you want them. */
+export function showFocus(ctx) {
+  const p = ctx.prefs;
+  const set = ctx.setPrefs;
+
+  const body = h('div', {},
+    row('Focus mode', 'Dim everything but where you are',
+      toggle(!!p.focusMode, (v) => set({ focusMode: v }))),
+
+    row('Keep lit', null, segmented([['paragraph', 'Paragraph'], ['line', 'Line']],
+      p.focusScope === 'line' ? 'line' : 'paragraph', (v) => set({ focusScope: v }))),
+
+    row('Notes', 'Picked out in colour, or dimmed until you want them',
+      segmented([['highlight', 'Highlighted'], ['dim', 'Dimmed']],
+        p.noteStyle === 'dim' ? 'dim' : 'highlight', (v) => set({ noteStyle: v })))
+  );
+
+  openPanel('focus', panelShell('Focus', body));
 }
 
 /* ------------------------------------------------------------------ sprint */

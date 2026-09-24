@@ -1420,6 +1420,67 @@ app.whenReady().then(async () => {
     await wait(300);
   });
 
+  await test('the focus button opens its own small panel', async () => {
+    await load('The lamp was lit. [[check the date]] She counted the steps.');
+    await wait(500);
+    await js(`window.__setPref('focusMode', false)`);
+    await wait(250);
+
+    await click('#btn-focus');
+    await wait(400);
+    const rows = await js(`[...document.querySelectorAll('.panel .row')].map(r => r.firstElementChild.firstElementChild.textContent)`);
+    eq('it asks the three things', rows, ['Focus mode', 'Keep lit', 'Notes']);
+    ok('and hangs off the button', await js(`(() => {
+      const p = document.querySelector('.panel').getBoundingClientRect();
+      const b = document.getElementById('btn-focus').getBoundingClientRect();
+      return p.top > b.bottom - 4 && p.right > b.left - 200; })()`));
+
+    // Focus mode is switched from inside it, not by the button itself.
+    await js(`[...document.querySelectorAll('.panel .row')].find(r => r.textContent.startsWith('Focus mode')).querySelector('.switch').click()`);
+    await wait(400);
+    ok('the page dims', await js(`document.body.classList.contains('focus-mode')`));
+    ok('and the button shows it', await js(`document.getElementById('btn-focus').classList.contains('on')`));
+
+    await js(`[...document.querySelectorAll('.panel .row')].find(r => r.textContent.startsWith('Keep lit')).querySelectorAll('.seg button')[1].click()`);
+    await wait(400);
+    eq('the scope can be changed there too',
+      await js(`(async () => (await window.api.prefs.get()).focusScope)()`), 'line');
+
+    await js(`window.__setPref('focusMode', false); window.__setPref('focusScope', 'paragraph')`);
+    await wait(300);
+    await click('#btn-focus');          // the panel is a toggle: put it away
+    await wait(300);
+  });
+
+  await test('notes can be dimmed instead of picked out', async () => {
+    await load('The lamp was lit. [[check the date]] She counted the steps.');
+    await wait(500);
+    const seen = () => js(`(() => {
+      const el = document.querySelector('.m-note:not(.m-note-marker)');
+      const cs = getComputedStyle(el);
+      return { colour: cs.color, lit: cs.backgroundColor !== 'rgba(0, 0, 0, 0)' }; })()`);
+
+    const bright = await seen();
+    ok('by default a note is picked out', bright.lit);
+
+    await click('#btn-focus');
+    await wait(400);
+    ok('the focus panel is up', await js(`!!document.querySelector('.panel .row')`));
+    await js(`[...document.querySelectorAll('.panel .row')].find(r => r.textContent.startsWith('Notes')).querySelectorAll('.seg button')[1].click()`);
+    await wait(400);
+    const dim = await seen();
+    ok('dimmed, the tint is gone', !dim.lit);
+    ok('and the letters are another colour', dim.colour !== bright.colour);
+    eq('the choice is kept', await js(`(async () => (await window.api.prefs.get()).noteStyle)()`), 'dim');
+    ok('but they are still there to read', await js(`document.querySelector('.m-note:not(.m-note-marker)').textContent.length > 0`));
+
+    await js(`window.__setPref('noteStyle', 'highlight')`);
+    await wait(400);
+    ok('and can be lit again', (await seen()).lit);
+    await click('#btn-focus');
+    await wait(300);
+  });
+
   await test('notes and comments are not in the word count', async () => {
     await load('One two three four five.');
     await wait(500);
