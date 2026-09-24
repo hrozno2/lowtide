@@ -58,7 +58,11 @@ if (HARNESS) app.dock?.hide();
    page rather than through the window, so none of it needs a window on screen
    and nothing is taken from whoever is at the keyboard. */
 function reveal(win) {
-  if (!HARNESS) win.show();
+  // Only where someone might be at the keyboard. A window that is never shown
+  // still lays out on macOS, but under X the layout and the DOM focus both
+  // depend on it being mapped, so the CI runner is given its windows.
+  if (HARNESS && process.platform === 'darwin') return;
+  win.show();
 }
 
 /** Bringing a window forward, which a test run has no business doing. */
