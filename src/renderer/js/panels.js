@@ -57,6 +57,7 @@ const ANCHOR_BY_NAME = {
   theme: 'btn-theme',
   export: 'btn-export',
   goal: 'goal-face',
+  record: 'goal-all',
   revision: 'rev-new',
   'revision-menu': 'rev-new',
   goto: 'btn-navigator',
@@ -404,6 +405,7 @@ export const PREF_CATALOGUE = [
   { id: 'youtubeMinimal', section: 'music', label: 'Hide the distractions', hint: 'Comments, likes, recommendations and the shorts bar', keys: 'youtube comments recommendations shorts' },
   { id: 'autosave', section: 'files', label: 'Save as you write', hint: 'Quietly, with nothing to dismiss', keys: 'autosave automatic save disk' },
   { id: 'autosaveSeconds', section: 'files', label: 'Save every', hint: 'At most; pausing saves sooner', keys: 'autosave interval seconds frequency how often' },
+  { id: 'companionFile', section: 'files', label: 'Keep a file beside the manuscript', hint: 'Carries the outline, notes and goal history with it between machines', keys: 'companion lowtide sidecar sync dropbox travel machines goal history' },
   { id: 'versionsKept', section: 'files', label: 'Versions kept', hint: 'Every recent one, then a day\'s last beyond them', keys: 'history backup versions limit cap how many' },
   { id: 'saveTo', section: 'files', label: 'Save new documents to', keys: 'folder location dropbox' },
   { id: 'updateCheck', section: 'files', label: 'Check for updates on launch', hint: 'Asks GitHub for the newest release; installs nothing', keys: 'upgrade version github' }
@@ -461,6 +463,7 @@ function prefControls(ctx, rebuild) {
     autosave: () => toggle(p.autosave !== false, (v) => set({ autosave: v })),
     autosaveSeconds: () => slider(p.autosaveSeconds || 15, 5, 120, 5,
       (v) => (v >= 60 ? `${v / 60} min` : `${v}s`), (v) => set({ autosaveSeconds: v })),
+    companionFile: () => toggle(p.companionFile !== false, (v) => set({ companionFile: v })),
     versionsKept: () => slider(p.versionsKept || 200, 50, 1000, 50, (v) => String(v),
       (v) => set({ versionsKept: v })),
     saveTo: () => segmented([['documents', 'Documents'], ['dropbox', 'Dropbox']],
@@ -571,7 +574,8 @@ const RELATED = {
   buttons: ['toolbar'], icons: ['toolbar'], order: ['toolbar'],
   colour: ['go:themes'], colours: ['go:themes'], color: ['go:themes'], colors: ['go:themes'],
   dark: ['go:themes'], light: ['go:themes'], appearance: ['go:themes'], background: ['go:themes'], look: ['go:themes'], wallpaper: ['go:themes'], skin: ['go:themes'], mode: ['go:themes', 'go:focus'],
-  goal: ['go:stats'], goals: ['go:stats'], target: ['go:stats'], daily: ['go:stats'], progress: ['go:stats'],
+  goal: ['go:stats', 'companionFile'], goals: ['go:stats', 'companionFile'], target: ['go:stats'], daily: ['go:stats'], progress: ['go:stats'],
+  sync: ['companionFile', 'saveTo'], machines: ['companionFile'], companion: ['companionFile'],
   timer: ['go:sprint'], pomodoro: ['go:sprint'], stopwatch: ['go:sprint'],
   shortcut: ['go:help'], shortcuts: ['go:help'], keyboard: ['go:help'], hotkey: ['go:help'], hotkeys: ['go:help'], syntax: ['go:help'], markdown: ['go:help'], fountain: ['go:help'],
   backup: ['go:history'], backups: ['go:history'], versions: ['go:history'], history: ['go:history'],
@@ -812,6 +816,76 @@ export function showFocus(ctx) {
   );
 
   openPanel('focus', panelShell('Focus', body));
+}
+
+/* Everything written down: the goals met and the sprints run, newest first,
+   with what they add up to. Highland keeps the same two lists behind a View
+   All on its sprint bar; this is one panel for both, since a writing day is
+   made of both. */
+export function showRecord(ctx) {
+  const goals = (ctx.goalHistory ? ctx.goalHistory() : []).filter((e) => e && e.met);
+  const sprints = ctx.sprintHistory ? ctx.sprintHistory() : [];
+
+  const day = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const plural = (n, one, many) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+  const sprintWords = sprints.reduce((n, s) => n + (Number(s.words) || 0), 0);
+  const sprintMinutes = sprints.reduce((n, s) => n + (Number(s.minutes) || 0), 0);
+  const goalWords = goals.reduce((n, g) => n + (g.type === 'pages' ? 0 : Number(g.achieved) || 0), 0);
+
+  const summary = h('div', { class: 'record-summary' },
+    h('div', {}, h('span', { class: 'n' }, goals.length.toLocaleString()),
+      h('span', { class: 'k' }, goals.length === 1 ? 'goal met' : 'goals met')),
+    h('div', {}, h('span', { class: 'n' }, sprints.length.toLocaleString()),
+      h('span', { class: 'k' }, sprints.length === 1 ? 'sprint' : 'sprints')),
+    h('div', {}, h('span', { class: 'n' }, sprintMinutes >= 120
+        ? `${Math.round(sprintMinutes / 60)}h` : `${sprintMinutes}m`),
+      h('span', { class: 'k' }, 'sprinting')),
+    h('div', {}, h('span', { class: 'n' }, sprintWords.toLocaleString()),
+      h('span', { class: 'k' }, 'words in them')));
+
+  const rows = (entries, draw) => {
+    const list = h('div', { class: 'record-list' });
+    let heading = '';
+    for (const entry of entries) {
+      const d = day(entry.finishedAt);
+      if (d !== heading) { heading = d; list.append(h('div', { class: 'record-day' }, d)); }
+      list.append(draw(entry));
+    }
+    return list;
+  };
+
+  const goalRow = (g) => h('div', { class: 'record-row met' },
+    h('span', {}, clock(g.finishedAt)),
+    h('span', { class: 'what' }, `${plural(g.achieved, g.type === 'pages' ? 'page' : 'word', g.type === 'pages' ? 'pages' : 'words')}`),
+    h('span', { class: 'n' }, `of ${Number(g.target).toLocaleString()}`));
+
+  const sprintRow = (s) => h('div', { class: `record-row ${s.met ? 'met' : ''}` },
+    h('span', {}, clock(s.finishedAt)),
+    h('span', { class: 'what' }, `${plural(Number(s.minutes) || 0, 'minute', 'minutes')}${s.full ? '' : ' (stopped early)'}`),
+    h('span', { class: 'n' }, `${Number(s.words || 0).toLocaleString()} words${s.target ? ` of ${Number(s.target).toLocaleString()}` : ''}`));
+
+  const panes = h('div', { class: 'record-pane' });
+  const tabs = h('div', { class: 'seg record-tabs' });
+  const show = (which) => {
+    panes.textContent = '';
+    tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.which === which));
+    if (which === 'goals') {
+      panes.append(goals.length ? rows(goals, goalRow)
+        : h('div', { class: 'goal-empty' }, 'No goals met yet. Set one from the ring above.'));
+    } else {
+      panes.append(sprints.length ? rows(sprints, sprintRow)
+        : h('div', { class: 'goal-empty' }, 'No sprints yet. The stopwatch starts one.'));
+    }
+  };
+  for (const [which, label] of [['goals', `Goals (${goals.length})`], ['sprints', `Sprints (${sprints.length})`]]) {
+    tabs.append(h('button', { 'data-which': which, onclick: () => show(which) }, label));
+  }
+
+  const body = h('div', { class: 'record-body' }, summary, tabs, panes);
+  show(goals.length || !sprints.length ? 'goals' : 'sprints');
+  openPanel('record', panelShell('Your record', body));
 }
 
 /* ------------------------------------------------------------------ sprint */

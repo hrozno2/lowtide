@@ -41,6 +41,7 @@ const state = {
   activeRevision: null,
   goal: null,
   goalHistory: [],
+  sprintHistory: [],
   outline_text: null,
   dockMode: null
 };
@@ -71,6 +72,7 @@ let repaintMusic = null;
   state.prefs = await api.prefs.get();
   state.goal = state.prefs.goal || null;
   state.goalHistory = state.prefs.goalHistory || [];
+  state.sprintHistory = state.prefs.sprintHistory || [];
   state.dropbox = (await api.app.dropbox()).root || null;
   state.spelling = await api.spell.languages();
 
@@ -160,6 +162,17 @@ function applyPrefs(p, prev) {
   document.body.classList.toggle('focus-mode', !!p.focusMode);
   document.body.classList.toggle('typewriter', !!p.typewriter);
   document.body.classList.toggle('notes-dim', p.noteStyle === 'dim');
+
+  /* A goal met in another window, or a history a document carried in with it,
+     belongs on this one too. The newest entry and the length are enough to
+     tell two of these lists apart. */
+  const sameRun = (a = [], b = []) =>
+    a.length === b.length && (!a.length || a[0].finishedAt === b[0].finishedAt);
+  if (!sameRun(state.goalHistory, p.goalHistory) || !sameRun(state.sprintHistory, p.sprintHistory)) {
+    state.goalHistory = p.goalHistory || [];
+    state.sprintHistory = p.sprintHistory || [];
+    if (prev) renderGoal();
+  }
 
   $('btn-navigator').classList.toggle('on', p.navigatorOpen !== false);
   if (changed('toolbarOrder') || changed('toolbarHidden') || !prev) renderToolbar();
@@ -377,7 +390,10 @@ api.doc.onMoved(({ path }) => {
   loadExtras(path);
 });
 
-api.doc.onLoad(({ path, content, cursor, dirty }) => {
+api.doc.onLoad(({ path, content, cursor, dirty, goals, sprints }) => {
+  // What the document carried with it from wherever it was last written.
+  if (Array.isArray(goals) && goals.length) state.goalHistory = goals;
+  if (Array.isArray(sprints) && sprints.length) state.sprintHistory = sprints;
   autosave.cancel();
   saveExtras.cancel();
   replaceAll(view, content || '', cursor || 0);
@@ -392,6 +408,7 @@ api.doc.onLoad(({ path, content, cursor, dirty }) => {
   pushState.flush();
   view.focus();
   loadExtras(path || null);
+  renderGoal();
   if (state.prefs.typewriter) centerCursor(view);
 });
 
@@ -776,8 +793,11 @@ export const GOAL_TYPES = [
 
 const goalType = (id) => GOAL_TYPES.find((t) => t.id === id) || GOAL_TYPES[0];
 
+/* Through setPrefs rather than straight to the store, so this window's own
+   copy of the settings keeps step with what was written — the sync below
+   compares the two and would otherwise undo a goal the moment it was met. */
 const persistGoal = debounce(() => {
-  api.prefs.set({ goal: state.goal, goalHistory: state.goalHistory });
+  setPrefs({ goal: state.goal, goalHistory: state.goalHistory, sprintHistory: state.sprintHistory });
 }, 700);
 
 function goalValue() {
@@ -837,7 +857,7 @@ function finishGoal() {
       target: goal.target,
       achieved,
       met: true
-    }].concat(state.goalHistory || []).slice(0, 40);
+    }].concat(state.goalHistory || []).slice(0, 600);
   }
 
   state.goal = null;
@@ -893,8 +913,12 @@ function renderGoalHistory() {
   const history = (state.goalHistory || []).filter((e) => e && e.met);
   if (!history.length) {
     list.append(ui.h('div', { class: 'goal-empty' }, 'Goals you meet are listed here.'));
+    const none = $('goal-all');
+    if (none) none.hidden = !(state.sprintHistory || []).length;
     return;
   }
+  const all = $('goal-all');
+  if (all) all.hidden = false;
   for (const entry of history.slice(0, 6)) {
     const type = goalType(entry.type);
     const when = new Date(entry.finishedAt)
@@ -995,6 +1019,7 @@ function setSidebarTab(tab) {
 
 const sprint = (() => {
   let endsAt = 0, startWords = 0, goal = 0, timer = null, tick = null, running = false, finished = false;
+  let startedAt = 0, plannedMinutes = 0, recorded = false;
 
   function written() { return Math.max(0, state.words - startWords); }
 
@@ -1024,9 +1049,11 @@ const sprint = (() => {
 
   function start(minutes, wordGoal) {
     stop(true);
-    running = true; finished = false;
+    running = true; finished = false; recorded = false;
     goal = wordGoal || 0;
     startWords = state.words;
+    startedAt = Date.now();
+    plannedMinutes = minutes;
     endsAt = Date.now() + minutes * 60000;
     timer = setInterval(() => {
       if (Date.now() >= endsAt) finish();
@@ -1040,12 +1067,34 @@ const sprint = (() => {
   function finish() {
     finished = true;
     clearInterval(timer); timer = null;
+    record(true);
     render();
     ui.toast(`Sprint complete: ${written().toLocaleString()} words written`, 5000);
     setTimeout(() => { if (finished) stop(); }, 9000);
   }
 
+  /* Every sprint is kept, run to the end or not: unlike a goal, a sprint that
+     was cut short is still time spent writing, and the words count. */
+  function record(ranFull) {
+    if (!running || recorded) return;
+    recorded = true;
+    const minutes = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
+    state.sprintHistory = [{
+      finishedAt: Date.now(),
+      startedAt,
+      minutes,
+      planned: plannedMinutes,
+      words: written(),
+      target: goal || 0,
+      met: !goal || written() >= goal,
+      full: !!ranFull,
+      doc: state.title || ''
+    }].concat(state.sprintHistory || []).slice(0, 600);
+    persistGoal();
+  }
+
   function stop(quiet) {
+    if (running && !finished) record(false);     // stopped early, still counts
     clearInterval(timer); timer = null;
     running = false; finished = false;
     render();
@@ -2321,6 +2370,7 @@ function wireChrome() {
     b.onclick = () => setSidebarTab(b.dataset.tab);
   });
   $('goal-face').onclick = () => { if (!state.goal) ui.showGoal(ctx()); };
+  $('goal-all').onclick = () => ui.showRecord(ctx());
   $('goal-action').onclick = () => finishGoal();
 
   $('scrim').onclick = () => ui.closePanel();
@@ -2370,6 +2420,8 @@ function ctx() {
     frontMatter: () => frontMatter(view.state.doc.toString()).meta,
     setFrontMatter: (entries) => writeFrontMatter(entries),
     sprint,
+    goalHistory: () => state.goalHistory || [],
+    sprintHistory: () => state.sprintHistory || [],
     themes: { THEMES, swatches },
     revisionColours: REVISION_COLOURS,
     dropbox: state.dropbox,

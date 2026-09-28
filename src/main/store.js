@@ -17,6 +17,8 @@ const DEFAULTS = {
   autosave: true,            // write to disk as you work, without a word about it
   autosaveSeconds: 15,       // at least this often while you keep writing
   versionsKept: 200,         // past versions of a document, before thinning
+  companionFile: true,       // keep a .lowtide beside a manuscript so its
+                             // outline, notes and goal history travel with it
   navigatorOpen: true,
   spellcheck: true,
   spellLanguages: [],
@@ -59,6 +61,7 @@ const DEFAULTS = {
   pageMarkers: false,        // page numbers in the margin of the writing view
   goal: null,
   goalHistory: [],
+  sprintHistory: [],
   sidebarTab: 'navigator',
   toolbarOrder: ['export', 'theme', 'music', 'sprint', 'focus', 'prefs'],
   toolbarHidden: [],

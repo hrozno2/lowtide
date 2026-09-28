@@ -1780,6 +1780,47 @@ app.whenReady().then(async () => {
   });
 
   /* ========================================================= scratchpad == */
+  await test('View all opens the record of goals and sprints', async () => {
+    const now = Date.now(), day = 86400000;
+    const goals = [
+      { finishedAt: now - day, type: 'words', target: 500, achieved: 640, met: true },
+      { finishedAt: now - 2 * day, type: 'pages', target: 3, achieved: 4, met: true }
+    ];
+    const sprints = [
+      { finishedAt: now - 3600000, startedAt: now - 5400000, minutes: 25, planned: 25, words: 412, target: 400, met: true, full: true },
+      { finishedAt: now - day, startedAt: now - day - 600000, minutes: 9, planned: 15, words: 130, target: 250, met: false, full: false }
+    ];
+    await js(`window.__setPref('goalHistory', ${JSON.stringify(goals)});
+              window.__setPref('sprintHistory', ${JSON.stringify(sprints)})`);
+    await wait(700);
+
+    ok('the button appears once there is something to show',
+      !(await js(`document.getElementById('goal-all').hidden`)));
+    await click('#goal-all');
+    await wait(500);
+
+    eq('the panel is the record', await js(`document.querySelector('.panel .panel-head span').textContent`), 'Your record');
+    const summary = await js(`[...document.querySelectorAll('.record-summary .n')].map(n => n.textContent)`);
+    eq('two goals, two sprints, 34 minutes, 542 words', summary, ['2', '2', '34m', '542']);
+
+    const goalRows = await js(`[...document.querySelectorAll('.record-row')].map(r => r.textContent)`);
+    eq('both goals are listed', goalRows.length, 2);
+    ok('with what was written against what was asked', /640 words/.test(goalRows[0]) && /of 500/.test(goalRows[0]));
+    ok('and pages counted as pages', /4 pages/.test(goalRows[1]));
+
+    await js(`document.querySelectorAll('.record-tabs button')[1].click()`);
+    await wait(300);
+    const sprintRows = await js(`[...document.querySelectorAll('.record-row')].map(r => r.textContent)`);
+    eq('both sprints too', sprintRows.length, 2);
+    ok('the full one reads plainly', /25 minutes/.test(sprintRows[0]) && !/stopped/.test(sprintRows[0]));
+    ok('and one cut short says so', /stopped early/.test(sprintRows[1]));
+
+    await js(`window.__setPref('goalHistory', []); window.__setPref('sprintHistory', [])`);
+    await wait(500);
+    await click('#goal-all');
+    await wait(300);
+  });
+
   group = 'Scratchpad';
 
   await test('holds and persists text', async () => {
@@ -1939,6 +1980,92 @@ app.whenReady().then(async () => {
     eq('and can be changed', await js(`(async () => (await window.api.prefs.get()).versionsKept)()`), 400);
     await js(`window.__setPref('versionsKept', 200)`);
     await wait(200);
+  });
+
+  await test('a manuscript carries its goal history beside it', async () => {
+    const companion = require(path.join(base, 'src', 'main', 'companion.js'));
+    const { getPrefs } = require(path.join(base, 'src', 'main', 'store.js'));
+    const file = path.join(WORK, 'carried.fountain');
+    const beside = companion.pathFor(file);
+    fs.rmSync(beside, { force: true });
+    fs.writeFileSync(file, 'body\n', 'utf8');
+
+    // A day's work recorded on this machine, then saved.
+    const mine = [{ finishedAt: Date.UTC(2026, 8, 20, 9), type: 'words', target: 500, achieved: 620, met: true }];
+    await js(`window.__setPref('goalHistory', ${JSON.stringify(mine)})`);
+    await wait(400);
+    await load('body\n', file);
+    await select(4, 4);
+    await type(' more');
+    await wait(2600);
+
+    ok('a companion is written beside the manuscript', fs.existsSync(beside));
+    const carried = companion.read(file);
+    eq('holding the goal that was met', carried.goals.length, 1);
+    eq('and its number', carried.goals[0].achieved, 620);
+
+    // Another machine: a different day in its history, none of ours.
+    const theirs = [{ finishedAt: Date.UTC(2026, 8, 21, 9), type: 'words', target: 500, achieved: 880, met: true }];
+    companion.write(file, { extras: {}, goals: theirs, sprints: [] });
+    await js(`window.__setPref('goalHistory', [])`);
+    await wait(400);
+
+    // Opened afresh: a file already showing in a window is only brought
+    // forward, and its companion was read when it first opened.
+    const openFresh = async () => {
+      await load('');
+      await wait(700);
+      await js(`window.api.file.openPath(${JSON.stringify(file)})`);
+      await wait(1800);
+    };
+    await openFresh();
+    const after = getPrefs().get('goalHistory') || [];
+    eq('opening the file brings its history back', after.length, 1);
+    eq('the day written elsewhere', after[0].achieved, 880);
+
+    // And the two are joined rather than one replacing the other.
+    companion.write(file, { extras: {}, goals: mine, sprints: [] });
+    await openFresh();
+    const both = getPrefs().get('goalHistory') || [];
+    eq('both days are kept', both.length, 2);
+    eq('newest first', both[0].achieved, 880);
+
+    await js(`window.__setPref('goalHistory', [])`);
+    await wait(300);
+  });
+
+  await test('the companion can be switched off', async () => {
+    const companion = require(path.join(base, 'src', 'main', 'companion.js'));
+    const file = path.join(WORK, 'nocompanion.fountain');
+    const beside = companion.pathFor(file);
+    fs.rmSync(beside, { force: true });
+    fs.writeFileSync(file, 'body\n', 'utf8');
+    await js(`window.__setPref('companionFile', false)`);
+    await wait(300);
+    await load('body\n', file);
+    await select(4, 4);
+    await type(' more');
+    await wait(2600);
+    eq('nothing is written beside the manuscript', fs.existsSync(beside), false);
+    await js(`window.__setPref('companionFile', true)`);
+    await wait(300);
+  });
+
+  await test('two histories join without losing or doubling a day', async () => {
+    const companion = require(path.join(base, 'src', 'main', 'companion.js'));
+    const a = [{ date: '2026-09-20', words: 400 }, { date: '2026-09-21', words: 900 }];
+    const b = [{ date: '2026-09-21', words: 250 }, { date: '2026-09-22', words: 100 }];
+    const merged = companion.mergeGoals(a, b);
+    eq('three days, not four', merged.length, 3);
+    eq('newest first', merged[0].date, '2026-09-22');
+    eq('the fuller count of a shared day wins',
+      merged.find((e) => e.date === '2026-09-21').words, 900);
+
+    const runs = companion.mergeRuns(
+      [{ finishedAt: 1000, words: 10 }, { finishedAt: 2000, words: 20 }],
+      [{ finishedAt: 2000, words: 20 }, { finishedAt: 3000, words: 30 }]);
+    eq('a sprint recorded twice is one sprint', runs.length, 3);
+    eq('newest first', runs[0].finishedAt, 3000);
   });
 
   await test('overwriting keeps a backup', async () => {

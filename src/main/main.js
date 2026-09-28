@@ -7,6 +7,7 @@ const os = require('os');
 const { getPrefs, getSession, docEntry, setDocEntry, addRecent } = require('./store');
 const { buildMenu, describeMenu, invokeMenuItem } = require('./menu');
 const backups = require('./backups');
+const companion = require('./companion');
 const { buildDocx } = require('./docx');
 const { checkForUpdate, initAutoUpdater, checkForUpdateAuto,
         findBrew, installPacman, installHomebrew } = require('./updates');
@@ -266,7 +267,8 @@ function openInWindow(win, filePath) {
       path: filePath, dirty: false, content, cursor: 0,
       title: path.basename(filePath)
     });
-    win.webContents.send('doc:load', { path: filePath, content });
+    const carried = readCompanion(filePath);
+    win.webContents.send('doc:load', Object.assign({ path: filePath, content }, carried));
     win.setTitle(path.basename(filePath));
     if (isMac) win.setRepresentedFilename(filePath);
     addRecent(filePath);
@@ -337,8 +339,47 @@ async function saveDocument(win, content, filePath) {
   if (isMac) win.setRepresentedFilename(target);
   addRecent(target);
   refreshMenu();
+  writeCompanion(target);
   win.webContents.send('doc:saved', { path: target });
   return target;
+}
+
+/* Everything about a document that is not the document, written beside it.
+   Silent when switched off, and silent when it cannot be written. */
+function writeCompanion(filePath) {
+  if (!filePath || getPrefs().get('companionFile') === false) return;
+  const entry = docEntry(filePath) || {};
+  const { updated, ...extras } = entry;
+  companion.write(filePath, {
+    extras,
+    goals: getPrefs().get('goalHistory') || [],
+    sprints: getPrefs().get('sprintHistory') || []
+  });
+}
+
+/* The other half: what a document's companion has to tell us when it opens.
+   Its extras replace this machine's if they are newer, and its goal history
+   is folded into the one kept here, so a day written on another computer is
+   not lost by opening the file on this one. */
+function readCompanion(filePath) {
+  if (!filePath || getPrefs().get('companionFile') === false) return {};
+  const beside = companion.read(filePath);
+  if (!beside) return {};
+
+  const mine = docEntry(filePath) || {};
+  if (Object.keys(beside.extras).length && beside.updated > (Number(mine.updated) || 0)) {
+    setDocEntry(filePath, Object.assign({}, beside.extras, { updated: beside.updated }));
+  }
+  const out = {};
+  if (beside.goals.length) {
+    out.goals = companion.mergeGoals(getPrefs().get('goalHistory') || [], beside.goals).slice(0, 600);
+    getPrefs().set({ goalHistory: out.goals });
+  }
+  if (beside.sprints.length) {
+    out.sprints = companion.mergeRuns(getPrefs().get('sprintHistory') || [], beside.sprints).slice(0, 600);
+    getPrefs().set({ sprintHistory: out.sprints });
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ session */
@@ -572,7 +613,9 @@ ipcMain.handle('backup:snapshot', (e, { path: filePath, content }) => {
 ipcMain.handle('doc:extras', (e, path) => (path ? docEntry(path) : {}));
 ipcMain.handle('doc:extras-set', (e, { path, patch }) => {
   if (!path) return null;
-  return setDocEntry(path, patch);
+  const entry = setDocEntry(path, Object.assign({}, patch, { updated: Date.now() }));
+  writeCompanion(path);
+  return entry;
 });
 
 ipcMain.handle('file:new', () => { createWindow(); });
@@ -1048,6 +1091,7 @@ ipcMain.handle('dropbox:move', async (e, filePath) => {
     // Carry the scratchpad and revision marks across to the new path.
     const extras = docEntry(filePath);
     if (extras && Object.keys(extras).length) setDocEntry(target, extras);
+    companion.moveWith(filePath, target);
 
     const state = docs.get(win.id);
     if (state) { state.path = target; state.title = path.basename(target); }
