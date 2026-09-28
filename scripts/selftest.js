@@ -342,6 +342,48 @@ app.whenReady().then(async () => {
   });
 
   /* ========================================================== counting == */
+  group = 'Scrolling while writing';
+
+  const LONG_DOC = Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of a manuscript that runs on and on.`).join('\n\n');
+  const caretDepth = () => js(`(() => {
+    const v = window.__lowTideView, s = document.querySelector('.cm-scroller');
+    const c = v.coordsAtPos(v.state.selection.main.head), r = s.getBoundingClientRect();
+    return Math.round(((c.top - r.top) / r.height) * 100); })()`);
+  const toEnd = async () => {
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.length }, scrollIntoView: true }); v.focus(); return true; })()`);
+    await wait(400);
+  };
+  const writeOn = async (lines) => {
+    for (let i = 0; i < lines; i++) await type('A further line of prose written at the foot of the page. ');
+    await wait(400);
+  };
+
+  await test('writing keeps a band of page below the caret', async () => {
+    await load(LONG_DOC);
+    await js(`window.__setPref('typewriter', false); window.__setPref('caretSnap', false)`);
+    await wait(400);
+    await toEnd();
+    await writeOn(6);
+    const depth = await caretDepth();
+    ok(`the caret settles in the lower half, not on the edge (at ${depth}%)`, depth > 55 && depth < 90);
+    await writeOn(3);
+    const later = await caretDepth();
+    ok(`and stays there as writing goes on (at ${later}%)`, Math.abs(later - depth) <= 6);
+  });
+
+  await test('snapping to the caret puts it back on the edge', async () => {
+    await load(LONG_DOC);
+    await js(`window.__setPref('typewriter', false); window.__setPref('caretSnap', true)`);
+    await wait(400);
+    await toEnd();
+    await writeOn(6);
+    const depth = await caretDepth();
+    ok(`the caret rides the bottom of the window (at ${depth}%)`, depth > 90);
+    await js(`window.__setPref('caretSnap', false)`);
+    await wait(300);
+  });
+
   group = 'Typewriter scrolling';
 
   await test('the caret line is centred, but not while the mouse is selecting', async () => {

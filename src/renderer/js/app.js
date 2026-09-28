@@ -174,6 +174,7 @@ function applyPrefs(p, prev) {
       });
     }
     if (changed('typewriter')) editor.setTypewriter(!!p.typewriter);
+    if (changed('caretSnap')) editor.setCaretSnap(!!p.caretSnap);
     // Switched on with work outstanding, catch up rather than wait a cycle.
     if (changed('autosave') && p.autosave !== false && state.dirty) autosave();
     if (changed('smartTypography')) editor.setSmartTypography(p.smartTypography !== false);

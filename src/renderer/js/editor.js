@@ -74,10 +74,26 @@ function wantsCentring(update) {
   return !update.transactions.some((tr) => tr.isUserEvent('select.pointer'));
 }
 
+/* Room to write. Left to itself the editor brings the caret just inside the
+ * window, so a line typed at the foot of the page sits on the last pixel of
+ * it and every new line arrives at the very bottom. This keeps a band of page
+ * below the caret — a fifth of the window, within reason — by asking for the
+ * scroll itself, with a margin.
+ *
+ * The margin is given per scroll rather than through CodeMirror's
+ * scrollMargins facet, which the editor also consults when deciding how near
+ * an edge a drag must reach before the view starts scrolling after it: a
+ * margin this wide there would have the page running away from the mouse the
+ * moment a selection dipped into the lower fifth.
+ */
+const caretRoom = (view) =>
+  Math.round(Math.max(80, Math.min(220, view.dom.clientHeight * 0.2)));
+
 /* --------------------------------------------------------------- creation */
 
 export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs }) {
   let typewriterOn = !!prefs.typewriter;
+  let snapOn = !!prefs.caretSnap;
   let smartOn = prefs.smartTypography !== false;
   let scrollPending = false;
 
@@ -115,14 +131,22 @@ export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs })
       EditorView.updateListener.of((update) => {
         if (update.docChanged) onChange(update);
         if (update.selectionSet || update.docChanged) onCursor(update);
-        if (typewriterOn && (update.docChanged || update.selectionSet) && !scrollPending &&
-            wantsCentring(update)) {
-          scrollPending = true;
-          requestAnimationFrame(() => {
-            scrollPending = false;
-            if (!view.dom.isConnected) return;
-            view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'center' }) });
-          });
+        if ((update.docChanged || update.selectionSet) && !scrollPending && wantsCentring(update)) {
+          // Typewriter scrolling holds the line in the middle; otherwise the
+          // view moves only when the caret comes near an edge, and then only
+          // far enough to leave room to carry on writing.
+          const centre = typewriterOn;
+          if (centre || !snapOn) {
+            scrollPending = true;
+            requestAnimationFrame(() => {
+              scrollPending = false;
+              if (!view.dom.isConnected) return;
+              const head = view.state.selection.main.head;
+              view.dispatch({ effects: centre
+                ? EditorView.scrollIntoView(head, { y: 'center' })
+                : EditorView.scrollIntoView(head, { y: 'nearest', yMargin: caretRoom(view) }) });
+            });
+          }
         }
       })
     ]
@@ -131,6 +155,7 @@ export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs })
   return {
     view,
     setTypewriter(on) { typewriterOn = on; if (on) centerCursor(view); },
+    setCaretSnap(on) { snapOn = on; },
     setSmartTypography(on) { smartOn = on; },
     setSpellcheck(on) {
       view.dispatch({ effects: spellcheck.reconfigure(EditorView.contentAttributes.of({

@@ -379,6 +379,7 @@ export const PREF_CATALOGUE = [
   { id: 'pageWidth', section: 'writing', label: 'Column width', keys: 'measure margin narrow wide' },
   { id: 'paragraphStyle', section: 'writing', label: 'Paragraphs', hint: 'How body text is laid out', keys: 'indent spacing blank line' },
   { id: 'typewriter', section: 'writing', label: 'Typewriter scrolling', hint: 'Keeps the line you are writing in the middle', keys: 'cursor centre scroll' },
+  { id: 'caretSnap', section: 'writing', label: 'Snap to the caret', hint: 'Off leaves a band of page below the line you are writing', keys: 'scroll cursor caret edge room jump follow' },
   { id: 'focusScope', section: 'writing', label: 'Focus scope', hint: 'What stays lit in Focus Mode', keys: 'dim highlight distraction' },
   { id: 'noteStyle', section: 'writing', label: 'Notes in the text', hint: 'Picked out in colour, or dimmed until you want them', keys: 'note notes comment comments dim highlight bracket' },
   { id: 'smartTypography', section: 'writing', label: 'Smart punctuation', hint: 'Curly quotes, — and …', keys: 'quotes dashes ellipsis apostrophe' },
@@ -425,6 +426,7 @@ function prefControls(ctx, rebuild) {
     paragraphStyle: () => segmented([['none', 'Plain'], ['indent', 'Indented'], ['spaced', 'Spaced']],
       p.paragraphStyle || 'none', (v) => set({ paragraphStyle: v })),
     typewriter: () => toggle(p.typewriter, (v) => set({ typewriter: v })),
+    caretSnap: () => toggle(!!p.caretSnap, (v) => set({ caretSnap: v })),
     focusScope: () => segmented([['paragraph', 'Paragraph'], ['line', 'Line']], p.focusScope, (v) => set({ focusScope: v })),
     noteStyle: () => segmented([['highlight', 'Highlighted'], ['dim', 'Dimmed']],
       p.noteStyle === 'dim' ? 'dim' : 'highlight', (v) => set({ noteStyle: v })),
@@ -546,6 +548,8 @@ function preferencesBody(ctx, opts = {}) {
    the ids of things it should find. */
 const RELATED = {
   font: ['fontFamily', 'printFontSize'], fonts: ['fontFamily', 'printFontSize'],
+  scroll: ['caretSnap', 'typewriter'], scrolling: ['caretSnap', 'typewriter'],
+  caret: ['caretSnap', 'typewriter'], cursor: ['caretSnap', 'typewriter'],
   zoom: ['fontSize', 'printFontSize', 'go:pages'], bigger: ['fontSize', 'printFontSize'], smaller: ['fontSize', 'printFontSize'],
   width: ['pageWidth', 'printSideMargin'], narrow: ['pageWidth', 'printSideMargin'], wide: ['pageWidth', 'printSideMargin'],
   spacing: ['lineHeight', 'printLeading', 'paragraphStyle'], leading: ['lineHeight', 'printLeading'],

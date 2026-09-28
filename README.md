@@ -132,8 +132,14 @@ Sprints run a countdown with an optional word goal.
 **Focus.** The focus button opens a small panel over the toolbar: dim
 everything but where you are, choose whether the paragraph or the line stays
 lit, and say whether the notes in your text are picked out in colour or dimmed
-until you want them. Typewriter scrolling keeps the caret centred — the caret
-only, so selecting with the mouse is left alone.
+until you want them.
+
+**Scrolling while you write.** The page follows the caret only when it comes
+near an edge, and then leaves a fifth of the window below it to write into,
+rather than letting the line you are on sit on the last pixel of the window.
+*Snap to the caret* in Preferences goes back to keeping it hard against the
+edge; *Typewriter scrolling* holds it in the middle instead — the caret only,
+so selecting with the mouse is left alone.
 
 **Notes to yourself.** `[[a note in double brackets]]` and `/* a comment
 block */` sit in the manuscript without ever being counted or printed. They
