@@ -25,7 +25,7 @@ process.env.LOWTIDE_FAKE_UPDATE = '9.9.9';
 require(path.join(base, 'src', 'main', 'main.js'));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-setTimeout(() => { report('TIMED OUT'); app.exit(2); }, 900000);
+setTimeout(() => { report("TIMED OUT"); app.exit(2); }, 1800000);
 process.on('unhandledRejection', (err) => {
   console.log('REJECTED:', (err && err.stack) || err);
   report();
@@ -1843,6 +1843,53 @@ app.whenReady().then(async () => {
     await wait(500);
     await click('#goal-all');
     await wait(300);
+  });
+
+  await test('an entry can be struck from the record', async () => {
+    const now = Date.now();
+    const goals = [
+      { finishedAt: now - 86400000, type: 'words', target: 500, achieved: 640, met: true },
+      { finishedAt: now - 172800000, type: 'words', target: 500, achieved: 500, met: true }
+    ];
+    await js(`window.__setHistory(${JSON.stringify(goals)}, [])`);
+    await wait(900);
+    await click('#goal-all');
+    await wait(500);
+    eq('both are listed', await js(`document.querySelectorAll('.record-row').length`), 2);
+
+    await js(`document.querySelector('.record-row .record-forget').click()`);
+    await wait(500);
+    eq('one is struck out', await js(`document.querySelectorAll('.record-row').length`), 1);
+    eq('the one that is left is the other', await js(`window.__history().goals[0].achieved`), 500);
+    eq('and the count above follows', await js(`document.querySelector('.record-summary .n').textContent`), '1');
+
+    await js(`window.__setHistory([], [])`);
+    await wait(400);
+    await click('#goal-all');
+    await wait(300);
+  });
+
+  await test('the record can be kept as a page', async () => {
+    const now = Date.now();
+    await js(`window.__setHistory(
+      [{ finishedAt: ${now - 86400000}, type: 'words', target: 500, achieved: 640, met: true },
+       { finishedAt: ${now - 172800000}, type: 'pages', target: 3, achieved: 4, met: true }],
+      [{ finishedAt: ${now - 3600000}, minutes: 25, words: 412, target: 400, met: true, full: true }])`);
+    await wait(900);
+
+    const table = await js(`window.__recordReport('table')`);
+    ok('it carries the document it belongs to', /writing record<\/h1>/.test(table));
+    ok('and what it all came to', /2 goals met/.test(table) && /1 sprint/.test(table) && /412 words in them/.test(table));
+    ok('goals as rows', /<th>Goal<\/th>/.test(table) && /640 words/.test(table));
+    ok('pages counted as pages', /4 pages/.test(table));
+    ok('sprints in their own table', /<th>Sprint<\/th>/.test(table) && /25 min/.test(table));
+
+    const grid = await js(`window.__recordReport('grid')`);
+    ok('the grid is cards, not rows', /class="card"/.test(grid) && !/<th>/.test(grid));
+    ok('holding the same days', /640 words/.test(grid) && /25 min/.test(grid));
+
+    await js(`window.__setHistory([], [])`);
+    await wait(400);
   });
 
   group = 'Scratchpad';

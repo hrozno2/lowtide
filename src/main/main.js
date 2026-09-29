@@ -417,6 +417,16 @@ function readCompanion(filePath) {
   goals = goals.slice(0, 600);
   sprints = sprints.slice(0, 600);
   if (goals.length || sprints.length) setDocEntry(filePath, { goalHistory: goals, sprintHistory: sprints });
+
+  /* A goal that was running when the history moved to the documents was left
+     behind in the settings, half finished and belonging to nothing. It goes
+     to the first document that has none of its own, which is where it was
+     being written. */
+  const stranded = prefs.get('goal');
+  if (stranded && !(docEntry(filePath) || {}).goal) {
+    setDocEntry(filePath, { goal: stranded });
+    prefs.set({ goal: null });
+  }
   return { goals, sprints };
 }
 

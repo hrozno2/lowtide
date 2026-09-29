@@ -117,6 +117,10 @@ let repaintMusic = null;
     renderGoal();
   };
   window.__history = () => ({ goals: state.goalHistory, sprints: state.sprintHistory });
+  window.__recordReport = (layout) => ui.recordHtml({
+    goals: (state.goalHistory || []).filter((e) => e && e.met),
+    sprints: state.sprintHistory || [],
+    title: `${state.title || 'Untitled'} — writing record`, layout });
   window.__checkUpdate = checkForUpdate;
   window.__moveSection = (i, slot) => moveSection(i, slot);
   window.__sectionRange = (i) => sectionRange(i);
@@ -397,6 +401,7 @@ function showDocument({ path, content, cursor, dirty, goals, sprints }) {
   // typed — is written before the window belongs to another manuscript.
   persistGoal.cancel();
   saveExtras.flush();
+  extrasFor = null;
   // What the document carried with it from wherever it was last written.
   carried = { goals, sprints };
   replaceAll(view, content || '', cursor || 0);
@@ -423,8 +428,14 @@ api.doc.pending().then((doc) => { if (doc && !documentShown) showDocument(doc); 
 
 /* ------------------------------------------------------- document extras */
 
+/* Which document's outline, notes, revisions and goals are the ones in
+   memory. Everything is written back together, so nothing may be written
+   until what is there has been read: a goal finishing while a document was
+   still opening used to write its empty revisions over the real ones. */
+let extrasFor = null;
+
 const saveExtras = debounce(() => {
-  if (!state.path) return;
+  if (!state.path || extrasFor !== state.path) return;
   api.doc.setExtras(state.path, {
     goal: state.goal,
     goalHistory: state.goalHistory,
@@ -439,6 +450,7 @@ const saveExtras = debounce(() => {
 
 async function loadExtras(path) {
   const extras = path ? await api.doc.extras(path) : {};
+  extrasFor = path || null;
   state.goal = extras.goal || null;
   /* What the file carried in from another machine has already been joined
      with what was kept here, so it is the fuller of the two. */
@@ -2448,6 +2460,22 @@ function ctx() {
     sprint,
     goalHistory: () => state.goalHistory || [],
     sprintHistory: () => state.sprintHistory || [],
+    documentTitle: () => state.title || 'Untitled',
+    saveRecordPdf: async (html) => {
+      const file = await api.file.export({
+        format: 'pdf', html, content: '',
+        suggested: `${state.title || 'Untitled'} writing record`,
+        runningHead: '',
+        pageSetup: { pageSize: 'letter', margin: 1, bottomMargin: 1, sideMargin: 1 }
+      });
+      if (file) ui.toast(`Saved ${file.replace(/^.*[\\/]/, '')}`);
+    },
+    forgetRecord: (kind, finishedAt) => {
+      const key = kind === 'sprints' ? 'sprintHistory' : 'goalHistory';
+      state[key] = (state[key] || []).filter((e) => e.finishedAt !== finishedAt);
+      persistGoal();
+      renderGoal();
+    },
     themes: { THEMES, swatches },
     revisionColours: REVISION_COLOURS,
     dropbox: state.dropbox,

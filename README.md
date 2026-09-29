@@ -158,7 +158,8 @@ the manuscript it was set for, so each project shows its own days and nobody
 else's. Every sprint is
 recorded whether it ran its course or not. *View all* under the recent goals
 opens the record of both — what each day came to, how long you sprinted, and
-how much of it was words.
+how much of it was words. Strike an entry out with the × beside it, or keep
+the lot as a PDF, as a table or as a grid of cards.
 
 **It travels with the manuscript.** Beside every saved document is a
 `.lowtide` companion holding its outline, scratchpad, revisions, the caret's

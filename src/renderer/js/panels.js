@@ -822,70 +822,158 @@ export function showFocus(ctx) {
    with what they add up to. Highland keeps the same two lists behind a View
    All on its sprint bar; this is one panel for both, since a writing day is
    made of both. */
-export function showRecord(ctx) {
-  const goals = (ctx.goalHistory ? ctx.goalHistory() : []).filter((e) => e && e.met);
-  const sprints = ctx.sprintHistory ? ctx.sprintHistory() : [];
+/* The record as a page to keep: the same two lists, set for print. Highland
+   calls its version Milestone History and offers it as a grid of cards or a
+   plain table; both are here, since one is for pinning up and the other for
+   reading down. */
+export function recordHtml({ goals, sprints, title, layout }) {
+  const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const day = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const words = (g) => `${Number(g.achieved).toLocaleString()} ${g.type === 'pages' ? 'pages' : 'words'}`;
+  const sprintWords = sprints.reduce((n, s) => n + (Number(s.words) || 0), 0);
+  const sprintMinutes = sprints.reduce((n, s) => n + (Number(s.minutes) || 0), 0);
 
+  const card = (top, middle, bottom) =>
+    `<div class="card"><div class="top">${esc(top)}</div><div class="mid">${esc(middle)}</div><div class="bot">${esc(bottom)}</div></div>`;
+  const row = (cells) => `<tr>${cells.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`;
+
+  const section = (heading, entries, asCard, asRow, headings) => {
+    if (!entries.length) return '';
+    const inner = layout === 'grid'
+      ? `<div class="grid">${entries.map(asCard).join('')}</div>`
+      : `<table><thead><tr>${headings.map((x) => `<th>${esc(x)}</th>`).join('')}</tr></thead>` +
+        `<tbody>${entries.map(asRow).join('')}</tbody></table>`;
+    return `<h2>${esc(heading)}</h2>${inner}`;
+  };
+
+  const goalPart = section('Goals met', goals,
+    (g) => card(words(g), `of ${Number(g.target).toLocaleString()}`, day(g.finishedAt)),
+    (g) => row([words(g), `of ${Number(g.target).toLocaleString()}`, day(g.finishedAt)]),
+    ['Goal', 'Target', 'Date']);
+
+  const sprintPart = section('Sprints', sprints,
+    (s) => card(`${Number(s.minutes) || 0} min`, `${Number(s.words || 0).toLocaleString()} words`, day(s.finishedAt)),
+    (s) => row([`${Number(s.minutes) || 0} min${s.full ? '' : ' (stopped early)'}`,
+                `${Number(s.words || 0).toLocaleString()} words`, day(s.finishedAt)]),
+    ['Sprint', 'Written', 'Date']);
+
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+  @page { size: Letter; margin: 1in; }
+  body { margin: 0; color: #111; background: #fff;
+         font-family: "Iowan Old Style", Palatino, Georgia, "Liberation Serif", serif; font-size: 11pt; line-height: 1.5; }
+  h1 { font-size: 17pt; font-weight: 400; text-align: center; margin: 0 0 4pt; }
+  .sub { text-align: center; color: #555; font-size: 10pt; margin: 0 0 22pt; }
+  h2 { font-size: 12pt; font-weight: 400; letter-spacing: .08em; text-transform: uppercase;
+       color: #555; margin: 20pt 0 8pt; page-break-after: avoid; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 9pt; font-weight: 400; letter-spacing: .08em; text-transform: uppercase;
+       color: #777; padding: 0 8pt 4pt 0; border-bottom: .5pt solid #bbb; }
+  td { padding: 5pt 8pt 5pt 0; border-bottom: .5pt solid #e2e2e2; vertical-align: baseline; }
+  td:last-child, th:last-child { text-align: right; padding-right: 0; }
+  .grid { display: flex; flex-wrap: wrap; gap: 10pt; }
+  .card { width: calc((100% - 40pt) / 5); box-sizing: border-box; padding: 10pt 6pt;
+          border: .5pt solid #ccc; border-radius: 4pt; text-align: center; page-break-inside: avoid; }
+  .card .top { font-size: 11pt; }
+  .card .mid { font-size: 9pt; color: #666; margin: 2pt 0 8pt; }
+  .card .bot { font-size: 9pt; color: #333; }
+</style></head>
+<body>
+  <h1>${esc(title)}</h1>
+  <p class="sub">${goals.length} goal${goals.length === 1 ? '' : 's'} met · ${sprints.length} sprint${sprints.length === 1 ? '' : 's'} · ${sprintMinutes >= 120 ? `${Math.round(sprintMinutes / 60)} hours` : `${sprintMinutes} minutes`} sprinting · ${sprintWords.toLocaleString()} words in them</p>
+  ${goalPart}${sprintPart}
+  ${goals.length || sprints.length ? '' : '<p class="sub">Nothing recorded yet.</p>'}
+</body></html>`;
+}
+
+export function showRecord(ctx) {
   const day = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const plural = (n, one, many) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-  const sprintWords = sprints.reduce((n, s) => n + (Number(s.words) || 0), 0);
-  const sprintMinutes = sprints.reduce((n, s) => n + (Number(s.minutes) || 0), 0);
-  const goalWords = goals.reduce((n, g) => n + (g.type === 'pages' ? 0 : Number(g.achieved) || 0), 0);
+  let which = null;
+  const body = h('div', { class: 'record-body' });
 
-  const summary = h('div', { class: 'record-summary' },
-    h('div', {}, h('span', { class: 'n' }, goals.length.toLocaleString()),
-      h('span', { class: 'k' }, goals.length === 1 ? 'goal met' : 'goals met')),
-    h('div', {}, h('span', { class: 'n' }, sprints.length.toLocaleString()),
-      h('span', { class: 'k' }, sprints.length === 1 ? 'sprint' : 'sprints')),
-    h('div', {}, h('span', { class: 'n' }, sprintMinutes >= 120
-        ? `${Math.round(sprintMinutes / 60)}h` : `${sprintMinutes}m`),
-      h('span', { class: 'k' }, 'sprinting')),
-    h('div', {}, h('span', { class: 'n' }, sprintWords.toLocaleString()),
-      h('span', { class: 'k' }, 'words in them')));
+  const draw = () => {
+    const goals = (ctx.goalHistory ? ctx.goalHistory() : []).filter((e) => e && e.met);
+    const sprints = ctx.sprintHistory ? ctx.sprintHistory() : [];
+    if (!which) which = goals.length || !sprints.length ? 'goals' : 'sprints';
 
-  const rows = (entries, draw) => {
-    const list = h('div', { class: 'record-list' });
-    let heading = '';
-    for (const entry of entries) {
-      const d = day(entry.finishedAt);
-      if (d !== heading) { heading = d; list.append(h('div', { class: 'record-day' }, d)); }
-      list.append(draw(entry));
+    const sprintWords = sprints.reduce((n, s) => n + (Number(s.words) || 0), 0);
+    const sprintMinutes = sprints.reduce((n, s) => n + (Number(s.minutes) || 0), 0);
+
+    body.textContent = '';
+    body.append(h('div', { class: 'record-summary' },
+      h('div', {}, h('span', { class: 'n' }, goals.length.toLocaleString()),
+        h('span', { class: 'k' }, goals.length === 1 ? 'goal met' : 'goals met')),
+      h('div', {}, h('span', { class: 'n' }, sprints.length.toLocaleString()),
+        h('span', { class: 'k' }, sprints.length === 1 ? 'sprint' : 'sprints')),
+      h('div', {}, h('span', { class: 'n' }, sprintMinutes >= 120
+          ? `${Math.round(sprintMinutes / 60)}h` : `${sprintMinutes}m`),
+        h('span', { class: 'k' }, 'sprinting')),
+      h('div', {}, h('span', { class: 'n' }, sprintWords.toLocaleString()),
+        h('span', { class: 'k' }, 'words in them'))));
+
+    const tabs = h('div', { class: 'seg record-tabs' });
+    for (const [id, label] of [['goals', `Goals (${goals.length})`], ['sprints', `Sprints (${sprints.length})`]]) {
+      tabs.append(h('button', { class: id === which ? 'on' : '', 'data-which': id,
+        onclick: () => { which = id; draw(); } }, label));
     }
-    return list;
-  };
+    body.append(tabs);
 
-  const goalRow = (g) => h('div', { class: 'record-row met' },
-    h('span', {}, clock(g.finishedAt)),
-    h('span', { class: 'what' }, `${plural(g.achieved, g.type === 'pages' ? 'page' : 'word', g.type === 'pages' ? 'pages' : 'words')}`),
-    h('span', { class: 'n' }, `of ${Number(g.target).toLocaleString()}`));
+    const forget = (entry) => h('button', {
+      class: 'record-forget', type: 'button', title: 'Remove this from the record',
+      'aria-label': 'Remove this from the record',
+      onclick: () => { ctx.forgetRecord(which, entry.finishedAt); draw(); }
+    }, '\u00d7');
 
-  const sprintRow = (s) => h('div', { class: `record-row ${s.met ? 'met' : ''}` },
-    h('span', {}, clock(s.finishedAt)),
-    h('span', { class: 'what' }, `${plural(Number(s.minutes) || 0, 'minute', 'minutes')}${s.full ? '' : ' (stopped early)'}`),
-    h('span', { class: 'n' }, `${Number(s.words || 0).toLocaleString()} words${s.target ? ` of ${Number(s.target).toLocaleString()}` : ''}`));
+    const goalRow = (g) => h('div', { class: 'record-row met' },
+      h('span', {}, clock(g.finishedAt)),
+      h('span', { class: 'what' }, plural(g.achieved, g.type === 'pages' ? 'page' : 'word',
+        g.type === 'pages' ? 'pages' : 'words')),
+      h('span', { class: 'n' }, `of ${Number(g.target).toLocaleString()}`),
+      forget(g));
 
-  const panes = h('div', { class: 'record-pane' });
-  const tabs = h('div', { class: 'seg record-tabs' });
-  const show = (which) => {
-    panes.textContent = '';
-    tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.which === which));
-    if (which === 'goals') {
-      panes.append(goals.length ? rows(goals, goalRow)
-        : h('div', { class: 'goal-empty' }, 'No goals met yet. Set one from the ring above.'));
+    const sprintRow = (s) => h('div', { class: `record-row ${s.met ? 'met' : ''}` },
+      h('span', {}, clock(s.finishedAt)),
+      h('span', { class: 'what' }, `${plural(Number(s.minutes) || 0, 'minute', 'minutes')}${s.full ? '' : ' (stopped early)'}`),
+      h('span', { class: 'n' }, `${Number(s.words || 0).toLocaleString()} words${s.target ? ` of ${Number(s.target).toLocaleString()}` : ''}`),
+      forget(s));
+
+    const pane = h('div', { class: 'record-pane' });
+    const entries = which === 'goals' ? goals : sprints;
+    if (!entries.length) {
+      pane.append(h('div', { class: 'goal-empty' }, which === 'goals'
+        ? 'No goals met yet. Set one from the ring above.'
+        : 'No sprints yet. The stopwatch starts one.'));
     } else {
-      panes.append(sprints.length ? rows(sprints, sprintRow)
-        : h('div', { class: 'goal-empty' }, 'No sprints yet. The stopwatch starts one.'));
+      let heading = '';
+      for (const entry of entries) {
+        const d = day(entry.finishedAt);
+        if (d !== heading) { heading = d; pane.append(h('div', { class: 'record-day' }, d)); }
+        pane.append(which === 'goals' ? goalRow(entry) : sprintRow(entry));
+      }
     }
+    body.append(pane);
   };
-  for (const [which, label] of [['goals', `Goals (${goals.length})`], ['sprints', `Sprints (${sprints.length})`]]) {
-    tabs.append(h('button', { 'data-which': which, onclick: () => show(which) }, label));
-  }
 
-  const body = h('div', { class: 'record-body' }, summary, tabs, panes);
-  show(goals.length || !sprints.length ? 'goals' : 'sprints');
-  openPanel('record', panelShell('Your record', body));
+  draw();
+
+  let layout = 'table';
+  const asPdf = h('button', { class: 'btn primary', onclick: () => {
+    const goals = (ctx.goalHistory ? ctx.goalHistory() : []).filter((e) => e && e.met);
+    ctx.saveRecordPdf(recordHtml({
+      goals,
+      sprints: ctx.sprintHistory ? ctx.sprintHistory() : [],
+      title: `${ctx.documentTitle ? ctx.documentTitle() : 'Untitled'} — writing record`,
+      layout
+    }));
+  } }, 'Save as PDF');
+
+  const shape = segmented([['table', 'Table'], ['grid', 'Grid']], layout, (v) => { layout = v; });
+  openPanel('record', panelShell('Your record', body,
+    h('div', { class: 'record-foot' }, shape, asPdf)));
 }
 
 /* ------------------------------------------------------------------ sprint */

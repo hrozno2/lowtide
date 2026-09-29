@@ -53,10 +53,14 @@ function writeAtomic(target, content) {
   }
 }
 
+/* The milliseconds matter: two versions can be written inside one second —
+   the copy kept when a file is overwritten and the one taken straight after —
+   and without them the two sort as equal and the newer is not reliably the
+   newest. */
 function parseStamp(name) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/.exec(name);
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})(?:-(\d{1,3}))?/.exec(name);
   if (!m) return null;
-  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6], +(m[7] || 0)));
 }
 
 /** Versions for one document, newest first. */
