@@ -55,10 +55,12 @@ body.focus-mode .cm-editor .cm-line.page-start::after { opacity: .35; }
 
 .cm-editor .cm-selectionLayer .cm-selectionBackground { background: var(--selection-off) !important; }
 .cm-editor.cm-focused .cm-selectionLayer .cm-selectionBackground { background: var(--selection) !important; }
-.cm-editor .cm-selectionMatch { background: rgba(79, 214, 196, .10); border-radius: 2px; }
+.cm-editor .cm-selectionMatch { background: var(--primary-ghost); border-radius: 2px; }
 
-.cm-editor .cm-searchMatch { background: rgba(224, 180, 76, .20); border-radius: 2px; }
-.cm-editor .cm-searchMatch.cm-searchMatch-selected { background: rgba(224, 180, 76, .42); }
+/* A find picks the theme's note colour, which is the one it keeps for
+   marginal things; the match you are on is the same colour, louder. */
+.cm-editor .cm-searchMatch { background: color-mix(in srgb, var(--note) 20%, transparent); border-radius: 2px; }
+.cm-editor .cm-searchMatch.cm-searchMatch-selected { background: color-mix(in srgb, var(--note) 42%, transparent); }
 
 /* ------------------------------------------------------------ block styles */
 
@@ -80,7 +82,7 @@ body.focus-mode .cm-editor .cm-line.page-start::after { opacity: .35; }
 
 .cm-editor .l-h1 .m-marker, .cm-editor .l-h2 .m-marker,
 .cm-editor .l-h3 .m-marker, .cm-editor .l-h4 .m-marker {
-  color: rgba(78, 199, 184, .42);
+  color: color-mix(in srgb, var(--primary) 45%, transparent);
   font-weight: 700;
 }
 

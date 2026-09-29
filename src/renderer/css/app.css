@@ -664,7 +664,8 @@ body:not(.status-on) .statusbar { display: none; }
 
 .scrim {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(4, 10, 11, .55);
+  /* A veil, not a colour: the same over a light theme as a dark one. */
+  background: rgba(0, 0, 0, .45);
   backdrop-filter: blur(2px);
   animation: fade var(--dur) var(--ease);
 }
@@ -1138,13 +1139,13 @@ input[type="range"]::-webkit-slider-thumb {
 ::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb, rgba(140, 175, 175, .16));
+  background: var(--scroll-thumb);
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--scroll-thumb-hover, rgba(140, 175, 175, .3));
+  background: var(--scroll-thumb-hover);
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-corner { background: transparent; }

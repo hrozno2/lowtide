@@ -162,6 +162,47 @@ ok('an HTML export carries no font files', !dflt.includes('@font-face'));
 const pdf = M.printHtml('x', {}, { fontBase: 'file:///app/fonts/' });
 ok('a PDF gets the face by absolute URL', pdf.includes('src: url("file:///app/fonts/am-400.woff2")') && pdf.includes('am-italic-700.woff2'));
 
+/* ------------------------------------------------------ search synonyms */
+
+/* The table of words that reach a setting is one object literal, so a word
+   written twice silently loses its first meaning: "notes" was written once
+   for the note style and again for the scratchpad, and the note style became
+   unreachable by the obvious word for it. */
+{
+  const src = readFileSync(join('src', 'renderer', 'js', 'panels.js'), 'utf8');
+  const body = src.slice(src.indexOf('const RELATED = {'), src.indexOf('};', src.indexOf('const RELATED = {')));
+  const keys = [...body.matchAll(/(?:^|[{,]\s*)([a-z0-9]+):\s*\[/g)].map((m) => m[1]);
+  const twice = keys.filter((k, i) => keys.indexOf(k) !== i);
+  eq('no word in the search synonyms is written twice', [...new Set(twice)], []);
+  ok('and there are plenty of them', keys.length > 60);
+}
+
+/* --------------------------------------------------- colours in the sheets */
+
+/* Every colour in the stylesheets has to come from the theme, or a theme that
+   is not the default paints half its window in somebody else's palette — a
+   blue theme was highlighting matching words in teal because the rule held
+   Material's own accent. The exceptions below are the ones that genuinely do
+   not follow the theme, with the reason they do not. */
+const CSS_COLOUR_EXCEPTIONS = [
+  // The preview is paper and ink, whatever colour the window is.
+  '#f7f5f0', '#16191a', '#7a6a2a',
+  // Revision marks are colours the writer picks by name.
+  '#5aa9e6', '#f27eb2', '#e0b44c', '#7fc96b', '#e8934a', '#b08ae0', '#e8695f', '#4ec7b8',
+  // The close button in the title bar, red the world over.
+  '#c4342f', '#fff',
+  // A veil over the window: black at low opacity, over light themes and dark.
+  'rgba(0, 0, 0, .45)'
+];
+
+for (const file of ['app.css', 'editor.css', 'home.css']) {
+  const css = readFileSync(join('src', 'renderer', 'css', file), 'utf8');
+  const found = (css.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [])
+    .filter((c) => !CSS_COLOUR_EXCEPTIONS.includes(c))
+    .filter((c) => !/^rgba?\(\s*(var|from)/.test(c));
+  eq(`${file} leaves every colour to the theme`, [...new Set(found)], []);
+}
+
 /* ------------------------------------------------------------ strip markup */
 eq('strip heading', M.stripMarkup('# Chapter **One**'), 'Chapter One');
 eq('strip list', M.stripMarkup('- a *b*'), 'a b');

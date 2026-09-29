@@ -127,7 +127,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
 ::-webkit-scrollbar { width: 11px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb, rgba(140, 175, 175, .16));
+  background: var(--scroll-thumb);
   border: 3px solid transparent; background-clip: padding-box; border-radius: 8px;
 }
 

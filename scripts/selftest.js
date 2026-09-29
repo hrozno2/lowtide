@@ -1448,10 +1448,13 @@ app.whenReady().then(async () => {
       const seen = await js(`(() => {
         const note = getComputedStyle(document.querySelector('.m-note:not(.m-note-marker)')).color;
         const mark = getComputedStyle(document.querySelector('.m-note-marker')).color;
-        // [0-9] rather than \d: this is a template literal, which would eat
-        // the backslash and leave a regex matching the letter d.
-        const rgb = (c) => (c.match(/[0-9.]+/g) || []).slice(0, 3).map(Number);
-        const srgb = (c) => c.startsWith('color(') ? rgb(c.replace('color(srgb', '')).map((v) => Math.round(v * 255)) : rgb(c);
+        /* Chromium hands back a mix as color(srgb 0…1 / a) and a plain colour
+           as rgb(0…255); both come back here on the same scale. [0-9] rather
+           than \d, which a template literal would eat down to the letter d. */
+        const srgb = (c) => {
+          const n = (c.match(/[0-9.]+/g) || []).slice(0, 3).map(Number);
+          return n.length === 3 && n.every((v) => v <= 1) ? n.map((v) => Math.round(v * 255)) : n;
+        };
         return { note: srgb(note), mark: srgb(mark),
                  text: srgb(getComputedStyle(document.querySelector('.cm-content')).color) }; })()`);
       const near = (a, b) => a.length === 3 && b.length === 3 && a.every((v, i) => Math.abs(v - b[i]) <= 2);
@@ -1562,6 +1565,56 @@ app.whenReady().then(async () => {
   });
 
   /* ========================================================== revisions == */
+  await test('every theme paints the editor in its own colours', async () => {
+    await load('# One\n\nThe lamp was lit and the lamp was warm. She counted the steps.');
+    await wait(600);
+    /* Chromium gives a mix back as color(srgb 0…1 / a) and a plain colour as
+       rgb(0…255), so both are brought to the same scale. */
+    const rgb = (c) => {
+      const n = (c.match(/[0-9.]+/g) || []).slice(0, 3).map(Number);
+      return n.length === 3 && n.every((v) => v <= 1) ? n.map((v) => Math.round(v * 255)) : n;
+    };
+    const near = (a, b) => a.length === 3 && b.length === 3 && a.every((v, i) => Math.abs(v - b[i]) <= 3);
+
+    for (const theme of ['midnight', 'monokai', 'dracula', 'paper']) {
+      await js(`window.__applyTheme(${JSON.stringify(theme)})`);
+      await wait(350);
+      const seen = await js(`(() => {
+        const cs = getComputedStyle(document.documentElement);
+        const marker = document.querySelector('.l-h1 .m-marker');
+        return { primary: cs.getPropertyValue('--primary').trim(),
+                 note: cs.getPropertyValue('--note').trim(),
+                 marker: marker ? getComputedStyle(marker).color : '' }; })()`);
+      const asRgb = (hex) => {
+        const h = hex.replace('#', '');
+        return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+      };
+      ok(`${theme}: the heading markers take the theme's accent`,
+        near(rgb(seen.marker), asRgb(seen.primary)));
+      ok(`${theme}: and its accent is not Material's teal`,
+        theme === 'material' || !near(asRgb(seen.primary), [78, 197, 194]));
+    }
+
+    // The matches of a selected word are lit from the theme as well. A real
+    // one, not a bare element wearing the class: the editor decorates these
+    // itself and a stand-in picks up rules that never apply in practice.
+    await js(`window.__applyTheme('midnight')`);
+    await load('The lamp was lit and the lamp was warm. She counted the lamp.');
+    await wait(500);
+    await js(`(() => { const v = window.__lowTideView, i = v.state.doc.toString().indexOf('lamp');
+      v.dispatch({ selection: { anchor: i, head: i + 4 } }); v.focus(); return true; })()`);
+    await wait(700);
+    const lit = await js(`(() => {
+      const els = [...document.querySelectorAll('.cm-selectionMatch')];
+      return { count: els.length, bg: els.length ? getComputedStyle(els[0]).backgroundColor : '' }; })()`);
+    ok('the other uses of a selected word are marked', lit.count >= 1);
+    const [r, g, b] = rgb(lit.bg);
+    ok(`a matching word takes the theme's blue, not a leftover teal (${lit.bg})`, b > r && b > g);
+
+    await js(`window.__applyTheme('material')`);
+    await wait(350);
+  });
+
   group = 'Revisions';
 
   await test('create, mark, hide, delete', async () => {
