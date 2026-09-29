@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     extras: (path) => ipcRenderer.invoke('doc:extras', path),
     setExtras: (path, patch) => ipcRenderer.invoke('doc:extras-set', { path, patch }),
     onLoad: (fn) => on('doc:load', fn),
+    pending: () => ipcRenderer.invoke('doc:pending'),
     onSaved: (fn) => on('doc:saved', fn),
     onMoved: (fn) => on('doc:moved', fn)
   },

@@ -1780,6 +1780,31 @@ app.whenReady().then(async () => {
   });
 
   /* ========================================================= scratchpad == */
+  await test('a goal belongs to its manuscript, not to the machine', async () => {
+    const A = path.join(WORK, 'novel.fountain');
+    const B = path.join(WORK, 'other.fountain');
+    fs.writeFileSync(A, 'The novel.\n', 'utf8');
+    fs.writeFileSync(B, 'Something else.\n', 'utf8');
+    const openFresh = async (f) => {
+      await load('');
+      await wait(700);
+      await js(`window.api.file.openPath(${JSON.stringify(f)})`);
+      await wait(1600);
+    };
+    const shown = () => js(`document.querySelectorAll('#goal-history .goal-row').length`);
+
+    await openFresh(A);
+    await js(`window.__setHistory([{ finishedAt: ${Date.UTC(2026, 8, 20, 9)}, type: 'words', target: 500, achieved: 700, met: true }], [])`);
+    await wait(1000);
+    eq('the novel has a goal to its name', await shown(), 1);
+
+    await openFresh(B);
+    eq('another manuscript starts with none of it', await shown(), 0);
+
+    await openFresh(A);
+    eq('and the novel still has its own', await shown(), 1);
+  });
+
   await test('View all opens the record of goals and sprints', async () => {
     const now = Date.now(), day = 86400000;
     const goals = [
@@ -1790,8 +1815,7 @@ app.whenReady().then(async () => {
       { finishedAt: now - 3600000, startedAt: now - 5400000, minutes: 25, planned: 25, words: 412, target: 400, met: true, full: true },
       { finishedAt: now - day, startedAt: now - day - 600000, minutes: 9, planned: 15, words: 130, target: 250, met: false, full: false }
     ];
-    await js(`window.__setPref('goalHistory', ${JSON.stringify(goals)});
-              window.__setPref('sprintHistory', ${JSON.stringify(sprints)})`);
+    await js(`window.__setHistory(${JSON.stringify(goals)}, ${JSON.stringify(sprints)})`);
     await wait(700);
 
     ok('the button appears once there is something to show',
@@ -1815,7 +1839,7 @@ app.whenReady().then(async () => {
     ok('the full one reads plainly', /25 minutes/.test(sprintRows[0]) && !/stopped/.test(sprintRows[0]));
     ok('and one cut short says so', /stopped early/.test(sprintRows[1]));
 
-    await js(`window.__setPref('goalHistory', []); window.__setPref('sprintHistory', [])`);
+    await js(`window.__setHistory([], [])`);
     await wait(500);
     await click('#goal-all');
     await wait(300);
@@ -1982,19 +2006,19 @@ app.whenReady().then(async () => {
     await wait(200);
   });
 
-  await test('a manuscript carries its goal history beside it', async () => {
+  await test('a manuscript carries its own goal history beside it', async () => {
     const companion = require(path.join(base, 'src', 'main', 'companion.js'));
-    const { getPrefs } = require(path.join(base, 'src', 'main', 'store.js'));
+    const { docEntry } = require(path.join(base, 'src', 'main', 'store.js'));
     const file = path.join(WORK, 'carried.fountain');
     const beside = companion.pathFor(file);
     fs.rmSync(beside, { force: true });
     fs.writeFileSync(file, 'body\n', 'utf8');
 
-    // A day's work recorded on this machine, then saved.
+    // A day's work recorded against this manuscript, then saved.
     const mine = [{ finishedAt: Date.UTC(2026, 8, 20, 9), type: 'words', target: 500, achieved: 620, met: true }];
-    await js(`window.__setPref('goalHistory', ${JSON.stringify(mine)})`);
-    await wait(400);
     await load('body\n', file);
+    await js(`window.__setHistory(${JSON.stringify(mine)}, [])`);
+    await wait(900);
     await select(4, 4);
     await type(' more');
     await wait(2600);
@@ -2003,35 +2027,23 @@ app.whenReady().then(async () => {
     const carried = companion.read(file);
     eq('holding the goal that was met', carried.goals.length, 1);
     eq('and its number', carried.goals[0].achieved, 620);
+    eq('the document keeps it too', (docEntry(file).goalHistory || []).length, 1);
 
-    // Another machine: a different day in its history, none of ours.
+    // Another machine writes a different day against the same manuscript —
+    // once this window has moved off it, since leaving a document writes
+    // what this machine knows back to the companion.
+    await load('');
+    await wait(900);
     const theirs = [{ finishedAt: Date.UTC(2026, 8, 21, 9), type: 'words', target: 500, achieved: 880, met: true }];
     companion.write(file, { extras: {}, goals: theirs, sprints: [] });
-    await js(`window.__setPref('goalHistory', [])`);
-    await wait(400);
 
-    // Opened afresh: a file already showing in a window is only brought
-    // forward, and its companion was read when it first opened.
-    const openFresh = async () => {
-      await load('');
-      await wait(700);
-      await js(`window.api.file.openPath(${JSON.stringify(file)})`);
-      await wait(1800);
-    };
-    await openFresh();
-    const after = getPrefs().get('goalHistory') || [];
-    eq('opening the file brings its history back', after.length, 1);
-    eq('the day written elsewhere', after[0].achieved, 880);
-
-    // And the two are joined rather than one replacing the other.
-    companion.write(file, { extras: {}, goals: mine, sprints: [] });
-    await openFresh();
-    const both = getPrefs().get('goalHistory') || [];
-    eq('both days are kept', both.length, 2);
+    // A file already showing in a window is only brought forward, so it has
+    // to be opened from nothing for its companion to be read again.
+    await js(`window.api.file.openPath(${JSON.stringify(file)})`);
+    await wait(1800);
+    const both = (await js(`window.__history()`)).goals;
+    eq('the two days are joined, not one replacing the other', both.length, 2);
     eq('newest first', both[0].achieved, 880);
-
-    await js(`window.__setPref('goalHistory', [])`);
-    await wait(300);
   });
 
   await test('the companion can be switched off', async () => {
@@ -2090,6 +2102,43 @@ app.whenReady().then(async () => {
     await wait(2600);
     const leftovers = fs.readdirSync(WORK).filter((n) => n.includes('.tmp'));
     eq('no temp files left behind', leftovers, []);
+  });
+
+  await test('a document opens where it was left', async () => {
+    const file = path.join(WORK, 'whereileft.fountain');
+    const body = Array.from({ length: 200 }, (_, i) => `Line ${i + 1} of the manuscript.`).join('\n\n');
+    fs.writeFileSync(file, body, 'utf8');
+
+    const openFresh = async () => {
+      await load('');
+      await wait(700);
+      await js(`window.api.file.openPath(${JSON.stringify(file)})`);
+      await wait(1600);
+    };
+
+    await openFresh();
+    eq('it opens with its text', await js(`window.__lowTideContent().length`), body.length);
+
+    // Leave the caret deep in it and let the window report where it is.
+    const deep = body.length - 30;
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: ${deep} }, scrollIntoView: true }); v.focus(); return true; })()`);
+    await js(`window.__lowTideView.dispatch({ changes: { from: ${deep}, insert: '.' }, selection: { anchor: ${deep + 1} }, userEvent: 'input.type' })`);
+    await wait(1200);
+
+    await openFresh();
+    const head = await js(`window.__lowTideView.state.selection.main.head`);
+    ok(`the caret comes back to where it was, not the top (at ${head})`, head > body.length - 200);
+    const down = await js(`(() => { const s = document.querySelector('.cm-scroller');
+      return Math.round((s.scrollTop / Math.max(1, s.scrollHeight - s.clientHeight)) * 100); })()`);
+    ok(`and the page is scrolled to it (${down}% down)`, down > 60);
+  });
+
+  await test('a window asks for its document if the message beat it there', async () => {
+    // The page pulls what it was meant to open; by now it has, so there is
+    // nothing left to hand out. A payload still waiting would mean a window
+    // that never showed its manuscript.
+    eq('nothing left pending for this window', await js(`window.api.doc.pending()`), null);
   });
 
   await test('opening a missing file is reported, not fatal', async () => {
@@ -2494,6 +2543,9 @@ app.whenReady().then(async () => {
     await click('#btn-music');
     await wait(900);
     ok('it opens as a panel', await js(`!!document.querySelector('.panel .music-body')`));
+    const panes = await js(`[...document.querySelectorAll('.panel .music-pane')]
+      .filter(p => !p.hidden).map(p => p.dataset.pane)`);
+    eq('showing one thing at a time, not your files and YouTube at once', panes.length, 1);
     eq('it takes no width from the page', await area(), before);
     eq('the button is lit', await js(`document.getElementById('btn-music').classList.contains('on')`), true);
     eq('the outline dock is not involved',

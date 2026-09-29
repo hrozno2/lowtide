@@ -60,8 +60,11 @@ const DEFAULTS = {
   printJustify: true,
   pageMarkers: false,        // page numbers in the margin of the writing view
   goal: null,
+  // Kept only to hand to the first document opened after the change that
+  // made a goal belong to its manuscript (see readCompanion in main).
   goalHistory: [],
   sprintHistory: [],
+  goalsAreDocuments: false,
   sidebarTab: 'navigator',
   toolbarOrder: ['export', 'theme', 'music', 'sprint', 'focus', 'prefs'],
   toolbarHidden: [],

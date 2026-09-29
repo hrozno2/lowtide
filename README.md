@@ -153,14 +153,16 @@ than HTML in disguise), Markdown, plain text or HTML, with an optional title
 page.
 
 **Goals and sprints.** Set a word or page goal from the ring in the sidebar;
-the ones you meet are kept, the ones you give up on are not. Every sprint is
+the ones you meet are kept, the ones you give up on are not. A goal belongs to
+the manuscript it was set for, so each project shows its own days and nobody
+else's. Every sprint is
 recorded whether it ran its course or not. *View all* under the recent goals
 opens the record of both — what each day came to, how long you sprinted, and
 how much of it was words.
 
 **It travels with the manuscript.** Beside every saved document is a
-`.lowtide` companion holding its outline, scratchpad, revisions and the goal
-and sprint history it was written under. Whatever syncs your manuscript syncs
+`.lowtide` companion holding its outline, scratchpad, revisions, the caret's
+last position, and the goal and sprint history it was written under. Whatever syncs your manuscript syncs
 that with it, so opening the file on another machine brings its history along
 and joins it to whatever that machine already knew — the same day recorded
 twice stays one day. Switch it off in Preferences if you would rather have

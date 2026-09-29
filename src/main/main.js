@@ -149,7 +149,7 @@ function createWindow(opts = {}) {
   win.once('ready-to-show', () => {
     reveal(win);
     if (opts.filePath) openInWindow(win, opts.filePath);
-    else if (opts.restore) win.webContents.send('doc:load', opts.restore);
+    else if (opts.restore) loadInto(win, opts.restore);
   });
 
   const saveBounds = () => {
@@ -172,6 +172,7 @@ function createWindow(opts = {}) {
   win.on('closed', () => {
     docs.delete(win.id);
     closing.delete(win.id);
+    forgetWindow(win.id);
     writeSession();
   });
 
@@ -268,7 +269,9 @@ function openInWindow(win, filePath) {
       title: path.basename(filePath)
     });
     const carried = readCompanion(filePath);
-    win.webContents.send('doc:load', Object.assign({ path: filePath, content }, carried));
+    const entry = docEntry(filePath) || {};
+    loadInto(win, Object.assign(
+      { path: filePath, content, cursor: Number(entry.cursor) || 0 }, carried));
     win.setTitle(path.basename(filePath));
     if (isMac) win.setRepresentedFilename(filePath);
     addRecent(filePath);
@@ -344,16 +347,41 @@ async function saveDocument(win, content, filePath) {
   return target;
 }
 
+/* What a window is to open once its page is listening.
+ *
+ * `ready-to-show` means the window has painted, not that the renderer has
+ * finished running its script and subscribed to anything — so a document
+ * pushed at that moment is sometimes pushed into a page with no listener,
+ * and the window sits there empty and Untitled with the manuscript nowhere
+ * in it. The payload is kept here as well, and the page asks for it as soon
+ * as it is ready; whichever arrives first wins and the other is discarded.
+ */
+const pendingLoad = new Map();          // window id → doc:load payload
+const listening = new Set();            // windows whose page has asked once
+
+function loadInto(win, payload) {
+  // Only the first load is at risk. Once a page has asked for its document
+  // the script is running and its listener is attached, so later documents
+  // are simply sent and nothing is left lying about.
+  if (!listening.has(win.id)) pendingLoad.set(win.id, payload);
+  win.webContents.send('doc:load', payload);
+}
+
+function forgetWindow(id) {
+  pendingLoad.delete(id);
+  listening.delete(id);
+}
+
 /* Everything about a document that is not the document, written beside it.
    Silent when switched off, and silent when it cannot be written. */
 function writeCompanion(filePath) {
   if (!filePath || getPrefs().get('companionFile') === false) return;
   const entry = docEntry(filePath) || {};
-  const { updated, ...extras } = entry;
+  const { updated, goalHistory, sprintHistory, ...extras } = entry;
   companion.write(filePath, {
     extras,
-    goals: getPrefs().get('goalHistory') || [],
-    sprints: getPrefs().get('sprintHistory') || []
+    goals: goalHistory || [],
+    sprints: sprintHistory || []
   });
 }
 
@@ -362,24 +390,34 @@ function writeCompanion(filePath) {
    is folded into the one kept here, so a day written on another computer is
    not lost by opening the file on this one. */
 function readCompanion(filePath) {
-  if (!filePath || getPrefs().get('companionFile') === false) return {};
-  const beside = companion.read(filePath);
-  if (!beside) return {};
-
+  if (!filePath) return {};
   const mine = docEntry(filePath) || {};
-  if (Object.keys(beside.extras).length && beside.updated > (Number(mine.updated) || 0)) {
+  const beside = getPrefs().get('companionFile') === false ? null : companion.read(filePath);
+
+  if (beside && Object.keys(beside.extras).length && beside.updated > (Number(mine.updated) || 0)) {
     setDocEntry(filePath, Object.assign({}, beside.extras, { updated: beside.updated }));
   }
-  const out = {};
-  if (beside.goals.length) {
-    out.goals = companion.mergeGoals(getPrefs().get('goalHistory') || [], beside.goals).slice(0, 600);
-    getPrefs().set({ goalHistory: out.goals });
+
+  /* A goal is set for a manuscript, so its history belongs to the document
+     rather than to the machine. Earlier versions kept one list for
+     everything: the first document opened after this takes that list over,
+     once, rather than every document inheriting somebody else's days. */
+  const prefs = getPrefs();
+  let goals = (docEntry(filePath) || {}).goalHistory || [];
+  let sprints = (docEntry(filePath) || {}).sprintHistory || [];
+  if (!prefs.get('goalsAreDocuments')) {
+    goals = companion.mergeRecords(goals, prefs.get('goalHistory') || []);
+    sprints = companion.mergeRecords(sprints, prefs.get('sprintHistory') || []);
+    prefs.set({ goalsAreDocuments: true, goalHistory: [], sprintHistory: [] });
   }
-  if (beside.sprints.length) {
-    out.sprints = companion.mergeRuns(getPrefs().get('sprintHistory') || [], beside.sprints).slice(0, 600);
-    getPrefs().set({ sprintHistory: out.sprints });
+  if (beside) {
+    goals = companion.mergeRecords(goals, beside.goals);
+    sprints = companion.mergeRecords(sprints, beside.sprints);
   }
-  return out;
+  goals = goals.slice(0, 600);
+  sprints = sprints.slice(0, 600);
+  if (goals.length || sprints.length) setDocEntry(filePath, { goalHistory: goals, sprintHistory: sprints });
+  return { goals, sprints };
 }
 
 /* ------------------------------------------------------------------ session */
@@ -569,12 +607,24 @@ function broadcastPrefs(e, p) {
   return p;
 }
 
+/* The page, now listening, asking for whatever it was meant to open. */
+ipcMain.handle('doc:pending', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return null;
+  listening.add(win.id);
+  const payload = pendingLoad.get(win.id) || null;
+  pendingLoad.delete(win.id);
+  return payload;
+});
+
 ipcMain.handle('doc:state', (e, state) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   if (!win) return;
   const prev = docs.get(win.id) || {};
   const next = Object.assign({}, prev, state);
   docs.set(win.id, next);
+  // Where the caret was left, so the document opens there next time.
+  if (next.path && Number.isFinite(next.cursor)) setDocEntry(next.path, { cursor: next.cursor });
   const name = next.path ? path.basename(next.path) : (next.title || 'Untitled');
   const title = next.dirty && !isMac ? `${name} — Edited` : name;
   if (win.getTitle() !== title) win.setTitle(title);

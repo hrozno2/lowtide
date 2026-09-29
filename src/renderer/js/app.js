@@ -70,9 +70,8 @@ let repaintMusic = null;
     api.platform === 'darwin' ? 'mac' : api.platform === 'win32' ? 'win' : 'linux');
 
   state.prefs = await api.prefs.get();
-  state.goal = state.prefs.goal || null;
-  state.goalHistory = state.prefs.goalHistory || [];
-  state.sprintHistory = state.prefs.sprintHistory || [];
+  state.goal = null;   // the document brings its own, once its extras load
+
   state.dropbox = (await api.app.dropbox()).root || null;
   state.spelling = await api.spell.languages();
 
@@ -111,6 +110,13 @@ let repaintMusic = null;
   window.__pages = () => state.pages;
   window.__parseYouTube = parseYouTube;
   window.__setPref = (k, v) => setPrefs({ [k]: v });
+  window.__setHistory = (goals, sprints) => {
+    state.goalHistory = goals || [];
+    state.sprintHistory = sprints || [];
+    persistGoal();
+    renderGoal();
+  };
+  window.__history = () => ({ goals: state.goalHistory, sprints: state.sprintHistory });
   window.__checkUpdate = checkForUpdate;
   window.__moveSection = (i, slot) => moveSection(i, slot);
   window.__sectionRange = (i) => sectionRange(i);
@@ -163,16 +169,7 @@ function applyPrefs(p, prev) {
   document.body.classList.toggle('typewriter', !!p.typewriter);
   document.body.classList.toggle('notes-dim', p.noteStyle === 'dim');
 
-  /* A goal met in another window, or a history a document carried in with it,
-     belongs on this one too. The newest entry and the length are enough to
-     tell two of these lists apart. */
-  const sameRun = (a = [], b = []) =>
-    a.length === b.length && (!a.length || a[0].finishedAt === b[0].finishedAt);
-  if (!sameRun(state.goalHistory, p.goalHistory) || !sameRun(state.sprintHistory, p.sprintHistory)) {
-    state.goalHistory = p.goalHistory || [];
-    state.sprintHistory = p.sprintHistory || [];
-    if (prev) renderGoal();
-  }
+
 
   $('btn-navigator').classList.toggle('on', p.navigatorOpen !== false);
   if (changed('toolbarOrder') || changed('toolbarHidden') || !prev) renderToolbar();
@@ -390,12 +387,18 @@ api.doc.onMoved(({ path }) => {
   loadExtras(path);
 });
 
-api.doc.onLoad(({ path, content, cursor, dirty, goals, sprints }) => {
-  // What the document carried with it from wherever it was last written.
-  if (Array.isArray(goals) && goals.length) state.goalHistory = goals;
-  if (Array.isArray(sprints) && sprints.length) state.sprintHistory = sprints;
+let documentShown = false;
+let carried = null;        // history the document brought with it, if any
+
+function showDocument({ path, content, cursor, dirty, goals, sprints }) {
+  documentShown = true;
   autosave.cancel();
-  saveExtras.cancel();
+  // Anything the outgoing document still owed — a goal just met, a note just
+  // typed — is written before the window belongs to another manuscript.
+  persistGoal.cancel();
+  saveExtras.flush();
+  // What the document carried with it from wherever it was last written.
+  carried = { goals, sprints };
   replaceAll(view, content || '', cursor || 0);
   setPath(path || null);
   state.savedText = dirty ? '' : (content || '');
@@ -408,15 +411,24 @@ api.doc.onLoad(({ path, content, cursor, dirty, goals, sprints }) => {
   pushState.flush();
   view.focus();
   loadExtras(path || null);
-  renderGoal();
-  if (state.prefs.typewriter) centerCursor(view);
-});
+  // Open where it was left, rather than at the top of a manuscript.
+  centerCursor(view);
+}
+
+api.doc.onLoad(showDocument);
+
+/* And, in case that message arrived before this script was listening, ask for
+   it. Whichever gets here first is the one that counts. */
+api.doc.pending().then((doc) => { if (doc && !documentShown) showDocument(doc); }).catch(() => {});
 
 /* ------------------------------------------------------- document extras */
 
 const saveExtras = debounce(() => {
   if (!state.path) return;
   api.doc.setExtras(state.path, {
+    goal: state.goal,
+    goalHistory: state.goalHistory,
+    sprintHistory: state.sprintHistory,
     scratch: state.scratch,
     outline: state.outline_text,
     revisions: state.revisions,
@@ -427,6 +439,14 @@ const saveExtras = debounce(() => {
 
 async function loadExtras(path) {
   const extras = path ? await api.doc.extras(path) : {};
+  state.goal = extras.goal || null;
+  /* What the file carried in from another machine has already been joined
+     with what was kept here, so it is the fuller of the two. */
+  state.goalHistory = (carried && carried.goals && carried.goals.length)
+    ? carried.goals : (Array.isArray(extras.goalHistory) ? extras.goalHistory : []);
+  state.sprintHistory = (carried && carried.sprints && carried.sprints.length)
+    ? carried.sprints : (Array.isArray(extras.sprintHistory) ? extras.sprintHistory : []);
+  carried = null;
   state.scratch = extras.scratch || '';
   state.outline_text = typeof extras.outline === 'string' ? extras.outline : null;
   if (state.dockMode === 'outline') renderOutlineDock();
@@ -437,6 +457,7 @@ async function loadExtras(path) {
   applyRevisions(view, { list: state.revisions, active: state.activeRevision });
   restoreMarks(view, extras.marks || []);
   renderRevisions();
+  renderGoal();
 }
 
 /* ---------------------------------------------------------------- scratch */
@@ -796,9 +817,10 @@ const goalType = (id) => GOAL_TYPES.find((t) => t.id === id) || GOAL_TYPES[0];
 /* Through setPrefs rather than straight to the store, so this window's own
    copy of the settings keeps step with what was written — the sync below
    compares the two and would otherwise undo a goal the moment it was met. */
-const persistGoal = debounce(() => {
-  setPrefs({ goal: state.goal, goalHistory: state.goalHistory, sprintHistory: state.sprintHistory });
-}, 700);
+/* A goal is set for a manuscript, so it and its history are the document's,
+   kept with its outline and notes rather than in this machine's settings.
+   An untitled draft keeps them in memory until it is saved somewhere. */
+const persistGoal = debounce(() => { saveExtras.flush(); }, 700);
 
 function goalValue() {
   const goal = state.goal;
@@ -1607,7 +1629,7 @@ function renderMusicDock({ rebuild = false, host = null } = {}) {
       for (const [id, label] of [['files', 'Your files'], ...available.map((x) => [x, SERVICES[x].name])]) {
         tabs.append(ui.h('button', {
           class: 'home-tab', 'data-pane': id,
-          onclick: () => { setPrefs({ musicMode: id }); showMusicPane(id); }
+          onclick: () => { setPrefs({ musicMode: id }); showMusicPane(id, body); }
         }, label));
       }
       body.append(tabs);
@@ -1624,11 +1646,15 @@ function renderMusicDock({ rebuild = false, host = null } = {}) {
     }
   }
 
-  showMusicPane(mode);
+  showMusicPane(mode, body);
 }
 
-function showMusicPane(mode) {
-  const body = musicPanelBody();
+/* The body is passed in where the caller has it: the panel is built before it
+   is put on the page, and looking it up by then found nothing — so no pane
+   was hidden and the music pane opened with your files and YouTube stacked
+   one on top of the other. */
+function showMusicPane(mode, host = null) {
+  const body = host || musicPanelBody();
   if (!body) return;
   body.querySelectorAll('.music-pane').forEach((p) => { p.hidden = p.dataset.pane !== mode; });
   body.querySelectorAll('.music-tabs .home-tab').forEach((t) => {
