@@ -106,27 +106,39 @@ body.focus-mode .cm-editor .cm-line.page-start::after { opacity: .35; }
 .cm-editor .l-hang-6 { padding-left: 6ch; text-indent: -6ch; }
 
 /* --- and === both draw a rule across the column with the marks sitting on
-   it, so a place where the text parts looks like one while you write. */
+   it, so a place where the text parts looks like one while you write.
+ *
+ * The rule is the line's own background, painted as a strip one pixel tall
+ * with a gap in the middle for the marks, rather than a full-width rule with
+ * an opaque chip over it. An opaque chip is painted in the text layer, which
+ * is above the layer the selection is drawn in, so selecting the line left
+ * the marks looking unselected — everything around them highlighted and the
+ * --- sitting in a hole. A strip this thin covers nothing. */
 .cm-editor .l-pagebreak,
 .cm-editor .l-divider {
   text-align: center;
-  position: relative;
   padding: .95em 0;
+  background-repeat: no-repeat;
+  background-position: 0 50%;
+  background-size: 100% 1px;
 }
-.cm-editor .l-pagebreak::before,
-.cm-editor .l-divider::before {
-  content: '';
-  position: absolute; left: 0; right: 0; top: 50%;
-  border-top: 1px solid var(--outline);
+.cm-editor .l-pagebreak {
+  background-image: linear-gradient(to right,
+    var(--outline) 0 calc(50% - 3ch), transparent calc(50% - 3ch) calc(50% + 3ch),
+    var(--outline) calc(50% + 3ch) 100%);
 }
 /* A scene break parts paragraphs and a page break parts pages: the lighter
    rule is the smaller interruption. */
-.cm-editor .l-divider::before { border-top-color: var(--outline-soft); }
+.cm-editor .l-divider {
+  background-image: linear-gradient(to right,
+    var(--outline-soft) 0 calc(50% - 3ch), transparent calc(50% - 3ch) calc(50% + 3ch),
+    var(--outline-soft) calc(50% + 3ch) 100%);
+}
+/* The marks on the rule take the colour headings take: a scene break and a
+   page break are structure, like a chapter title, and belong to the same
+   family rather than standing out in the revision red. */
 .cm-editor .m-rule {
-  position: relative;
-  background: var(--bg);
-  padding: 0 14px;
-  color: var(--rule);
+  color: var(--primary);
   letter-spacing: .1em;
 }
 

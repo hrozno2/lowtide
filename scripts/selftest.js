@@ -329,20 +329,45 @@ app.whenReady().then(async () => {
       for (const line of document.querySelectorAll('.cm-line')) {
         const text = line.textContent.trim();
         if (!/^[-=*]{3,}$/.test(text)) continue;
-        const rule = getComputedStyle(line, '::before');
+        const cs = getComputedStyle(line);
+        const chip = line.querySelector('.m-rule');
         out.push({ text, cls: line.className.replace('cm-line ', '').trim(),
-                   drawn: rule.content !== 'none' && parseFloat(rule.borderTopWidth) > 0,
-                   colour: rule.borderTopColor,
-                   onRule: !!line.querySelector('.m-rule') });
+                   drawn: /linear-gradient/.test(cs.backgroundImage),
+                   thin: cs.backgroundSize === '100% 1px',
+                   // Chromium reports the gap as rgba(0, 0, 0, 0), not the
+                   // word; matched without a regex, whose backslashes a
+                   // template literal would eat.
+                   gap: cs.backgroundImage.includes('transparent') ||
+                        cs.backgroundImage.includes('rgba(0, 0, 0, 0)'),
+                   colour: cs.backgroundImage,
+                   // Nothing opaque over the marks: that would paint out the
+                   // selection, which is drawn in a layer beneath the text.
+                   clear: !!chip && getComputedStyle(chip).backgroundColor === 'rgba(0, 0, 0, 0)',
+                   onRule: !!chip });
       }
       return out; })()`);
     eq('all three marks are found', marks.map((m) => m.text), ['---', '===', '***']);
     ok('each draws a rule across the column', marks.every((m) => m.drawn));
-    ok('with the marks sitting on it', marks.every((m) => m.onRule));
+    ok('a strip one pixel tall, so it covers nothing', marks.every((m) => m.thin));
+    ok('with a gap in it for the marks', marks.every((m) => m.gap));
+    ok('and nothing opaque over them to hide a selection', marks.every((m) => m.clear));
     eq('three dashes are a scene break', marks[0].cls, 'l-divider');
     eq('three asterisks are the same thing', marks[2].cls, 'l-divider');
     eq('three equals is a page break', marks[1].cls, 'l-pagebreak');
     ok('and the page break is the heavier rule of the two', marks[1].colour !== marks[0].colour);
+
+    // The marks themselves belong with the headings, not with revision marks.
+    const hue = await js(`(() => {
+      const chip = document.querySelector('.m-rule');
+      const head = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+      const rule = getComputedStyle(document.documentElement).getPropertyValue('--rule').trim();
+      return { chip: getComputedStyle(chip).color, head, rule }; })()`);
+    const asRgb = (hex) => { const h = hex.replace('#', '');
+      return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+    const nums = (c) => (c.match(/[0-9.]+/g) || []).slice(0, 3).map(Number);
+    const same = (a, b) => a.length === 3 && b.length === 3 && a.every((v, i) => Math.abs(v - b[i]) <= 2);
+    ok('the marks are the colour a chapter title is', same(nums(hue.chip), asRgb(hue.head)));
+    ok('and not the revision colour they used to be', !same(nums(hue.chip), asRgb(hue.rule)));
   });
 
   group = 'Smart punctuation';
@@ -499,6 +524,32 @@ app.whenReady().then(async () => {
 
     await js(`window.__setPref('typewriter', false)`);
     await wait(300);
+  });
+
+  await test('three dashes can be typed, and still become an em dash elsewhere', async () => {
+    await load('Before.\n\n');
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.length } }); v.focus(); return true; })()`);
+    await type('---');
+    await wait(500);
+    eq('a line of three dashes survives being typed',
+      (await content()).split('\n').pop(), '---');
+    eq('and is drawn as a scene break',
+      await js(`[...document.querySelectorAll('.cm-line')].pop().className.replace('cm-line ', '').trim()`),
+      'l-divider');
+
+    await load('She turned');
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.length } }); v.focus(); return true; })()`);
+    await type('--then stopped');
+    eq('two dashes inside a sentence are still one em dash',
+      await content(), 'She turned\u2014then stopped');
+
+    await load('She turned ');
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.length } }); v.focus(); return true; })()`);
+    await type('-- then');
+    eq('as are two after a space', await content(), 'She turned \u2014 then');
   });
 
   group = 'Counting';

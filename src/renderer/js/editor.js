@@ -20,6 +20,16 @@ const OPENERS = ' \t\n([{—–\u00a0';
 
 const opensAfter = (ch) => OPENERS.indexOf(ch) > -1;
 
+/* A line that is nothing but dashes is on its way to being a scene break, so
+   the second dash must stay a dash. Otherwise it turned into an em dash and
+   the third one landed beside it — --- could not be typed at all. Anywhere
+   else, two dashes are two dashes meaning one em dash, as before. */
+function onlyDashes(doc, pos) {
+  const line = doc.lineAt(pos);
+  return /^-+$/.test(doc.sliceString(line.from, pos)) &&
+         doc.sliceString(pos, line.to).trim() === '';
+}
+
 /**
  * Implemented as a transaction filter rather than an input handler: rewriting
  * the transaction that CodeMirror is already applying avoids dispatching a
@@ -45,7 +55,7 @@ function smartTypography(enabled) {
         rewrite = { from: fromA, to: toA, insert: opensAfter(prev) ? '\u201c' : '\u201d' };
       } else if (text === "'") {
         rewrite = { from: fromA, to: toA, insert: opensAfter(prev) ? '\u2018' : '\u2019' };
-      } else if (text === '-' && prev === '-') {
+      } else if (text === '-' && prev === '-' && !onlyDashes(doc, fromA)) {
         rewrite = { from: fromA - 1, to: toA, insert: '\u2014' };
       } else if (text === '.' && fromA >= 2 && doc.sliceString(fromA - 2, fromA) === '..') {
         rewrite = { from: fromA - 2, to: toA, insert: '\u2026' };

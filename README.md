@@ -44,9 +44,10 @@ stopped quarantining casks and removed the flag, so passing it there is an
 error instead — which is why the app tries it and drops it if this Homebrew
 has never heard of it.
 
-Low Tide offers this itself: when it finds a newer release and sees it was
-installed by Homebrew, the update notice opens Terminal and runs the upgrade
-there, in plain sight, rather than doing anything behind your back.
+Low Tide offers this itself: when it finds a newer release and sees Homebrew
+installed this copy, the notice reads **Update & Restart** and runs that
+upgrade for you. If Homebrew ever wants an answer it cannot get from inside
+the app, the same command is handed to Terminal where you can answer it.
 
 ### Download
 
@@ -60,6 +61,11 @@ Take the file for your machine from
 | Windows | `LowTide-‹version›-win-x64.exe` |
 | Linux, any distro | `LowTide-‹version›-linux-x86_64.AppImage` |
 | Arch, CachyOS, Manjaro | `LowTide-‹version›-linux-x64.pacman` |
+
+Everything but the macOS disk image can update itself afterwards; **Updates**
+under [What's in it](#whats-in-it) says what each one does when a new release
+appears. A disk image dragged to Applications cannot, which is what Homebrew
+above is for.
 
 - **macOS** — open the `.dmg`, drag it to Applications.
 - **Windows** — run the `.exe`. It updates itself from then on: the app
