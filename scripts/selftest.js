@@ -378,10 +378,50 @@ app.whenReady().then(async () => {
     await wait(400);
     await toEnd();
     await writeOn(6);
+    await wait(500);                      // let the last scroll settle
     const depth = await caretDepth();
-    ok(`the caret rides the bottom of the window (at ${depth}%)`, depth > 90);
+    /* Filling the line rather than starting new ones settles it at 88%, and
+       pressing Return for each line at 97%; either way it is far below the
+       band the default keeps free, which settles at 78%. */
+    ok(`the caret rides the bottom of the window (at ${depth}%)`, depth > 85);
     await js(`window.__setPref('caretSnap', false)`);
     await wait(300);
+  });
+
+  await test('clicking beside a paragraph lands in that paragraph', async () => {
+    const LONG = Array.from({ length: 300 }, (_, i) =>
+      `Line ${i + 1} of a manuscript long enough that the top of it is far away.`).join('\n\n');
+    await load(LONG);
+    await wait(700);
+
+    const box = await js(`(() => {
+      const s = document.querySelector('.cm-scroller').getBoundingClientRect();
+      const c = document.querySelector('.cm-content').getBoundingClientRect();
+      const line = document.querySelector('.cm-line').getBoundingClientRect();
+      return { sLeft: Math.round(s.left), sRight: Math.round(s.right),
+               cLeft: Math.round(c.left), cRight: Math.round(c.right),
+               top: Math.round(s.top), h: Math.round(s.height), col: Math.round(line.width) }; })()`);
+    ok('the writing column keeps its width', Math.abs(box.col - 650) < 2);
+    ok('and the text element fills the scroller, leaving no dead margin',
+      box.cLeft - box.sLeft < 2 && box.sRight - box.cRight < 20);
+
+    // Read a long way down, then click in the space beside the words.
+    await js(`document.querySelector('.cm-scroller').scrollTop = 9000; window.__lowTideView.focus();`);
+    await wait(700);
+    const y = box.top + Math.round(box.h / 2);
+    const before = await js(`Math.round(document.querySelector('.cm-scroller').scrollTop)`);
+    wc.sendInputEvent({ type: 'mouseDown', x: box.cLeft + 20, y, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: box.cLeft + 20, y, button: 'left', clickCount: 1 });
+    await wait(700);
+
+    const head = await js(`window.__lowTideView.state.selection.main.head`);
+    ok(`the caret is on a line in view, not at the start of the manuscript (${head})`, head > 1000);
+    const near = await js(`(() => {
+      const v = window.__lowTideView, s = document.querySelector('.cm-scroller');
+      const c = v.coordsAtPos(v.state.selection.main.head), r = s.getBoundingClientRect();
+      return c && c.top > r.top - 40 && c.bottom < r.bottom + 40; })()`);
+    ok('and it is where the click was, not off the screen', near);
+    eq('the page has not moved', await js(`Math.round(document.querySelector('.cm-scroller').scrollTop)`), before);
   });
 
   group = 'Typewriter scrolling';

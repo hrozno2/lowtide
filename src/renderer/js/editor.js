@@ -152,6 +152,20 @@ export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs })
     ]
   });
 
+  /* A press on the scrollbar — or on any sliver of the scroller that is not
+     over the text — was read as a click at the very start of the manuscript:
+     the caret left the page being read and the view followed it there. Out
+     there the press is not the editor's. Capture, so this is decided before
+     the editor's own handler, and only propagation is stopped: the scrollbar
+     must still behave like a scrollbar. */
+  view.scrollDOM.addEventListener('mousedown', (event) => {
+    const box = view.contentDOM.getBoundingClientRect();
+    if (event.clientX < box.left || event.clientX > box.right ||
+        event.clientY < box.top || event.clientY > box.bottom) {
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
   return {
     view,
     setTypewriter(on) { typewriterOn = on; if (on) centerCursor(view); },

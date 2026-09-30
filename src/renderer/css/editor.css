@@ -5,17 +5,23 @@
 .cm-editor.cm-focused { outline: none !important; }
 
 .cm-editor .cm-scroller {
-  justify-content: center;          /* centres the writing column */
   overflow-y: auto;
   font-family: var(--doc-font);
   font-size: var(--doc-size);
   line-height: var(--doc-lh);
 }
 
+/* The writing column is centred by padding rather than by narrowing the
+   element: a narrower element leaves margins inside the scroller that belong
+   to no line, and a click in one of them — most of the window on a wide
+   screen — put the caret at the very start of the manuscript and threw the
+   view back to the top. Padded like this, every point in the scroller is on
+   a line, and a click beside a paragraph lands in that paragraph. */
 .cm-editor .cm-content {
   width: 100%;
-  max-width: var(--doc-width);
-  padding: 46px 26px 24vh;
+  max-width: none;
+  padding: 46px max(26px, calc((100% - var(--doc-width)) / 2)) 24vh;
+  box-sizing: border-box;
   caret-color: transparent;   /* the drawn .cm-cursor is the only caret */
   color: var(--text);
   font-family: var(--doc-font);
