@@ -2302,7 +2302,7 @@ function showUpdateBar(info) {
   button.disabled = false;
 
   if (info.homebrew) {
-    text.append(document.createTextNode(' Installed via Homebrew — updating needs your password.'));
+    text.append(document.createTextNode(' Installed with Homebrew, which can update it here.'));
     button.textContent = 'Update & Restart';
     button.onclick = wirePrivilegedInstall(button, () => api.update.installHomebrew());
   } else if (info.pacman) {

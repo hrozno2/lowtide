@@ -257,24 +257,46 @@ async function installPacman(pkg, onProgress) {
  * the Linux path: a real, visible gate in front of anything that changes
  * the app on its own, rather than a click that just does it.
  */
-/* Opens Terminal and runs the upgrade there, in plain sight, as the user.
-   Not with administrator privileges: Homebrew refuses to run as root, so an
-   elevated `brew upgrade` fails every time — which is what this did before.
-   The --cask is needed too; Low Tide is a cask, not a formula.
+/* Runs the upgrade here, so the button in the app is the whole of it.
+ *
+ * Homebrew needs no elevation to replace a cask in /Applications and it
+ * refuses to run as root anyway, so this is an ordinary child process. Its
+ * input is closed: if it ever does want an answer — a password, a
+ * confirmation — it fails at once instead of hanging on a prompt nobody can
+ * see, and the whole command is handed to Terminal where it can be answered.
+ *
+ * --cask because Low Tide is one, and --no-quarantine because these builds
+ * are unsigned: an unsigned app carrying macOS's quarantine flag is refused
+ * as damaged, and this is the permission a person would otherwise give by
+ * right-clicking the app and choosing Open.
+ */
+const BREW_ARGS = ['upgrade', '--cask', '--no-quarantine', 'lowtide'];
 
-   And --no-quarantine: these builds are not signed by a paid developer
-   account, and an unsigned app that arrives carrying macOS's quarantine flag
-   is refused outright as damaged. The flag is what the person would have to
-   pass by hand, so the upgrade passes it for them. */
-async function installHomebrew() {
-  const brew = findBrew();
-  if (!brew) throw new Error('Homebrew was not found');
-  const cmd = `${brew} upgrade --cask --no-quarantine lowtide`;
+function inTerminal(cmd) {
   const script = `tell application "Terminal"
     activate
     do script ${JSON.stringify(cmd)}
   end tell`;
-  await run('osascript', ['-e', script]);
+  return run('osascript', ['-e', script]);
+}
+
+async function installHomebrew() {
+  const brew = findBrew();
+  if (!brew) throw new Error('Homebrew was not found');
+  try {
+    await new Promise((resolve, reject) => {
+      execFile(brew, BREW_ARGS, {
+        timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe']
+      }, (err, stdout, stderr) => {
+        if (err) reject(new Error((stderr || err.message || '').trim() || 'brew upgrade failed'));
+        else resolve(stdout);
+      });
+    });
+  } catch (err) {
+    await inTerminal(`${brew} ${BREW_ARGS.join(' ')}`).catch(() => {});
+    throw new Error(`Homebrew wanted a hand, so it is running in Terminal — ${err.message}`);
+  }
 }
 
 module.exports = {
