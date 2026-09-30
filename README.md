@@ -21,6 +21,22 @@ No database, no lock-in, readable in any other editor.
 
 ## Install
 
+### With Homebrew, on macOS
+
+The tap is this repository, so there is one to add and then the usual two
+commands. Updating never means downloading a disk image and dragging it over
+the old copy again.
+
+```bash
+brew tap hrozno2/lowtide https://github.com/hrozno2/lowtide
+brew install --cask lowtide
+brew upgrade --cask lowtide      # whenever there is a new one
+```
+
+Low Tide offers this itself: when it finds a newer release and sees it was
+installed by Homebrew, the update notice opens Terminal and runs the upgrade
+there, in plain sight, rather than doing anything behind your back.
+
 ### Download
 
 Take the file for your machine from
@@ -35,8 +51,11 @@ Take the file for your machine from
 | Arch, CachyOS, Manjaro | `LowTide-‹version›-linux-x64.pacman` |
 
 - **macOS** — open the `.dmg`, drag it to Applications.
-- **Windows** — run the `.exe`.
-- **AppImage** — `chmod +x` it and run it. Nothing to install.
+- **Windows** — run the `.exe`. It updates itself from then on: the app
+  fetches the new installer and runs it, and nothing has to be downloaded by
+  hand.
+- **AppImage** — `chmod +x` it and run it. Nothing to install, and it replaces
+  itself when a new release appears.
 - **Arch** — `sudo pacman -U LowTide-‹version›-linux-x64.pacman`
 
 The builds are not notarised, so the first launch needs a nudge: on macOS
@@ -211,7 +230,7 @@ The taskbar/dock icon follows along too, its mark recoloured to match.
 | `[[a note to self]]` | Note — never printed, never counted |
 | `/* … */` | Comment — hidden from the manuscript |
 | `===` | Page break |
-| `***` or `---` | Scene break |
+| `***` or `---` | Scene break — drawn as a rule while you write |
 | `> centered <` | Centered line |
 | `- item` | Bulleted list |
 
