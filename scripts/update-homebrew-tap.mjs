@@ -47,8 +47,7 @@ cask "lowtide" do
   sha256 arm:   "${arm}",
          intel: "${intel}"
 
-  url "https://github.com/${REPO}/releases/download/v#{version}/LowTide-#{version}-mac-#{arch}.dmg",
-      verified: "github.com/${REPO}/"
+  url "https://github.com/${REPO}/releases/download/v#{version}/LowTide-#{version}-mac-#{arch}.dmg"
   name "Low Tide"
   desc "Writing app for novels and screenplays"
   homepage "https://github.com/${REPO}"

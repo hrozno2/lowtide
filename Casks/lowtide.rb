@@ -2,12 +2,11 @@
 cask "lowtide" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.0.28"
-  sha256 arm:   "588700a4b08e0e9126236d403f39617ab07e2bd7baa44521a43fe03ce45f79f7",
-         intel: "7ba4b69f01d69537ca4018afe78c73ead8147b67ecf84e19efe35341167c4625"
+  version "1.0.29"
+  sha256 arm:   "53cba360aebe7226e8d204454777a2ec2fa176ddbf11dfbaae6fd3661de9835e",
+         intel: "1f4a076f9978b4903badadbd52d6be75c76a41ff6927d71ae59d26b97fcd3f10"
 
-  url "https://github.com/hrozno2/lowtide/releases/download/v#{version}/LowTide-#{version}-mac-#{arch}.dmg",
-      verified: "github.com/hrozno2/lowtide/"
+  url "https://github.com/hrozno2/lowtide/releases/download/v#{version}/LowTide-#{version}-mac-#{arch}.dmg"
   name "Low Tide"
   desc "Writing app for novels and screenplays"
   homepage "https://github.com/hrozno2/lowtide"
