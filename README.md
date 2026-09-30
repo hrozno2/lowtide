@@ -30,16 +30,19 @@ the old copy again.
 ```bash
 brew tap hrozno2/lowtide https://github.com/hrozno2/lowtide
 brew trust hrozno2/lowtide
-brew install --cask --no-quarantine lowtide
-brew upgrade --cask --no-quarantine lowtide    # whenever there is a new one
+brew install --cask lowtide
+brew upgrade --cask lowtide      # whenever there is a new one
 ```
 
 `brew trust` is Homebrew asking whether you mean to run code from a tap that
-is not its own. `--no-quarantine` is needed because these builds are not
-signed by a paid Apple developer account: an unsigned app that arrives
-carrying macOS's quarantine flag is refused as damaged, and this is the same
-permission you would otherwise give by right-clicking the app and choosing
-Open.
+is not its own; it is asked once.
+
+On Homebrew 6 and older, add `--no-quarantine` to those last two. These builds
+are not signed by a paid Apple developer account, and an unsigned app that
+arrives carrying macOS's quarantine flag is refused as damaged. Homebrew 7
+stopped quarantining casks and removed the flag, so passing it there is an
+error instead — which is why the app tries it and drops it if this Homebrew
+has never heard of it.
 
 Low Tide offers this itself: when it finds a newer release and sees it was
 installed by Homebrew, the update notice opens Terminal and runs the upgrade
@@ -215,7 +218,7 @@ was installed, and none of it happens without a click:
 
 | Installed as | The notice offers |
 | --- | --- |
-| Homebrew cask (macOS) | `brew upgrade --cask --no-quarantine lowtide`, run in Terminal where you can see it — see [Install](#with-homebrew-on-macos) |
+| Homebrew cask (macOS) | running `brew upgrade --cask lowtide` itself, then restarting — see [Install](#with-homebrew-on-macos) |
 | Windows installer | fetching the new installer and running it |
 | AppImage (Linux) | replacing the AppImage in place |
 | pacman package (Arch) | `pacman -U` on the new package, behind the system's password prompt |

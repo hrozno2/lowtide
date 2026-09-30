@@ -265,12 +265,13 @@ async function installPacman(pkg, onProgress) {
  * confirmation — it fails at once instead of hanging on a prompt nobody can
  * see, and the whole command is handed to Terminal where it can be answered.
  *
- * --cask because Low Tide is one, and --no-quarantine because these builds
- * are unsigned: an unsigned app carrying macOS's quarantine flag is refused
- * as damaged, and this is the permission a person would otherwise give by
- * right-clicking the app and choosing Open.
+ * About --no-quarantine: Homebrew used to mark what it downloaded with
+ * macOS's quarantine flag, which an unsigned app like this one cannot
+ * survive — it is refused as damaged. Homebrew 7 stopped quarantining casks
+ * and removed the flag, so passing it there is an error. It is tried first
+ * and dropped if this Homebrew has never heard of it, which covers both.
  */
-const BREW_ARGS = ['upgrade', '--cask', '--no-quarantine', 'lowtide'];
+const BREW_ARGS = ['upgrade', '--cask', 'lowtide'];
 
 function inTerminal(cmd) {
   const script = `tell application "Terminal"
@@ -280,21 +281,38 @@ function inTerminal(cmd) {
   return run('osascript', ['-e', script]);
 }
 
+function brewRun(brew, args) {
+  return new Promise((resolve, reject) => {
+    execFile(brew, args, {
+      timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || err.message || '').trim() || 'brew upgrade failed'));
+      else resolve(stdout);
+    });
+  });
+}
+
 async function installHomebrew() {
   const brew = findBrew();
   if (!brew) throw new Error('Homebrew was not found');
+  const withFlag = ['upgrade', '--cask', '--no-quarantine', 'lowtide'];
+  let args = withFlag;
   try {
-    await new Promise((resolve, reject) => {
-      execFile(brew, BREW_ARGS, {
-        timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024,
-        stdio: ['ignore', 'pipe', 'pipe']
-      }, (err, stdout, stderr) => {
-        if (err) reject(new Error((stderr || err.message || '').trim() || 'brew upgrade failed'));
-        else resolve(stdout);
-      });
-    });
+    await brewRun(brew, args);
+    return;
   } catch (err) {
-    await inTerminal(`${brew} ${BREW_ARGS.join(' ')}`).catch(() => {});
+    if (/invalid option|unknown option|--no-quarantine/i.test(err.message)) {
+      args = BREW_ARGS;                     // a Homebrew that no longer quarantines
+      try {
+        await brewRun(brew, args);
+        return;
+      } catch (second) {
+        await inTerminal(`${brew} ${args.join(' ')}`).catch(() => {});
+        throw new Error(`Homebrew wanted a hand, so it is running in Terminal — ${second.message}`);
+      }
+    }
+    await inTerminal(`${brew} ${args.join(' ')}`).catch(() => {});
     throw new Error(`Homebrew wanted a hand, so it is running in Terminal — ${err.message}`);
   }
 }
