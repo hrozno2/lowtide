@@ -105,24 +105,23 @@ body.focus-mode .cm-editor .cm-line.page-start::after { opacity: .35; }
 .cm-editor .l-hang-5 { padding-left: 5ch; text-indent: -5ch; }
 .cm-editor .l-hang-6 { padding-left: 6ch; text-indent: -6ch; }
 
+/* --- and === both draw a rule across the column with the marks sitting on
+   it, so a place where the text parts looks like one while you write. */
+.cm-editor .l-pagebreak,
 .cm-editor .l-divider {
-  text-align: center;
-  color: var(--text-4);
-  letter-spacing: .55em;
-  padding: .6em 0;
-}
-
-/* --- and === draw a rule across the column with the marks sitting on it. */
-.cm-editor .l-pagebreak {
   text-align: center;
   position: relative;
   padding: .95em 0;
 }
-.cm-editor .l-pagebreak::before {
+.cm-editor .l-pagebreak::before,
+.cm-editor .l-divider::before {
   content: '';
   position: absolute; left: 0; right: 0; top: 50%;
   border-top: 1px solid var(--outline);
 }
+/* A scene break parts paragraphs and a page break parts pages: the lighter
+   rule is the smaller interruption. */
+.cm-editor .l-divider::before { border-top-color: var(--outline-soft); }
 .cm-editor .m-rule {
   position: relative;
   background: var(--bg);

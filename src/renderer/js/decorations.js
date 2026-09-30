@@ -146,7 +146,7 @@ class MarkupHighlighter {
           deco.push(Decoration.mark({ class: 'm-marker' })
             .range(line.from, line.from + info.markerTo));
         }
-        if (info.type === LINE.pagebreak && text.trim().length) {
+        if ((info.type === LINE.pagebreak || info.type === LINE.divider) && text.trim().length) {
           const a = text.length - text.trimStart().length;
           const b = text.trimEnd().length;
           deco.push(Decoration.mark({ class: 'm-rule' }).range(line.from + a, line.from + b));

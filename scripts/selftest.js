@@ -321,6 +321,30 @@ app.whenReady().then(async () => {
   });
 
   /* ================================================== smart punctuation == */
+  await test('a scene break and a page break are drawn as rules', async () => {
+    await load('Before.\n\n---\n\nBetween.\n\n===\n\nAfter.\n\n***\n\nThe end.');
+    await wait(700);
+    const marks = await js(`(() => {
+      const out = [];
+      for (const line of document.querySelectorAll('.cm-line')) {
+        const text = line.textContent.trim();
+        if (!/^[-=*]{3,}$/.test(text)) continue;
+        const rule = getComputedStyle(line, '::before');
+        out.push({ text, cls: line.className.replace('cm-line ', '').trim(),
+                   drawn: rule.content !== 'none' && parseFloat(rule.borderTopWidth) > 0,
+                   colour: rule.borderTopColor,
+                   onRule: !!line.querySelector('.m-rule') });
+      }
+      return out; })()`);
+    eq('all three marks are found', marks.map((m) => m.text), ['---', '===', '***']);
+    ok('each draws a rule across the column', marks.every((m) => m.drawn));
+    ok('with the marks sitting on it', marks.every((m) => m.onRule));
+    eq('three dashes are a scene break', marks[0].cls, 'l-divider');
+    eq('three asterisks are the same thing', marks[2].cls, 'l-divider');
+    eq('three equals is a page break', marks[1].cls, 'l-pagebreak');
+    ok('and the page break is the heavier rule of the two', marks[1].colour !== marks[0].colour);
+  });
+
   group = 'Smart punctuation';
 
   await test('quotes, dash and ellipsis', async () => {
