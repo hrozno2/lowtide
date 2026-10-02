@@ -138,6 +138,25 @@ export function createEditor({ parent, doc, onChange, onCursor, onSave, prefs })
         autocapitalize: 'sentences',
         autocorrect: 'off'
       })),
+      /* A press in the empty space under the last line means the end of the
+         text — that is what every editor does with it. Left to itself the
+         press landed nowhere in particular and the view went back to wherever
+         the caret had been, which on a long manuscript is a long way off. */
+      EditorView.domEventHandlers({
+        mousedown(event, view) {
+          if (event.button !== 0 || event.detail > 1) return false;
+          const end = view.state.doc.length;
+          const last = view.coordsAtPos(end);
+          if (!last || event.clientY <= last.bottom) return false;
+          view.dispatch({
+            selection: { anchor: end },
+            userEvent: 'select.pointer',
+            scrollIntoView: true
+          });
+          view.focus();
+          return true;                 // handled: nothing else should guess
+        }
+      }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) onChange(update);
         if (update.selectionSet || update.docChanged) onCursor(update);

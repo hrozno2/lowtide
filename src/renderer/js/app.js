@@ -2409,6 +2409,7 @@ function wireChrome() {
   });
   $('goal-face').onclick = () => { if (!state.goal) ui.showGoal(ctx()); };
   $('goal-all').onclick = () => ui.showRecord(ctx());
+  $('save-state').onclick = () => ui.showWhere(ctx());
   $('goal-action').onclick = () => finishGoal();
 
   $('scrim').onclick = () => ui.closePanel();
@@ -2461,6 +2462,9 @@ function ctx() {
     goalHistory: () => state.goalHistory || [],
     sprintHistory: () => state.sprintHistory || [],
     documentTitle: () => state.title || 'Untitled',
+    path: state.path,
+    revealPath: (p) => api.file.reveal(p),
+    copyPath: (p) => { navigator.clipboard.writeText(p).catch(() => {}); ui.toast('Path copied'); },
     saveRecordPdf: async (html) => {
       const file = await api.file.export({
         format: 'pdf', html, content: '',

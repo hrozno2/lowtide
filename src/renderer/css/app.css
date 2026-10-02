@@ -1097,6 +1097,21 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .record-row:hover .record-forget, .record-forget:focus-visible { opacity: 1; }
 .record-forget:hover { background: var(--surface-3); color: var(--text); }
+/* The save state is a button now: it says where the document lives. */
+.sb-save {
+  background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.sb-save:hover { color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
+.where-body { min-width: 300px; max-width: 460px; }
+.where-name { font-size: 13.5px; color: var(--text); margin-bottom: 4px; }
+.where-path {
+  font: 12px var(--font-mono, ui-monospace, monospace); line-height: 1.5;
+  color: var(--text-3); word-break: break-all; user-select: text;
+}
+.where-acts { display: flex; gap: 8px; margin-top: 14px; }
+.where-acts .btn.primary { margin-left: auto; }
+
 .record-foot { display: flex; align-items: center; gap: 10px; }
 .record-foot .seg { flex: 0 0 auto; }
 .record-foot .btn.primary { margin-left: auto; }

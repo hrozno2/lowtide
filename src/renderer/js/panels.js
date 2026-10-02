@@ -57,6 +57,7 @@ const ANCHOR_BY_NAME = {
   theme: 'btn-theme',
   export: 'btn-export',
   goal: 'goal-face',
+  where: 'save-state',
   record: 'goal-all',
   revision: 'rev-new',
   'revision-menu': 'rev-new',
@@ -974,6 +975,34 @@ export function showRecord(ctx) {
   const shape = segmented([['table', 'Table'], ['grid', 'Grid']], layout, (v) => { layout = v; });
   openPanel('record', panelShell('Your record', body,
     h('div', { class: 'record-foot' }, shape, asPdf)));
+}
+
+/* Where the document is, for the times you cannot remember which copy you
+   have open. The path is selectable, since half the use of it is pasting it
+   somewhere else. */
+export function showWhere(ctx) {
+  const path = ctx.path;
+  if (!path) {
+    openPanel('where', panelShell('Not saved yet',
+      h('div', { class: 'where-body' },
+        h('div', { class: 'rev-empty' },
+          'This draft has never been saved, so it has no place on disk yet. It is kept in the app until it does.'))));
+    return;
+  }
+
+  const sep = path.includes('\\') ? '\\' : '/';
+  const name = path.slice(path.lastIndexOf(sep) + 1);
+  const folder = path.slice(0, path.lastIndexOf(sep)) || sep;
+
+  const body = h('div', { class: 'where-body' },
+    h('div', { class: 'where-name' }, name),
+    h('div', { class: 'where-path', title: path }, folder),
+    h('div', { class: 'where-acts' },
+      h('button', { class: 'btn', onclick: () => { ctx.copyPath(path); closePanel(); } }, 'Copy path'),
+      h('button', { class: 'btn primary', onclick: () => { ctx.revealPath(path); closePanel(); } },
+        ctx.platform === 'darwin' ? 'Show in Finder' : 'Show in folder')));
+
+  openPanel('where', panelShell('Where this is', body));
 }
 
 /* ------------------------------------------------------------------ sprint */

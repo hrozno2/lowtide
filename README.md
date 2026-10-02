@@ -205,6 +205,10 @@ and joins it to whatever that machine already knew — the same day recorded
 twice stays one day. Switch it off in Preferences if you would rather have
 nothing beside the file.
 
+**Where it lives.** The save state in the status bar is a button: it tells you
+the file this window is writing to, offers to copy the path, and opens the
+folder it is in.
+
 **Nothing gets lost.** Saves are atomic, so a crash cannot truncate your file.
 It saves as you write — silently, with nothing to dismiss — when you pause and
 at least every fifteen seconds while you keep going; both the switch and the
@@ -300,6 +304,18 @@ A `Key: Value` block at the top of the file (`Title:`, `Author:`,
   the current theme. Taking only the audio is against their terms, so it is not
   done; use local files if you want sound with nothing to look at. There is no
   Spotify tab — its web player needs DRM that Electron does not ship.
+
+## Known problems
+
+**The view can jump after a long scroll.** Scroll a long way down a long
+manuscript and then click, and the page may move somewhere else. The caret
+goes where you clicked — that part is right — but the editor re-anchors its
+viewport on the first update after the scroll, even though the document's
+height has not changed (measured: 46,300 pixels before the click and 46,286
+after, while the scroll position moved by 27,000). It is not caused by the
+theme, the markup, or the way the writing column is centred: a plain document
+with no headings or notes is worse, and reverting the column to how it was
+laid out before changes nothing. Not yet fixed.
 
 ## Development
 

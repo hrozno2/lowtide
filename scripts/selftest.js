@@ -473,6 +473,47 @@ app.whenReady().then(async () => {
     eq('the page has not moved', await js(`Math.round(document.querySelector('.cm-scroller').scrollTop)`), before);
   });
 
+  await test('clicking below the last line puts the caret at the end', async () => {
+    const LONG = Array.from({ length: 120 }, (_, i) =>
+      `Line ${i + 1} of a manuscript with a good deal of text in it.`).join('\n\n');
+    await load(LONG);
+    await wait(700);
+    /* The page at the end of the text and the caret far above it, which is
+       where this goes wrong. Reached by sending the caret to the end — which
+       scrolls there properly, unlike setting scrollTop on a document whose
+       height is still partly estimated — and then moving the caret back
+       without asking for a scroll. */
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: v.state.doc.length }, scrollIntoView: true }); v.focus(); return true; })()`);
+    await wait(700);
+    await js(`(() => { const v = window.__lowTideView;
+      v.dispatch({ selection: { anchor: Math.round(v.state.doc.length / 2) }, userEvent: 'select.pointer' });
+      return true; })()`);
+    await wait(500);
+
+    const where = await js(`(() => {
+      const s = document.querySelector('.cm-scroller').getBoundingClientRect();
+      const lines = [...document.querySelectorAll('.cm-line')];
+      const last = lines[lines.length - 1].getBoundingClientRect();
+      return { x: Math.round((s.left + s.right) / 2),
+               below: Math.round(Math.min(last.bottom + 60, s.bottom - 8)),
+               room: Math.round(s.bottom - last.bottom) }; })()`);
+    ok('there is empty space under the text to click in', where.room > 20);
+
+    wc.sendInputEvent({ type: 'mouseDown', x: where.x, y: where.below, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: where.x, y: where.below, button: 'left', clickCount: 1 });
+    await wait(900);
+
+    const head = await js(`window.__lowTideView.state.selection.main.head`);
+    const len = await js(`window.__lowTideView.state.doc.length`);
+    eq('the caret goes to the end of the text', head, len);
+    /* Where the view ends up afterwards is a separate matter: on a long
+       document the editor re-anchors its viewport on the first update after
+       a long scroll, which moves the page even though the document's height
+       has not changed. That is not asserted here because it is not yet
+       fixed — see the note in the README. */
+  });
+
   group = 'Typewriter scrolling';
 
   await test('the caret line is centred, but not while the mouse is selecting', async () => {
@@ -2058,6 +2099,37 @@ app.whenReady().then(async () => {
 
     await js(`window.__setHistory([], [])`);
     await wait(400);
+  });
+
+  await test('the save state says where the document is', async () => {
+    await load('A draft with no home yet.');
+    await wait(500);
+    await click('#save-state');
+    await wait(500);
+    eq('an unsaved draft says so',
+      await js(`document.querySelector('.panel .panel-head span').textContent`), 'Not saved yet');
+    await js(`document.querySelector('.panel .text-btn').click()`);
+    await wait(400);
+
+    const file = path.join(WORK, 'where-is-it.fountain');
+    fs.writeFileSync(file, 'Words.\n', 'utf8');
+    await load('Words.\n', file);
+    await wait(500);
+    await click('#save-state');
+    await wait(500);
+    const seen = await js(`(() => { const p = document.querySelector('.panel');
+      return { head: p.querySelector('.panel-head span').textContent,
+               name: p.querySelector('.where-name').textContent,
+               folder: p.querySelector('.where-path').textContent,
+               acts: [...p.querySelectorAll('.where-acts .btn')].map(b => b.textContent) }; })()`);
+    eq('a saved one names the file', seen.name, 'where-is-it.fountain');
+    eq('and the folder it is in', seen.folder, WORK);
+    ok('with a way to copy it and a way to open the folder',
+      seen.acts.length === 2 && /Copy/.test(seen.acts[0]));
+    ok('the path can be selected to paste elsewhere',
+      await js(`getComputedStyle(document.querySelector('.where-path')).userSelect`) === 'text');
+    await js(`document.querySelector('.panel .text-btn').click()`);
+    await wait(300);
   });
 
   group = 'Scratchpad';
