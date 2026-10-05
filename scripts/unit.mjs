@@ -257,6 +257,64 @@ eq('nonsense is treated as equal', U.compareVersions('not-a-version', '1.0.0'), 
 eq('the repository is found', U.repoSlug({ repository: { url: 'https://github.com/hrozno2/lowtide.git' } }), 'hrozno2/lowtide');
 eq('a missing repository is null', U.repoSlug({}), null);
 
+/* ------------------------------------------------------------- darlings */
+
+/* A darling goes home by the words around it. These are the ways a
+   manuscript changes under one between the cut and putting it back. */
+{
+  const NOVEL = [
+    '# One',
+    '',
+    'The lamp had been burning for ninety-one years. She counted the steps because her father had counted them. At the top the light turned in its slow circle.',
+    '',
+    '# Two',
+    '',
+    'Nobody had thought to give it a name, and the number was a kind of prayer.'
+  ].join('\n');
+
+  // the middle sentence of the first paragraph
+  const from = NOVEL.indexOf('She counted');
+  const to = NOVEL.indexOf('At the top');
+  const d = M.cutFrom(NOVEL, from, to, { now: 1700000000000 });
+
+  eq('a darling knows its chapter', d.chapter, 'One');
+  eq('and counts its own words', d.words, 10);
+  ok('it keeps the words before the cut', NOVEL.slice(0, from).endsWith(d.before));
+  ok('and the words after', NOVEL.slice(to).startsWith(d.after));
+
+  const cut = NOVEL.slice(0, from) + NOVEL.slice(to);
+  const home = M.homeFor(cut, d);
+  eq('it goes straight home in text nobody touched', home.at, from);
+  ok('and is sure of it', home.sure);
+  eq('putting it back gives the manuscript it came from',
+     cut.slice(0, home.at) + M.restoreText(cut, home.at, d.text) + cut.slice(home.at), NOVEL);
+
+  // a line added above moves every offset and must not matter
+  const added = '# Nought\n\nA new first chapter entirely.\n\n';
+  const above = added + cut;
+  eq('an edit above it does not lose it', M.homeFor(above, d).at, from + added.length);
+
+  // the words right at the seam rewritten: the far side still finds it
+  const reworded = cut.replace('had been burning for ninety-one years.', 'had burned for ninety-one years.');
+  const near = M.homeFor(reworded, d);
+  ok('a rewrite at the seam still finds a place', near.at !== -1);
+  ok('but does not claim to be sure', !near.sure);
+
+  // the paragraph gone altogether
+  const gone = NOVEL.slice(0, NOVEL.indexOf('The lamp')) + NOVEL.slice(NOVEL.indexOf('# Two'));
+  eq('a paragraph that is gone has no home', M.homeFor(gone, d).at, -1);
+
+  // a darling cut from the very start of a document has no text before it
+  const d2 = M.cutFrom('Only this.', 0, 5);
+  eq('a cut at the start keeps nothing before', d2.before, '');
+  eq('and still goes home', M.homeFor('this.', d2).at, 0);
+
+  // restoring must not run two words together
+  eq('a space is added where words would collide', M.restoreText('ab', 1, 'X'), ' X ');
+  eq('and not where there is already space', M.restoreText('a b', 2, 'X'), 'X ');
+  eq('nor at the very end', M.restoreText('a ', 2, 'X'), 'X');
+}
+
 /* ------------------------------------------------- the first-paint palette */
 
 /* theme.css paints before any script runs, so its :root has to hold exactly

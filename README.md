@@ -155,7 +155,22 @@ stripped out, which leaves the search box and the player. Closing the pane
 hides it rather than stopping it, so whatever is playing keeps playing.
 YouTube can be switched off entirely.
 
-**Scratchpad.** Notes about the document, kept with it, never printed or counted.
+**Tabs.** Along the bottom: **Manuscript**, **Notes**, **Darlings**. They
+cover the writing area rather than replacing it, so coming back to the
+manuscript finds the caret and the scroll exactly where you left them.
+
+**Scratchpad and Notes.** Notes about the document, kept with it, never
+printed or counted. The strip in the sidebar is for a line while you are
+writing; the Notes tab is the same notes with the whole page to say it in.
+
+**Darlings.** "Murder your darlings" is advice about the sentence you love
+that is doing the chapter no good, and the hard part was never spotting it.
+Select a passage and press ⇧⌘X: it leaves the manuscript — out of the word
+count, out of the page count, out of the file — and is kept whole on the
+Darlings tab. Put it back and it returns to where it was cut from, found by
+the words that surrounded it rather than by a position, so it still knows its
+place after you have rewritten the chapters above it. If that place is
+genuinely gone, it says so and puts it at the caret instead.
 
 **Revisions.** Name and colour a revision; everything you type while it is
 selected is marked in that colour, and the marks follow the text through later
@@ -204,7 +219,7 @@ how much of it was words. Strike an entry out with the × beside it, or keep
 the lot as a PDF, as a table or as a grid of cards.
 
 **It travels with the manuscript.** Beside every saved document is a
-`.lowtide` companion holding its outline, scratchpad, revisions, the caret's
+`.lowtide` companion holding its outline, scratchpad, darlings, revisions, the caret's
 last position, and the goal and sprint history it was written under. Whatever syncs your manuscript syncs
 that with it, so opening the file on another machine brings its history along
 and joins it to whatever that machine already knew — the same day recorded

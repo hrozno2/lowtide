@@ -8,6 +8,7 @@ import { paginate, geometryFor } from './pagination.js';
 import { showPageMarks } from './pagemarks.js';
 import { OUTLINE_TEMPLATES, templateById } from './outlines.js';
 import { countWords, stripMarkup } from './markup.js';
+import { cutFrom, homeFor, restoreText } from './darlings.js';
 import * as ui from './panels.js';
 import { showAppMenu, renderMenuBar, forgetMenu, closeMenu } from './appmenu.js';
 import { THEMES, swatches, applyTheme } from './themes.js';
@@ -36,6 +37,8 @@ const state = {
   pages: [],
   pageCount: 0,
   pagePresets: [],
+  darlings: [],
+  docTab: 'manuscript',
   lastPages: 0,
   scratch: '',
   revisions: [],
@@ -449,6 +452,7 @@ const saveExtras = debounce(() => {
     outline: state.outline_text,
     revisions: state.revisions,
     activeRevision: state.activeRevision,
+    darlings: state.darlings,
     marks: serialiseMarks(view.state)
   });
 }, 700);
@@ -469,25 +473,193 @@ async function loadExtras(path) {
   if (state.dockMode === 'outline') renderOutlineDock();
   state.revisions = Array.isArray(extras.revisions) ? extras.revisions : [];
   state.activeRevision = extras.activeRevision || null;
+  state.darlings = Array.isArray(extras.darlings) ? extras.darlings : [];
 
   $('scratchpad').value = state.scratch;
+  $('notes-pad').value = state.scratch;
+  renderDarlings();
   applyRevisions(view, { list: state.revisions, active: state.activeRevision });
   restoreMarks(view, extras.marks || []);
   renderRevisions();
   renderGoal();
 }
 
+/* --------------------------------------------------------------- darlings */
+
+/* "Murder your darlings" is advice about the sentence you love that is doing
+   the chapter no good, and the hard part was never spotting it. So a darling
+   really leaves the manuscript — out of the word count, out of the page count,
+   out of the file — and is kept beside it in the companion, which means it
+   travels with the document to another machine like everything else.
+   darlings.js knows how one finds its way home. */
+
+function setDocTab(name) {
+  state.docTab = name;
+  document.querySelectorAll('.sb-tab').forEach((b) => {
+    const on = b.dataset.doctab === name;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  $('notes-host').hidden = name !== 'notes';
+  $('darlings-host').hidden = name !== 'darlings';
+  if (name === 'darlings') renderDarlings();
+  if (name === 'notes') $('notes-pad').focus();
+  /* The editor is never unmounted, only covered, so coming back to the
+     manuscript finds the caret and the scroll exactly where they were. */
+  if (name === 'manuscript') view.focus();
+}
+
+function sendToDarlings() {
+  const sel = view.state.selection.main;
+  if (sel.empty) {
+    ui.toast('Select the passage first — ⇧⌘X sends it to Darlings');
+    return;
+  }
+  const text = view.state.doc.toString();
+  const darling = cutFrom(text, sel.from, sel.to);
+  if (!darling.text.trim()) return;
+
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert: '' },
+    selection: { anchor: sel.from },
+    userEvent: 'delete.darling'
+  });
+  state.darlings.unshift(darling);
+  saveExtras();
+  renderDarlings();
+  ui.toast(`Kept — ${darling.words} word${darling.words === 1 ? '' : 's'} out of the manuscript`);
+  view.focus();
+}
+
+function restoreDarling(id) {
+  const darling = state.darlings.find((d) => d.id === id);
+  if (!darling) return;
+  const text = view.state.doc.toString();
+  const home = homeFor(text, darling);
+
+  /* Undoing the cut puts the passage back without telling us, and putting it
+     back again would leave two of it. Looked for where this darling belongs,
+     not anywhere in the document: a darling of two or three common words is
+     somewhere in every manuscript, and would otherwise never come back. */
+  const body = darling.text.trim();
+  if (home.at !== -1 && text.slice(home.at, home.at + darling.text.length + 2).trimStart().startsWith(body)) {
+    forgetDarling(id);
+    ui.toast('That one is already back in the manuscript');
+    return;
+  }
+
+  const at = home.at === -1 ? view.state.selection.main.head : home.at;
+  const insert = restoreText(text, at, darling.text);
+
+  /* Selected where it landed, and scrolled to, so you can see what came back
+     and undo it with one keystroke if it was the wrong one. */
+  view.dispatch({
+    changes: { from: at, to: at, insert },
+    selection: { anchor: at, head: at + insert.length },
+    scrollIntoView: true,
+    userEvent: 'input.darling'
+  });
+  state.darlings = state.darlings.filter((d) => d.id !== id);
+  saveExtras();
+  renderDarlings();
+  setDocTab('manuscript');
+  ui.toast(home.at === -1 ? 'Its place was gone — put back at the caret'
+         : home.sure ? 'Back where it came from'
+         : 'Back near where it came from — the words around it had changed');
+}
+
+function forgetDarling(id) {
+  state.darlings = state.darlings.filter((d) => d.id !== id);
+  saveExtras();
+  renderDarlings();
+}
+
+function renderDarlings() {
+  const badge = $('darlings-count');
+  badge.textContent = state.darlings.length;
+  badge.hidden = !state.darlings.length;
+
+  const host = $('darlings-list');
+  if (!host || $('darlings-host').hidden) return;
+  host.textContent = '';
+
+  if (!state.darlings.length) {
+    const empty = document.createElement('div');
+    empty.className = 'darlings-empty';
+    empty.innerHTML = 'Nothing murdered yet.<br>Select a passage that is doing the chapter no good ' +
+      'and press ⇧⌘X. It leaves the manuscript — and every count of it — but it is never lost.';
+    host.append(empty);
+    return;
+  }
+
+  const text = view.state.doc.toString();
+  for (const darling of state.darlings) {
+    const home = homeFor(text, darling);
+    const card = document.createElement('div');
+    card.className = 'darling';
+
+    const body = document.createElement('p');
+    body.className = 'darling-text';
+    body.textContent = darling.text.trim();
+    card.append(body);
+
+    const foot = document.createElement('div');
+    foot.className = 'darling-foot';
+    const where = document.createElement('span');
+    where.className = 'darling-where' + (home.at === -1 ? ' darling-lost' : '');
+    const when = new Date(darling.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    where.textContent = home.at === -1
+      ? `${darling.words} words · its place in the text is gone`
+      : `${darling.words} words · ${darling.chapter ? darling.chapter + ' · ' : ''}${when}`;
+    foot.append(where);
+
+    const put = document.createElement('button');
+    put.className = 'text-btn';
+    put.textContent = home.at === -1 ? 'Put at caret' : 'Put back';
+    put.onclick = () => restoreDarling(darling.id);
+    foot.append(put);
+
+    const copy = document.createElement('button');
+    copy.className = 'text-btn';
+    copy.textContent = 'Copy';
+    copy.onclick = () => { navigator.clipboard.writeText(darling.text.trim()); ui.toast('Copied'); };
+    foot.append(copy);
+
+    const forget = document.createElement('button');
+    forget.className = 'text-btn';
+    forget.textContent = 'Forget';
+    forget.onclick = () => forgetDarling(darling.id);
+    foot.append(forget);
+
+    card.append(foot);
+    host.append(card);
+  }
+}
+
 /* ---------------------------------------------------------------- scratch */
 
 function wireScratchpad() {
   const pad = $('scratchpad');
+  const sheet = $('notes-pad');
   const state$ = $('scratch-state');
-  pad.addEventListener('input', () => {
-    state.scratch = pad.value;
+
+  /* One set of notes, two places to write them: the strip in the sidebar for
+     a line while you are writing, the Notes tab when there is more to say. */
+  const changed = (from, to) => {
+    state.scratch = from.value;
+    to.value = from.value;
     state$.textContent = state.path ? 'saving' : 'unsaved doc';
     saveExtras();
     clearTimeout(wireScratchpad.t);
     wireScratchpad.t = setTimeout(() => { state$.textContent = ''; }, 1200);
+  };
+  pad.addEventListener('input', () => changed(pad, sheet));
+  sheet.addEventListener('input', () => changed(sheet, pad));
+}
+
+function wireDocTabs() {
+  document.querySelectorAll('.sb-tab').forEach((b) => {
+    b.onclick = () => setDocTab(b.dataset.doctab);
   });
 }
 
@@ -2422,6 +2594,7 @@ function wireChrome() {
   $('pv-notes').onchange = (e) => { setPrefs({ previewNotes: e.target.checked }); renderPreview(true); };
 
   wireScratchpad();
+  wireDocTabs();
 
   $('rev-new').onclick = () => ui.showNewRevision(ctx());
   $('rev-show').onchange = (e) =>
@@ -2516,6 +2689,8 @@ function ctx() {
       focus: () => setPrefs({ focusMode: !state.prefs.focusMode }),
       music: () => toggleMusicPanel(),
       home: () => api.home.show(),
+      darlings: () => setDocTab('darlings'),
+      notes: () => setDocTab('notes'),
       updates: () => checkForUpdate({ force: true }),
       history: () => showBackups()
     },
@@ -2629,6 +2804,9 @@ function wireMenu() {
     'view:music': () => toggleMusicPanel(),
     'file:title-page': () => ui.showTitlePage(ctx()),
     'tools:scratch': () => setSidebarTab('scratch'),
+    'tools:darling': () => sendToDarlings(),
+    'view:darlings': () => setDocTab(state.docTab === 'darlings' ? 'manuscript' : 'darlings'),
+    'view:notes': () => setDocTab(state.docTab === 'notes' ? 'manuscript' : 'notes'),
     'tools:revision': () => { setSidebarTab('revisions'); ui.showNewRevision(ctx()); },
 
     'help:updates': () => checkForUpdate({ force: true }),

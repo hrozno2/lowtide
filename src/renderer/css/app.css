@@ -885,6 +885,81 @@ input[type="range"]::-webkit-slider-thumb {
   pointer-events: none;
 }
 
+/* ------------------------------------------------- tabs and their sheets */
+
+/* Manuscript, Notes and Darlings. They sit in the status bar because that is
+   where your eye already is while you write, and because the thing they
+   switch between is the page itself, not a panel beside it. */
+/* The left of the status bar is now a row: the save state, then the tabs. On
+   a narrow window the file name gives way first — which tab you are on
+   matters more than being reminded what the document is called. */
+.sb-left { display: flex; align-items: center; }
+.sb-left .sb-save { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-tabs { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; margin-left: 14px; }
+.sb-tab {
+  background: none; border: 0; border-radius: 5px;
+  padding: 2px 9px; margin: 0;
+  font: inherit; color: var(--text-4); cursor: pointer;
+  white-space: nowrap;
+}
+.sb-tab:hover { color: var(--text-2); background: var(--surface-2); }
+.sb-tab.on { color: var(--text); background: var(--surface-3); }
+.sb-tab-n {
+  display: inline-block; margin-left: 6px; padding: 0 5px;
+  border-radius: 7px; background: var(--primary); color: var(--on-primary);
+  font-size: 10px; line-height: 14px; vertical-align: 1px;
+}
+
+/* Notes and Darlings cover the writing area the way the pages view does, so
+   the editor underneath keeps its caret and its place without being asked. */
+.sheet-host {
+  /* Above the pages view, which covers the same area: asking for Notes while
+     the preview is up should show Notes. */
+  position: absolute; inset: 0; z-index: 11;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  animation: fade 140ms var(--ease);
+}
+.sheet-head {
+  flex: 0 0 auto; display: flex; align-items: baseline; gap: 12px;
+  padding: 10px 24px 10px 140px;   /* clear the floating view switch */
+  border-bottom: 1px solid var(--outline-soft);
+  background: var(--surface);
+}
+.sheet-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.sheet-hint { font-size: 12px; color: var(--text-4); }
+.sheet-hint kbd {
+  font: inherit; padding: 0 4px; border: 1px solid var(--outline-soft);
+  border-radius: 4px; background: var(--surface-2);
+}
+.sheet-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 18px 0 24vh; }
+.sheet-pad {
+  flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box;
+  border: 0; outline: none; resize: none;
+  padding: 22px max(26px, calc((100% - var(--doc-width)) / 2)) 24vh;
+  background: var(--bg); color: var(--text);
+  font-family: var(--doc-font); font-size: var(--doc-size); line-height: var(--doc-lh);
+}
+
+/* A darling: what it says, where it came from, and what you can do with it. */
+.darling {
+  max-width: var(--doc-width); margin: 0 auto 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--outline-soft); border-radius: 10px;
+  background: var(--surface);
+}
+.darling-text {
+  margin: 0 0 10px; white-space: pre-wrap;
+  font-family: var(--doc-font); font-size: 14px; line-height: 1.55; color: var(--text-2);
+}
+.darling-foot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-4); }
+.darling-where { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.darling-lost { color: var(--stat); }
+.darlings-empty {
+  max-width: var(--doc-width); margin: 12vh auto 0;
+  text-align: center; color: var(--text-4); font-size: 13px; line-height: 1.7;
+}
+
 /* ---------------------------------------------------------------- preview */
 
 .preview-host {

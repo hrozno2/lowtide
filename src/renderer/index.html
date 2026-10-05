@@ -181,6 +181,23 @@
         <button class="btn primary" id="pv-pdf">Save as PDF</button>
       </div>
     </section>
+
+    <section class="sheet-host" id="notes-host" hidden>
+      <div class="sheet-head">
+        <h2 class="sheet-title">Notes</h2>
+        <span class="sheet-hint">Kept beside the manuscript, never counted in it.</span>
+      </div>
+      <textarea class="sheet-pad" id="notes-pad" spellcheck="true"
+                placeholder="Anything that is not the book: what happens next, what to check, who said what."></textarea>
+    </section>
+
+    <section class="sheet-host" id="darlings-host" hidden>
+      <div class="sheet-head">
+        <h2 class="sheet-title">Darlings</h2>
+        <span class="sheet-hint">Select a passage and press <kbd>⇧⌘D</kbd>. It leaves the manuscript, not your hands.</span>
+      </div>
+      <div class="sheet-body" id="darlings-list"></div>
+    </section>
       </div>
 
     <div class="side-dock" id="side-dock" hidden>
@@ -201,7 +218,14 @@
     </div>
 
     <footer class="statusbar" id="statusbar">
-      <div class="sb-left"><button class="sb-save" id="save-state">New document</button></div>
+      <div class="sb-left">
+        <button class="sb-save" id="save-state">New document</button>
+        <div class="sb-tabs" id="doc-tabs" role="tablist">
+          <button class="sb-tab on" role="tab" aria-selected="true" data-doctab="manuscript">Manuscript</button>
+          <button class="sb-tab" role="tab" aria-selected="false" data-doctab="notes">Notes</button>
+          <button class="sb-tab" role="tab" aria-selected="false" data-doctab="darlings">Darlings<span class="sb-tab-n" id="darlings-count" hidden></span></button>
+        </div>
+      </div>
       <div class="sb-center">
         <span id="stat-chars">0 characters</span>
         <span id="stat-words">0 words</span>

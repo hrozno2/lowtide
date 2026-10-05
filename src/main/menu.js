@@ -96,7 +96,9 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
         { label: 'Centered', accelerator: 'CmdOrCtrl+Shift+C', click: send('format:center') },
         { label: 'Note', accelerator: 'CmdOrCtrl+Shift+N', click: send('format:note') },
         { label: 'Scene Break', accelerator: 'CmdOrCtrl+Shift+B', click: send('format:divider') },
-        { label: 'Page Break', accelerator: 'CmdOrCtrl+Shift+P', click: send('format:pagebreak') }
+        { label: 'Page Break', accelerator: 'CmdOrCtrl+Shift+P', click: send('format:pagebreak') },
+        { type: 'separator' },
+        { label: 'Send to Darlings', accelerator: 'CmdOrCtrl+Shift+X', click: send('tools:darling') }
       ]
     },
     {
@@ -116,6 +118,8 @@ function buildMenu({ onNewWindow, onOpen, onOpenRecent, recent, onClearRecent, o
         { label: 'Sprint…', accelerator: 'CmdOrCtrl+Shift+R', click: send('tools:sprint') },
         { label: 'Search Everything…', accelerator: 'CmdOrCtrl+K', click: send('tools:search') },
         { label: 'Scratchpad', accelerator: 'CmdOrCtrl+Shift+K', click: send('tools:scratch') },
+        { label: 'Notes', click: send('view:notes') },
+        { label: 'Darlings', click: send('view:darlings') },
         { label: 'New Revision…', accelerator: 'CmdOrCtrl+Shift+V', click: send('tools:revision') },
         { type: 'separator' },
         { label: 'Bigger Text', accelerator: 'CmdOrCtrl+Plus', click: send('view:zoom-in') },

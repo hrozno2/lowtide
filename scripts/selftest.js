@@ -78,6 +78,7 @@ function report(note) {
 let win, wc, js;
 
 const content = () => js('window.__lowTideContent()');
+const countOf = (t) => (String(t).replace(/^#.*$/gm, ' ').match(/\S+/g) || []).length;
 const text = (id) => js(`document.getElementById(${JSON.stringify(id)}).textContent`);
 
 /**
@@ -1597,6 +1598,137 @@ app.whenReady().then(async () => {
     await wait(250);
     await click('.side-tab[data-tab="navigator"]');
     await wait(150);
+  });
+
+  /* =========================================================== darlings == */
+  group = 'Darlings';
+
+  const CUT = ['# One', '',
+    'The lamp had been burning for ninety-one years. She counted the steps because her father ' +
+    'had counted them. At the top the light turned in its slow circle.', '',
+    '# Two', '', 'Nobody had thought to give it a name.'].join('\n');
+
+  await test('a darling leaves the manuscript and comes back to the same place', async () => {
+    await load(CUT);
+    await js(`(() => { window.__forcePaginate(); })()`);
+    await wait(700);
+    const from = CUT.indexOf('She counted');
+    const to = CUT.indexOf('At the top');
+    const before = countOf(await content());
+    await select(from, to);
+    await menu('tools:darling');
+    await wait(800);
+
+    const after = await content();
+    ok('the passage is out of the text', !after.includes('She counted'));
+    eq('and out of the word count', countOf(after), before - 10);
+    eq('the tab keeps a count of them', await text('darlings-count'), '1');
+
+    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await wait(500);
+    eq('it is on the Darlings tab', await js(`document.querySelectorAll('#darlings-list .darling').length`), 1);
+    ok('which says where it came from',
+      (await js(`document.querySelector('.darling-where').textContent`)).includes('One'));
+
+    /* An edit above it moves every offset in the document. A darling that
+       remembered an offset would land in the wrong place; one that remembers
+       the words around it does not. */
+    await js(`(() => { window.__lowTideView.dispatch({ changes:
+      { from: 0, to: 0, insert: '# Nought\\n\\nAn entirely new chapter.\\n\\n' } }); })()`);
+    await wait(900);
+    await js(`(() => { document.querySelector('.darling-foot .text-btn').click(); })()`);
+    await wait(900);
+
+    const back = await content();
+    ok('putting it back puts it exactly where it was',
+      back.includes('ninety-one years. She counted the steps because her father had counted them. At the top'));
+    ok('and returns you to the manuscript',
+      await js(`document.querySelector('[data-doctab="manuscript"]').classList.contains('on')`));
+    ok('the count goes away with the last one', await js(`document.getElementById('darlings-count').hidden`));
+  });
+
+  await test('a short darling still comes back', async () => {
+    /* Two common words are somewhere in every manuscript. A darling is looked
+       for where it belongs, not anywhere at all, or this one never returns. */
+    const SHORT = 'The lamp was lit. The lamp had always been lit. Marta climbed the stairs to the lamp.';
+    await load(SHORT);
+    const at = SHORT.indexOf('had always been ');
+    await select(at, at + 16);
+    await menu('tools:darling');
+    await wait(700);
+    eq('it leaves', await content(), 'The lamp was lit. The lamp lit. Marta climbed the stairs to the lamp.');
+
+    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await wait(400);
+    await js(`(() => { document.querySelector('.darling-foot .text-btn').click(); })()`);
+    await wait(800);
+    eq('and comes back whole', await content(), SHORT);
+  });
+
+  await test('undoing the cut does not leave two of it', async () => {
+    await load(CUT);
+    const from = CUT.indexOf('She counted');
+    const to = CUT.indexOf('At the top');
+    await select(from, to);
+    await menu('tools:darling');
+    await wait(700);
+
+    await js(`window.__lowTideView.focus()`);
+    const mod = process.platform === 'darwin' ? 'cmd' : 'control';
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'z', modifiers: [mod] });
+    await wait(60);
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'z', modifiers: [mod] });
+    await wait(700);
+    eq('undo brings the passage back by itself', await content(), CUT);
+
+    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await wait(400);
+    await js(`(() => { document.querySelector('.darling-foot .text-btn').click(); })()`);
+    await wait(800);
+    eq('and putting it back again changes nothing', await content(), CUT);
+    ok('the stale card goes', await js(`document.getElementById('darlings-count').hidden`));
+  });
+
+  await test('a darling travels with the document', async () => {
+    const file = path.join(WORK, 'darling-carrier.md');
+    fs.writeFileSync(file, CUT);
+    wc.send('doc:load', { path: file, content: CUT });
+    await until(async () => (await content()) === CUT, { what: 'the document to open', timeout: 6000 });
+    await settled();
+
+    const at = CUT.indexOf('Nobody had thought');
+    await select(at, at + 18);
+    await menu('tools:darling');
+    await wait(700);
+    await menu('file:save');
+    await wait(1800);
+
+    const companion = JSON.parse(fs.readFileSync(file + '.lowtide', 'utf8'));
+    eq('the companion beside the manuscript carries it',
+      (companion.extras.darlings || []).map((d) => d.text), ['Nobody had thought']);
+  });
+
+  await test('darlings belong to their own document', async () => {
+    await load('A document with no darlings at all.');
+    await wait(600);
+    eq('a fresh document shows none', await js(`document.querySelectorAll('#darlings-list .darling').length`), 0);
+    ok('and says so', (await js(`document.querySelector('.darlings-empty') ? 'empty' : ''`)) === 'empty');
+  });
+
+  await test('the tabs cover the writing area and give it back', async () => {
+    await load(CUT);
+    await js(`(() => { document.querySelector('[data-doctab="notes"]').click(); })()`);
+    await wait(400);
+    ok('Notes covers the editor', !(await js(`document.getElementById('notes-host').hidden`)));
+    await js(`(() => { document.getElementById('notes-pad').value = 'a note';
+      document.getElementById('notes-pad').dispatchEvent(new Event('input')); })()`);
+    await wait(400);
+    eq('and shares the scratchpad', await js(`document.getElementById('scratchpad').value`), 'a note');
+
+    await js(`(() => { document.querySelector('[data-doctab="manuscript"]').click(); })()`);
+    await wait(400);
+    ok('the manuscript comes back', await js(`document.getElementById('notes-host').hidden`));
+    eq('with the text untouched', await content(), CUT);
   });
 
   /* ========================================================= pagination == */
