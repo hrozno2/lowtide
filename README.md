@@ -124,15 +124,21 @@ outline belongs to its document and stays open in both the text and pages views.
 
 ![The outline open beside the finished pages](docs/screen-outline-pages.png)
 
-**Pages.** The pages view sets the manuscript the way Highland's Novel
-template does, measured from a PDF it produced: Amiri at 13pt on 20.8pt lines
-in a 5.35in column, an inch above and below, a centred running head, each
-chapter opening 2.7in down the page and flowing on rather than forcing a new
-one. On the same manuscript it gives the same page count, and the same page
-breaks to the line for as long as Highland's own paginator holds a steady 33
-lines. Amiri is bundled, so the page is the same on macOS, Windows and Linux,
-and the PDF embeds it. Letter or A4 follows your region; book trims, margins,
-type size, leading, justification and hyphenation are in Preferences, with a
+**Pages.** The pages view sets the manuscript as a trade paperback is set:
+Amiri at 11.5pt on 145% leading in a 4.25in measure on a 6×9 trim, 31 lines to
+a page, a centred running head, each chapter opening partway down the page and
+flowing on rather than forcing a new one. That geometry puts a page at about
+300 words, which is the number the trade works to — measured rather than
+assumed: `scripts/wpp.js` lays 30,000 words of real novel prose out in the
+exact print geometry and reads back what a page holds (307 Austen, 320 Doyle,
+316 Melville). Amiri is bundled, so the page is the same on macOS, Windows and
+Linux, and the PDF embeds it.
+
+Whole pages can be chosen at once under Preferences → Page: **Trade
+paperback**, **Mass market**, the page **Highland 2** draws (13pt on 20.8pt
+lines in a 5.35in column on your region's paper, about 390 words a page), and
+a double-spaced **submission manuscript**. Trim, margins, type size, leading,
+justification and hyphenation are all still there one at a time, with a
 Reset. Page markers, off by default, show where each printed page begins in
 the margin of the writing view. Zoom the pages with ⌘+ and ⌘−, ⌘-scroll, or the −/+ under them; ⌘0 fits
 the page. The PDF is the preview, at the trim you chose.

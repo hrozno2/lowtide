@@ -35,7 +35,15 @@ process.on('unhandledRejection', (err) => {
 /* ------------------------------------------------------------- framework */
 
 const results = [];
-let group = '';
+/* The report only prints at the end, which tells you nothing when a run wedges.
+   LOWTIDE_TRACE=1 names each group and test as it starts, so a hang has an
+   address. A plain run is unchanged. */
+const TRACE = !!process.env.LOWTIDE_TRACE;
+let _group = '';
+Object.defineProperty(globalThis, 'group', {
+  get: () => _group,
+  set: (v) => { _group = v; if (TRACE) console.log(`\n→ ${v}`); }
+});
 const eq = (name, actual, expected) => {
   const a = JSON.stringify(actual);
   const b = JSON.stringify(expected);
@@ -44,6 +52,7 @@ const eq = (name, actual, expected) => {
 const ok = (name, cond) => eq(name, !!cond, true);
 
 async function test(name, fn) {
+  if (TRACE) console.log(`   · ${name}`);
   try {
     await fn();
   } catch (err) {
@@ -1180,16 +1189,15 @@ app.whenReady().then(async () => {
     '', 'At the top the light turned in its slow circle, indifferent as weather, and the extraordinarily long paragraphs of the manuscript continued for a considerable distance without pause.'
   ].concat(Array.from({ length: 60 }, (_, i) => `\nParagraph ${i + 2} of the manuscript keeps going with characteristically unremarkable sentences about the lighthouse and its keeper and the weather that would not settle.`)).join('\n');
 
-  await test('the page is set the way Highland sets it', async () => {
+  await test('the page is set the way a trade paperback is set', async () => {
     const p = await js(`(async () => (await window.api.prefs.get()))()`);
-    ok('paper follows the region', ['a4', 'letter'].includes(p.pageSize));
-    eq('13pt type', p.printFontSize, 13);
-    eq('at 160%', p.printLeading, 1.6);
-    eq('an inch above', p.printMargin, 1);
-    eq('and below', p.printBottomMargin, 1);
-    eq('and 1.46in at the sides', p.printSideMargin, 1.46);
+    eq('a 6x9 trim', p.pageSize, '6x9');
+    eq('11.5pt type', p.printFontSize, 11.5);
+    eq('at 145%', p.printLeading, 1.45);
+    eq('0.9in above', p.printMargin, 0.9);
+    eq('and below', p.printBottomMargin, 0.9);
+    eq('and 0.875in at the sides', p.printSideMargin, 0.875);
 
-    await js(`window.__setPref('pageSize', 'a4')`);
     await load(NOVEL);
     await menu('view:preview');
     await wait(1200);
@@ -1200,18 +1208,24 @@ app.whenReady().then(async () => {
       const cs = getComputedStyle(el), ps = getComputedStyle(p);
       const head = document.querySelectorAll('.page')[1].querySelector('.page-head');
       const hs = getComputedStyle(head);
-      return { w: cs.width, padX: cs.paddingLeft, padY: cs.paddingTop, padB: cs.paddingBottom, size: cs.fontSize, lh: cs.lineHeight,
+      return { w: cs.width, h: cs.height, padX: cs.paddingLeft, padY: cs.paddingTop, padB: cs.paddingBottom, size: cs.fontSize, lh: cs.lineHeight,
                hyph: ps.hyphens || ps.webkitHyphens, align: ps.textAlign, indent: ps.textIndent,
                face: document.fonts.check('17px Amiri'),
                h1: getComputedStyle(document.querySelector('.page h1')).fontStyle,
                headAlign: hs.textAlign, headCaps: hs.fontVariantCaps,
                no: head.querySelector('.page-no').textContent }; })()`);
-    ok('the sheet is A4', Math.abs(parseFloat(page.w) - 793.92) < 0.1);
-    ok('with 1.46in at the sides', Math.abs(parseFloat(page.padX) - 140.16) < 0.1);
-    eq('an inch above', page.padY, '96px');
-    eq('and below', page.padB, '96px');
-    ok('type is 13pt', Math.abs(parseFloat(page.size) - 17.333) < 0.01);
-    ok('on 20.8pt lines', Math.abs(parseFloat(page.lh) - 27.733) < 0.01);
+    ok('the sheet is 6x9', Math.abs(parseFloat(page.w) - 576) < 0.1);
+    ok('with 0.875in at the sides', Math.abs(parseFloat(page.padX) - 84) < 0.1);
+    ok('0.9in above', Math.abs(parseFloat(page.padY) - 86.4) < 0.1);
+    ok('and below', Math.abs(parseFloat(page.padB) - 86.4) < 0.1);
+    ok('type is 11.5pt', Math.abs(parseFloat(page.size) - 15.333) < 0.01);
+    ok('on 16.675pt lines', Math.abs(parseFloat(page.lh) - 22.233) < 0.01);
+    /* The measure and the line count are what put a page at about 300 words,
+       which is what the trade sets to. scripts/wpp.js measures the words
+       themselves against real novels; these two numbers are what produce it. */
+    ok('a 4.25in measure', Math.abs(parseFloat(page.w) - parseFloat(page.padX) * 2 - 408) < 0.5);
+    ok('31 lines to a page',
+      Math.round((parseFloat(page.h) - parseFloat(page.padY) - parseFloat(page.padB)) / parseFloat(page.lh)) === 31);
     eq('not hyphenated', page.hyph, 'manual');
     eq('justified', page.align, 'justify');
     eq('paragraphs indented a quarter inch', page.indent, '24px');
@@ -1229,6 +1243,58 @@ app.whenReady().then(async () => {
     await wait(600);
     await menu('view:preview');
     await wait(400);
+  });
+
+  await test('the status bar says where you are', async () => {
+    await load(NOVEL);
+    await js(`(() => { window.__forcePaginate(); })()`);
+    await wait(900);
+    const label = () => text('stat-pages');
+    ok('it counts the manuscript to begin with', /^\d+ pages?$/.test(await label()));
+
+    await select(0, 0);
+    await js(`(() => { document.getElementById('stat-pages').click(); })()`);
+    await wait(250);
+    eq('a click puts you on page one', await label(), 'page 1 of ' + (await js(`window.__pageCount()`)));
+
+    // the caret moves, the page follows it
+    const end = await js(`window.__lowTideView.state.doc.length`);
+    await select(end, end);
+    await wait(250);
+    const last = await label();
+    ok('the last line is on the last page',
+      last === 'page ' + (await js(`window.__pageCount()`)) + ' of ' + (await js(`window.__pageCount()`)));
+
+    await js(`(() => { document.getElementById('stat-pages').click(); })()`);
+    await wait(250);
+    eq('another click names the chapter', await label(), 'chapter 1 of 1');
+
+    await js(`(() => { document.getElementById('stat-pages').click(); })()`);
+    await wait(250);
+    ok('and a third goes back to the total', /^\d+ pages?$/.test(await label()));
+  });
+
+  await test('selecting a passage says how big it is', async () => {
+    await load('One two three four five.');
+    ok('nothing shows with no selection', await js(`document.getElementById('stat-selection').hidden`));
+    await select(0, 13);
+    await wait(250);
+    eq('the status bar counts the selection', await text('stat-selection'), '3 selected');
+    await select(0, 0);
+    await wait(250);
+    ok('and goes quiet again', await js(`document.getElementById('stat-selection').hidden`));
+  });
+
+  await test('a whole page can be chosen at once', async () => {
+    const presets = await js(`(async () => (await window.api.prefs.presets()))()`);
+    ok('there are presets to choose', presets.length >= 4);
+    const highland = presets.find((x) => x.id === 'highland');
+    ok('Highland\'s page is still one of them', !!highland);
+    eq('set the way Highland sets it', highland.prefs.printFontSize, 13);
+    ok('on the locale\'s paper', ['a4', 'letter'].includes(highland.prefs.pageSize));
+    const book = presets.find((x) => x.id === 'book');
+    eq('and the book page leads', book.prefs.pageSize, '6x9');
+    eq('at 11.5pt', book.prefs.printFontSize, 11.5);
   });
 
   await test('the pages view zooms with the same keys as the text', async () => {
@@ -1284,7 +1350,7 @@ app.whenReady().then(async () => {
 
   await test('page layout follows the current defaults', async () => {
     const p = await js(`(async () => (await window.api.prefs.get()))()`);
-    ok('an old default left on disk does not stick', ['a4', 'letter'].includes(p.pageSize) && p.printFontSize === 13 && p.printLeading === 1.6);
+    ok('an old default left on disk does not stick', p.pageSize === '6x9' && p.printFontSize === 11.5 && p.printLeading === 1.45);
     eq('a value the user chose does', p.readingSpeed, 310);
     eq('and the file is stamped so it is not migrated twice', p.settingsVersion, 2);
 
@@ -1293,7 +1359,7 @@ app.whenReady().then(async () => {
     await wait(700);
     eq('a retired default chosen deliberately is kept on disk',
       JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')).printFontSize, 12);
-    await js(`window.__setPref('printFontSize', 13)`);
+    await js(`window.__setPref('printFontSize', 11.5)`);
     await wait(500);
 
     await js(`window.__setPref('printLeading', 2)`);
@@ -1310,10 +1376,10 @@ app.whenReady().then(async () => {
     await js(`document.getElementById('reset-page-layout').click()`);
     await wait(700);
     eq('reset puts the leading back',
-      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.6);
+      await js(`(async () => (await window.api.prefs.get()).printLeading)()`), 1.45);
     const after = await js(`[...document.querySelectorAll('.prefs-body .row')]
       .find(r => r.textContent.startsWith('Print leading')).querySelector('.val').textContent`);
-    eq('and the panel shows it', after, '1.60');
+    eq('and the panel shows it', after, '1.45');
     eq('the file no longer carries it',
       'printLeading' in JSON.parse(fs.readFileSync(path.join(PROFILE, 'preferences.json'), 'utf8')), false);
     await click('#btn-prefs');

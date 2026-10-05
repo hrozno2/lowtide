@@ -35,6 +35,7 @@ const state = {
   navFilter: '',
   pages: [],
   pageCount: 0,
+  pagePresets: [],
   lastPages: 0,
   scratch: '',
   revisions: [],
@@ -70,6 +71,7 @@ let repaintMusic = null;
     api.platform === 'darwin' ? 'mac' : api.platform === 'win32' ? 'win' : 'linux');
 
   state.prefs = await api.prefs.get();
+  state.pagePresets = await api.prefs.presets().catch(() => []);
   state.goal = null;   // the document brings its own, once its extras load
 
   state.dropbox = (await api.app.dropbox()).root || null;
@@ -131,6 +133,7 @@ let repaintMusic = null;
   // after the editor is up, never before
   setTimeout(() => checkForUpdate(), 3000);
   window.__forcePaginate = () => repaginate.flush();
+  window.__pageCount = () => state.pageCount;
 })();
 
 /* ---------------------------------------------------------------- prefs */
@@ -301,7 +304,9 @@ function onDocChange() {
 
 function onCursorMove() {
   highlightActive(false);
-  if (state.prefs.sidebarTab === 'stats') renderSelection();
+  /* Not only when the Stats tab is open any more: the selection size and the
+     page you are on are in the status bar, which is always there. */
+  renderSelection();
 }
 
 function inDropbox(path) {
@@ -1009,13 +1014,48 @@ const repaginate = debounce(() => {
   if (state.previewOpen) paintPreview(true);
 }, 500);
 
+/* The caret's page: the last page that begins at or before the caret's line.
+   Pages carry the source line they start on, which is what the markers in the
+   margin use, so this agrees with them exactly. */
+function pageAtCaret() {
+  if (!state.pages.length) return 0;
+  const line = view.state.doc.lineAt(view.state.selection.main.head).number - 1;
+  let page = 1;
+  for (let i = 0; i < state.pages.length; i++) {
+    const at = state.pages[i].line;
+    if (at != null && at <= line) page = i + 1;
+  }
+  return page;
+}
+
+/* What the middle of the status bar says about where you are. Clicking it
+   cycles, the way NEO's does: the whole manuscript, then the page you are on,
+   then the chapter. */
+function positionLabel() {
+  const pages = state.pageCount;
+  const mode = state.prefs.positionMode;
+  if (mode === 'page' && pages) {
+    return `page ${pageAtCaret().toLocaleString()} of ${pages.toLocaleString()}`;
+  }
+  if (mode === 'chapter') {
+    const items = state.outline.filter((i) => i.level === 1);
+    if (items.length) {
+      const here = state.outline[state.activeIndex];
+      const at = here ? items.findIndex((i) => i.line === here.line) : -1;
+      if (at >= 0) return `chapter ${at + 1} of ${items.length}`;
+      return `${items.length} chapter${items.length === 1 ? '' : 's'}`;
+    }
+  }
+  return `${pages.toLocaleString()} page${pages === 1 ? '' : 's'}`;
+}
+
 function renderStats() {
   const words = state.words;
   const pages = state.pageCount;
 
   $('stat-chars').textContent = `${state.chars.toLocaleString()} characters`;
   $('stat-words').textContent = `${words.toLocaleString()} word${words === 1 ? '' : 's'}`;
-  $('stat-pages').textContent = `${pages.toLocaleString()} page${pages === 1 ? '' : 's'}`;
+  $('stat-pages').textContent = positionLabel();
 
   $('ds-pages').textContent = pages.toLocaleString();
   $('ds-time').textContent = readingTime(words);
@@ -1030,10 +1070,25 @@ const renderSelection = debounce(() => {
   const sel = view.state.selection.main;
   const w = $('ds-selwords');
   const c = $('ds-selchars');
-  if (sel.empty) { w.textContent = '\u2014'; c.textContent = '\u2014'; return; }
-  const text = view.state.sliceDoc(sel.from, sel.to);
-  w.textContent = countWords(text).toLocaleString();
-  c.textContent = text.length.toLocaleString();
+  const bar = $('stat-selection');
+
+  /* Selecting a passage puts its size in the status bar, where you are
+     already looking, and takes it away again when the selection collapses. */
+  if (sel.empty) {
+    w.textContent = '\u2014';
+    c.textContent = '\u2014';
+    bar.hidden = true;
+  } else {
+    const text = view.state.sliceDoc(sel.from, sel.to);
+    const n = countWords(text);
+    w.textContent = n.toLocaleString();
+    c.textContent = text.length.toLocaleString();
+    bar.textContent = `${n.toLocaleString()} selected`;
+    bar.hidden = false;
+  }
+
+  // The page and chapter the caret is in move with it, not with the text.
+  if (state.prefs.positionMode) $('stat-pages').textContent = positionLabel();
 }, 90);
 
 /* --------------------------------------------------------------- sidebar */
@@ -2410,6 +2465,15 @@ function wireChrome() {
   $('goal-face').onclick = () => { if (!state.goal) ui.showGoal(ctx()); };
   $('goal-all').onclick = () => ui.showRecord(ctx());
   $('save-state').onclick = () => ui.showWhere(ctx());
+
+  /* Three things to say about where you are, and one place to say them. The
+     choice is remembered, so it is the one you chose, not the one you landed on. */
+  $('stat-pages').onclick = () => {
+    const order = [null, 'page', 'chapter'];
+    const next = order[(order.indexOf(state.prefs.positionMode || null) + 1) % order.length];
+    setPrefs({ positionMode: next });
+    $('stat-pages').textContent = positionLabel();
+  };
   $('goal-action').onclick = () => finishGoal();
 
   $('scrim').onclick = () => ui.closePanel();
@@ -2441,6 +2505,7 @@ function wireChrome() {
 function ctx() {
   return {
     prefs: state.prefs,
+    pagePresets: state.pagePresets,
     setPrefs,
     resetPrefs,
     // Where Search can send someone.

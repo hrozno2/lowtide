@@ -35,30 +35,32 @@ const DEFAULTS = {
   menuStyle: 'button',      // 'button' | 'bar' — Windows and Linux only
   statusBar: true,
   readingSpeed: 275,
-  // Print template. The defaults describe a typical printed novel page;
-  // every value is adjustable in Preferences.
-  /* A printed novel, not a manuscript. 6x9 is the standard trade paperback
-     trim. 11pt on a 4in measure with leading at 142% and an inch all round is
-     how a trade paperback is actually set — inside every range typesetters
-     work to, and close to what Highland draws. Letter and A4 are still there
-     for a manuscript you are posting to someone. */
-  // The page is set the way Highland's Novel template sets it, measured
-  // from a PDF it produced: Amiri at 13pt on 20.8pt lines in a 385pt column,
-  // an inch above and below, no hyphenation. Highland's own paginator fits
-  // 32–34 lines to a page (it estimates rather than measures); 33 is its
-  // average, and a page count that agrees with it. The paper follows the
-  // locale (see getPrefs).
-  pageSize: 'a4',            // '6x9' | '5.5x8.5' | 'letter' | 'a4'
-  printFontSize: 13,         // pt
-  printLeading: 1.6,         // multiple of the font size
-  printSideMargin: 1.46,     // inches, left and right: a 385pt column on A4
+  /* Print template — a printed novel, not a manuscript. Every value is
+     adjustable in Preferences, and PAGE_PRESETS below sets them in a group.
+
+     6x9 is the standard trade paperback trim. 11.5pt Amiri on 145% leading in
+     a 4.25in measure gives 31 lines a page, which is how a trade paperback is
+     actually set, and it lands on the number the trade works to: a page is
+     about 300 words. Measured, not estimated — scripts/wpp.js lays 30,000
+     words of real novel prose out in this exact geometry and reads back what
+     a page holds: 307 (Austen), 320 (Doyle), 316 (Melville), mean 314.
+
+     The page Highland draws is a different thing and is kept as a preset:
+     13pt on 20.8pt lines in a 385pt column on the locale's paper, which comes
+     to about 386 words a page. That is a manuscript page count, not a book's,
+     so it no longer leads. */
+  pageSize: '6x9',           // '6x9' | '5.5x8.5' | 'letter' | 'a4'
+  printFontSize: 11.5,       // pt
+  printLeading: 1.45,        // multiple of the font size
+  printSideMargin: 0.875,    // inches, left and right: a 4.25in measure on 6x9
   printHyphenate: false,
   theme: 'material',
   saveTo: 'documents',      // 'documents' | 'dropbox'
-  printMargin: 1,            // inches, top
-  printBottomMargin: 1,      // inches; 33 lines a page, Highland's average
+  printMargin: 0.9,          // inches, top
+  printBottomMargin: 0.9,    // inches; 31 lines a page
   printJustify: true,
   pageMarkers: false,        // page numbers in the margin of the writing view
+  positionMode: null,        // null = 'N pages' | 'page' | 'chapter' (the status bar cycles)
   goal: null,
   // Kept only to hand to the first document opened after the change that
   // made a goal belong to its manuscript (see readCompanion in main).
@@ -118,9 +120,36 @@ const RETIRED_DEFAULTS = {
 };
 
 // Letter is the paper of the US and a few of its neighbours; everywhere else
-// it is A4.
+// it is A4. Only the manuscript presets use it now: a book is set on a book
+// trim wherever you live.
 function paperFor(country) {
   return ['US', 'CA', 'MX', 'PH'].includes(String(country || '').toUpperCase()) ? 'letter' : 'a4';
+}
+
+/* Whole pages, set the way the job is actually set, so the seven values that
+   describe a page can be chosen as one. Words-per-page is measured, not
+   estimated: scripts/wpp.js lays 30,000 words of real novel prose out in each
+   geometry and reads back what a page holds. */
+function pagePresets(country) {
+  const paper = paperFor(country);
+  return [
+    { id: 'book', name: 'Trade paperback', hint: '6×9, about 300 words a page',
+      prefs: { pageSize: '6x9', printFontSize: 11.5, printLeading: 1.45,
+               printSideMargin: 0.875, printMargin: 0.9, printBottomMargin: 0.9,
+               printJustify: true, printHyphenate: false } },
+    { id: 'pocket', name: 'Mass market', hint: '5.5×8.5, a smaller book',
+      prefs: { pageSize: '5.5x8.5', printFontSize: 10.5, printLeading: 1.42,
+               printSideMargin: 0.75, printMargin: 0.75, printBottomMargin: 0.75,
+               printJustify: true, printHyphenate: false } },
+    { id: 'highland', name: 'Highland Novel', hint: 'the page Highland 2 draws, about 390 words',
+      prefs: { pageSize: paper, printFontSize: 13, printLeading: 1.6,
+               printSideMargin: 1.46, printMargin: 1, printBottomMargin: 1,
+               printJustify: true, printHyphenate: false } },
+    { id: 'manuscript', name: 'Submission manuscript', hint: 'double spaced, 12pt, an inch all round',
+      prefs: { pageSize: paper, printFontSize: 12, printLeading: 2,
+               printSideMargin: 1, printMargin: 1, printBottomMargin: 1,
+               printJustify: false, printHyphenate: false } }
+  ];
 }
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -187,6 +216,7 @@ class JsonFile {
 }
 
 let prefs = null;
+let localeCountry = '';
 let session = null;
 let sidecar = null;
 
@@ -194,7 +224,7 @@ function getPrefs() {
   if (!prefs) {
     let country = '';
     try { country = app.getLocaleCountryCode(); } catch { /* not ready: A4 */ }
-    DEFAULTS.pageSize = paperFor(country);
+    localeCountry = country;
     prefs = new JsonFile('preferences.json', DEFAULTS);
   }
   return prefs;
@@ -241,4 +271,4 @@ function addRecent(filePath) {
   try { app.addRecentDocument(filePath); } catch {}
 }
 
-module.exports = { getPrefs, getSession, getSidecar, docEntry, setDocEntry, addRecent, DEFAULTS };
+module.exports = { getPrefs, getSession, getSidecar, docEntry, setDocEntry, addRecent, DEFAULTS, pagePresets: () => pagePresets(localeCountry) };

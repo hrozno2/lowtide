@@ -1103,6 +1103,13 @@ input[type="range"]::-webkit-slider-thumb {
   font: inherit; color: inherit; cursor: pointer;
 }
 .sb-save:hover { color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
+/* The position reads as plain text and only looks clickable under the pointer. */
+.sb-cycle {
+  background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.sb-cycle:hover { color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
+#stat-selection { color: var(--primary); }
 .where-body { min-width: 300px; max-width: 460px; }
 .where-name { font-size: 13.5px; color: var(--text); margin-bottom: 4px; }
 .where-path {

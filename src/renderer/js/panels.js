@@ -360,6 +360,32 @@ function toggle(value, onPick) {
   return b;
 }
 
+/* A whole page in one pick. The presets come from the main process (one of
+   them follows the locale's paper), and the menu shows which one the current
+   values are — or Custom, once a slider has been moved. */
+function pagePresetControl(ctx, set) {
+  const presets = ctx.pagePresets || [];
+  const p = ctx.prefs || {};
+  const matches = (preset) => Object.entries(preset.prefs)
+    .every(([k, v]) => (typeof v === 'number' ? Math.abs((p[k] ?? 0) - v) < 1e-9 : (p[k] ?? null) === v));
+  const current = presets.find(matches);
+
+  const sel = h('select', {
+    style: 'max-width:200px',
+    title: presets.map((x) => `${x.name} — ${x.hint}`).join('\n'),
+    onchange: (e) => {
+      const preset = presets.find((x) => x.id === e.target.value);
+      if (preset) set(Object.assign({}, preset.prefs));
+    }
+  });
+  if (!current) sel.append(h('option', { value: '', selected: true }, 'Custom'));
+  for (const preset of presets) {
+    sel.append(h('option', Object.assign({ value: preset.id },
+      current && current.id === preset.id ? { selected: true } : {}), preset.name));
+  }
+  return sel;
+}
+
 const PAGE_LAYOUT_KEYS = ['pageSize', 'printMargin', 'printBottomMargin', 'printSideMargin', 'printFontSize', 'printLeading', 'printJustify', 'printHyphenate'];
 
 const PREF_SECTIONS = [
@@ -389,6 +415,7 @@ export const PREF_CATALOGUE = [
   { id: 'spellLanguages', section: 'words', label: 'Dictionary', hint: 'Right-click a misspelling for corrections', keys: 'language spelling english' },
   { id: 'onlineLookup', section: 'words', label: 'Look up words online', hint: 'Sends only the word, to dictionaryapi.dev and datamuse.com', keys: 'thesaurus synonyms definition reference privacy' },
   { id: 'readingSpeed', section: 'words', label: 'Reading speed', hint: 'Words per minute', keys: 'wpm reading time minutes stats' },
+  { id: 'pagePreset', section: 'page', label: 'Page', hint: 'A whole page at once. A trade paperback holds about 300 words; the page Highland draws holds about 390', keys: 'preset template trade paperback mass market highland manuscript submission words per page 300 book trim' },
   { id: 'pageSize', section: 'page', label: 'Paper', hint: 'Letter and A4 are manuscript paper; the first two are book trims', keys: 'size trim a4 letter book print pdf' },
   { id: 'printSideMargin', section: 'page', label: 'Side margins', keys: 'left right column width print' },
   { id: 'printMargin', section: 'page', label: 'Top margin', keys: 'print' },
@@ -398,7 +425,7 @@ export const PREF_CATALOGUE = [
   { id: 'printJustify', section: 'page', label: 'Justify text', keys: 'ragged align flush' },
   { id: 'printHyphenate', section: 'page', label: 'Hyphenate', hint: 'Break words at the margin, as a printed book does', keys: 'hyphens break' },
   { id: 'pageMarkers', section: 'page', label: 'Page markers', hint: 'Where each printed page begins, in the margin as you write', keys: 'numbers breaks editor' },
-  { id: 'resetPage', section: 'page', label: 'Reset page layout', hint: 'Back to Highland\'s page: 13pt Amiri at 160% in a 5.35in column', keys: 'default defaults highland' },
+  { id: 'resetPage', section: 'page', label: 'Reset page layout', hint: 'Back to the trade paperback page: 11.5pt Amiri at 145% in a 4.25in measure', keys: 'default defaults highland' },
   { id: 'statusBar', section: 'window', label: 'Status bar', keys: 'word count footer bottom' },
   { id: 'menuStyle', section: 'window', label: 'Menu', hint: 'A button in the title bar, or the menus written out along it', keys: 'menubar title bar', notOn: 'darwin' },
   { id: 'toolbar', section: 'window', label: 'Toolbar', hint: 'Drag to reorder; switch buttons off', keys: 'buttons icons order hide', block: true },
@@ -441,8 +468,9 @@ function prefControls(ctx, rebuild) {
       type: 'number', min: 100, max: 600, step: 25, value: p.readingSpeed || 275, style: 'width:74px',
       onchange: (e) => set({ readingSpeed: Math.max(100, Math.min(600, +e.target.value || 275)) })
     }),
+    pagePreset: () => pagePresetControl(ctx, set),
     pageSize: () => segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
-      p.pageSize || 'a4', (v) => set({ pageSize: v })),
+      p.pageSize || '6x9', (v) => set({ pageSize: v })),
     printSideMargin: () => slider(p.printSideMargin || 1.46, 0.5, 2, 0.01, (v) => `${v.toFixed(2)}"`, (v) => set({ printSideMargin: v })),
     printMargin: () => slider(p.printMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`, (v) => set({ printMargin: v })),
     printBottomMargin: () => slider(p.printBottomMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`, (v) => set({ printBottomMargin: v })),

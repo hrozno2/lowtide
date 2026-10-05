@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const os = require('os');
-const { getPrefs, getSession, docEntry, setDocEntry, addRecent } = require('./store');
+const { getPrefs, getSession, docEntry, setDocEntry, addRecent, pagePresets } = require('./store');
 const { buildMenu, describeMenu, invokeMenuItem } = require('./menu');
 const backups = require('./backups');
 const companion = require('./companion');
@@ -606,6 +606,7 @@ function defaultSaveDir() {
 /* ---------------------------------------------------------------------- ipc */
 
 ipcMain.handle('prefs:get', () => getPrefs().all);
+ipcMain.handle('prefs:presets', () => pagePresets());
 ipcMain.handle('prefs:set', (e, patch) => broadcastPrefs(e, getPrefs().set(patch)));
 ipcMain.handle('prefs:reset', (e, keys) => broadcastPrefs(e, getPrefs().reset(keys)));
 

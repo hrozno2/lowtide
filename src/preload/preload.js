@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
     get: () => ipcRenderer.invoke('prefs:get'),
     set: (patch) => ipcRenderer.invoke('prefs:set', patch),
     reset: (keys) => ipcRenderer.invoke('prefs:reset', keys),
+    presets: () => ipcRenderer.invoke('prefs:presets'),
     onChange: (fn) => on('prefs:changed', fn)
   },
 
