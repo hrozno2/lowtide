@@ -67,6 +67,10 @@ const DEFAULTS = {
   goalHistory: [],
   sprintHistory: [],
   goalsAreDocuments: false,
+  // How Home is arranged: see src/main/shelf.js. Empty until you move
+  // something, and then it holds the arrangement you made.
+  shelves: [],
+  homeView: 'shelf',        // 'shelf' | 'list'
   sidebarTab: 'navigator',
   toolbarOrder: ['export', 'theme', 'music', 'sprint', 'focus', 'prefs'],
   toolbarHidden: [],

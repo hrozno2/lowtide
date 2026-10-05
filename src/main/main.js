@@ -5,6 +5,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const os = require('os');
 const { getPrefs, getSession, docEntry, setDocEntry, addRecent, pagePresets } = require('./store');
+const shelf = require('./shelf');
 const { buildMenu, describeMenu, invokeMenuItem } = require('./menu');
 const backups = require('./backups');
 const companion = require('./companion');
@@ -506,13 +507,42 @@ function closeHome() {
   homeWindow = null;
 }
 
+/* The head of a file is enough for a cover: the front matter is the first
+   thing in a manuscript, and reading the whole of every recent document to
+   learn its title would be a poor trade for a list that redraws on every
+   visit to Home. */
+const HEAD = 2048;
+
+function headOf(filePath) {
+  let fd = null;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(HEAD);
+    const n = fs.readSync(fd, buf, 0, HEAD, 0);
+    return buf.subarray(0, n).toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd != null) { try { fs.closeSync(fd); } catch { /* already gone */ } }
+  }
+}
+
 function recentDocuments() {
   const list = getPrefs().get('recent') || [];
   const out = [];
   for (const p of list) {
     try {
       const stat = fs.statSync(p);
-      out.push({ path: p, name: path.basename(p).replace(/\.[^.]+$/, ''), time: stat.mtimeMs });
+      const name = path.basename(p).replace(/\.[^.]+$/, '');
+      const meta = shelf.metaFrom(headOf(p));
+      out.push({
+        path: p, name, time: stat.mtimeMs,
+        // a document that has not been given a title is known by its file name
+        title: meta.title || name,
+        author: meta.author,
+        series: meta.series,
+        goal: (docEntry(p) || {}).goal || null
+      });
     } catch {
       /* file moved or deleted - leave it out */
     }
@@ -520,11 +550,43 @@ function recentDocuments() {
   return out;
 }
 
-ipcMain.handle('home:data', () => ({
-  recent: recentDocuments(),
-  templates: TEMPLATES.map(({ id, name, hint }) => ({ id, name, hint })),
-  samples: SAMPLES.map(({ id, name, hint }) => ({ id, name, hint }))
-}));
+ipcMain.handle('home:data', () => {
+  const recent = recentDocuments();
+  return {
+    recent,
+    shelves: shelf.arrange(getPrefs().get('shelves'), recent),
+    templates: TEMPLATES.map(({ id, name, hint }) => ({ id, name, hint })),
+    samples: SAMPLES.map(({ id, name, hint }) => ({ id, name, hint }))
+  };
+});
+
+/* Every change to the arrangement goes through here, so the shelves on disk
+   and the shelves on screen can never drift: the renderer asks for a change
+   and is handed back the whole arrangement to draw. */
+function reshelve(change) {
+  const prefs = getPrefs();
+  const recent = recentDocuments();
+  const kept = shelf.toPrefs(shelf.arrange(prefs.get('shelves'), recent));
+  const next = change(kept);
+  prefs.set({ shelves: next });
+  return shelf.arrange(next, recent);
+}
+
+ipcMain.handle('shelf:move-book', (e, { path: p, to, index }) =>
+  reshelve((kept) => shelf.moveBook(kept, p, to, index)));
+ipcMain.handle('shelf:move', (e, { id, index }) =>
+  reshelve((kept) => shelf.moveShelf(kept, id, index)));
+ipcMain.handle('shelf:add', (e, name) =>
+  reshelve((kept) => kept.concat([shelf.newShelf(name)])));
+ipcMain.handle('shelf:rename', (e, { id, name }) =>
+  reshelve((kept) => shelf.renameShelf(kept, id, name)));
+ipcMain.handle('shelf:remove', (e, id) =>
+  reshelve((kept) => shelf.removeShelf(kept, id)));
+ipcMain.handle('shelf:forget', (e, p) => {
+  const prefs = getPrefs();
+  prefs.set({ recent: (prefs.get('recent') || []).filter((r) => r !== p) });
+  return reshelve((kept) => kept);
+});
 
 ipcMain.handle('home:open', (e, filePath) => {
   if (!filePath) return;

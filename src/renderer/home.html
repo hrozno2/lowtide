@@ -14,6 +14,7 @@
   <symbol id="i-close" viewBox="0 0 16 16"><path d="M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8"/></symbol>
   <symbol id="i-book" viewBox="0 0 16 16"><path d="M2.6 3.2h4.2c.7 0 1.2.5 1.2 1.2v8.4c0-.7-.5-1.2-1.2-1.2H2.6zM13.4 3.2H9.2c-.7 0-1.2.5-1.2 1.2v8.4c0-.7.5-1.2 1.2-1.2h4.2z"/></symbol>
   <symbol id="i-page" viewBox="0 0 16 16"><path d="M3.6 1.8h5.6l3.2 3.2v9.2H3.6z"/><path d="M9.2 1.9v3.2h3.1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.4v9.2M3.4 8h9.2"/></symbol>
   <symbol id="i-list" viewBox="0 0 16 16"><path d="M2.6 4h10.8M2.6 8h10.8M2.6 12h7"/></symbol>
   <symbol id="i-doc" viewBox="0 0 16 16"><path d="M3.4 1.8h6l3.2 3.2v9.2H3.4z"/><path d="M9.2 1.9v3.2h3.1M5.6 8.4h4.8M5.6 11h3.2"/></symbol>
 </svg>
@@ -49,12 +50,17 @@
 
   <main class="home-main">
     <div class="home-tabs" id="home-tabs">
-      <button class="home-tab on" data-view="recent">Recent</button>
+      <button class="home-tab on" data-view="shelf">Shelf</button>
+      <button class="home-tab" data-view="recent">Recent</button>
       <button class="home-tab" data-view="templates">Templates</button>
       <button class="home-tab" data-view="samples">Sample Documents</button>
+      <span class="home-tabs-end">
+        <button class="text-btn" id="shelf-add" title="A new shelf to arrange books on">+ Shelf</button>
+      </span>
     </div>
 
-    <div class="home-list" id="home-list"></div>
+    <div class="home-shelves" id="home-shelves"></div>
+    <div class="home-list" id="home-list" hidden></div>
 
     <div class="home-foot">
       <button class="btn primary" id="home-new">New <span class="kbd-inline" id="new-key">⌘N</span></button>

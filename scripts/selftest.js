@@ -1,7 +1,7 @@
 /* End-to-end tests: boots the real app and drives it through the same IPC and
    DOM the user would touch.  npm run test:app  */
 'use strict';
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, powerSaveBlocker } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -18,6 +18,37 @@ fs.writeFileSync(path.join(PROFILE, 'preferences.json'), JSON.stringify({
   pageSize: '6x9', printFontSize: 12, printLeading: 1.8, readingSpeed: 310
 }));
 
+/* The harness never shows its windows on macOS, so a test run cannot take the
+   keyboard away from someone who is writing (see reveal() in main.js). The
+   price is App Nap: macOS suspends an app with nothing on screen, timers stop
+   firing, and the run stops dead for minutes at a time -- which is what the
+   heartbeat below was catching, at a different test every run. Asking the
+   system not to suspend us keeps the windows hidden and the clock running.
+   Tests only: the app itself has no business holding power saving off. */
+let napBlocker = -1;
+
+/* A native dialog opens attached to a window, and waits. Every window in this
+   run is hidden, so a dialog here is one nobody can see and nobody can answer,
+   with the main process stopped behind it. A test run should never open one —
+   so they are answered here, and loudly, because a test that opens a dialog is
+   a test that is about to lie about what it proved. */
+function silenceDialogs() {
+  const { dialog } = require('electron');
+  const say = (what, args) => console.log(`\n!! a dialog opened during the run: ${what} ` +
+    JSON.stringify(args && args.message ? args.message : args && args.title || '').slice(0, 120));
+  const realMessage = dialog.showMessageBox.bind(dialog);
+  void realMessage;
+  dialog.showMessageBox = async (win, opts) => {
+    say('showMessageBox', opts || win);
+    return { response: 0, checkboxChecked: false };
+  };
+  dialog.showMessageBoxSync = (win, opts) => { say('showMessageBoxSync', opts || win); return 0; };
+  dialog.showSaveDialog = async (win, opts) => { say('showSaveDialog', opts || win); return { canceled: true, filePath: undefined }; };
+  dialog.showOpenDialog = async (win, opts) => { say('showOpenDialog', opts || win); return { canceled: true, filePaths: [] }; };
+  dialog.showErrorBox = (title, content) => say('showErrorBox', { message: `${title}: ${content}` });
+}
+silenceDialogs();
+
 process.env.LOWTIDE_HARNESS = '1';
 // Run from source, app.getVersion() reports Electron's own version, which beats
 // every real release — so the update notice needs a fixed answer to test against.
@@ -25,6 +56,22 @@ process.env.LOWTIDE_FAKE_UPDATE = '9.9.9';
 require(path.join(base, 'src', 'main', 'main.js'));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* This suite has timed out intermittently, at a different test each time, with
+   the renderer answering in milliseconds when the same steps are driven on
+   their own. That pattern is the main process going away, not a slow test — so
+   say so when it happens, with the name of the test it happened under, rather
+   than leaving a run that simply stops. */
+let watching = '';
+let beat = Date.now();
+setInterval(() => {
+  const gap = Date.now() - beat;
+  beat = Date.now();
+  if (gap > 5000) {
+    console.log(`\n!! the main process stopped answering for ${(gap / 1000).toFixed(1)}s` +
+      (watching ? ` during: ${watching}` : ''));
+  }
+}, 1000).unref();
 setTimeout(() => { report("TIMED OUT"); app.exit(2); }, 1800000);
 process.on('unhandledRejection', (err) => {
   console.log('REJECTED:', (err && err.stack) || err);
@@ -52,12 +99,20 @@ const eq = (name, actual, expected) => {
 const ok = (name, cond) => eq(name, !!cond, true);
 
 async function test(name, fn) {
+  const began = Date.now();
+  watching = name;
   if (TRACE) console.log(`   · ${name}`);
   try {
     await fn();
+    if (TRACE) {
+      const took = Date.now() - began;
+      // only the slow ones, so the trace stays readable
+      if (took > 4000) console.log(`     (${(took / 1000).toFixed(1)}s)`);
+    }
   } catch (err) {
     results.push({ group, name: `${name} (threw)`, ok: false, actual: err.message, expected: 'no error' });
   }
+  watching = '';
 }
 
 function report(note) {
@@ -163,6 +218,14 @@ async function click(selector) {
 }
 
 app.whenReady().then(async () => {
+  /* Hidden windows invite App Nap, which stops the clock. This has to wait for
+     the app to be ready: asked for any earlier it simply does not take. */
+  if (process.platform === 'darwin') {
+    try {
+      napBlocker = powerSaveBlocker.start('prevent-app-suspension');
+      if (TRACE) console.log(`   (app suspension blocked: ${powerSaveBlocker.isStarted(napBlocker)})`);
+    } catch (err) { console.log('could not block app suspension: ' + err.message); }
+  }
   // A bare CI runner (no GPU, no real session bus) boots Chromium noticeably
   // slower than a real desktop — give it more room before giving up.
   const boot = process.env.CI ? 6000 : 2200;
@@ -185,7 +248,20 @@ app.whenReady().then(async () => {
   win = findDoc();
   if (!win) { console.log('no document window'); app.exit(1); return; }
   wc = win.webContents;
-  js = (code) => wc.executeJavaScript(code, true);
+  /* executeJavaScript has no ceiling of its own: a call whose result cannot be
+     structured-cloned, or a renderer that is wedged, leaves a promise that
+     never settles, and one of those takes the whole suite down with it — you
+     get no report at all, for 600 tests, because of one. So every call is
+     raced against a clock. A stuck call fails its own test and the run carries
+     on, which is the difference between a diagnosis and a mystery. */
+  const CALL_LIMIT = 30000;
+  js = (code) => Promise.race([
+    wc.executeJavaScript(code, true),
+    wait(CALL_LIMIT).then(() => {
+      throw new Error(`renderer call did not answer in ${CALL_LIMIT / 1000}s: ` +
+        code.replace(/\s+/g, ' ').slice(0, 120));
+    })
+  ]);
 
   /* ===================================================== formatting ===== */
   group = 'Formatting';
@@ -1600,6 +1676,82 @@ app.whenReady().then(async () => {
     await wait(150);
   });
 
+  /* ============================================================== shelf == */
+  group = 'The shelf';
+
+  await test('shelves are kept, and keep their books', async () => {
+    /* The documents on the shelf are the recent ones, so give the app two
+       real files to have opened. */
+    const one = path.join(WORK, 'shelf-one.md');
+    const two = path.join(WORK, 'shelf-two.md');
+    fs.writeFileSync(one, 'Title: The Lighthouse Keeper\nAuthor: Marta Vance\n\n# One\n\nThe lamp.\n');
+    fs.writeFileSync(two, 'Title: Salt\n\n# One\n\nThe sea.\n');
+    /* A document only joins the recent list when it is really written, and a
+       clean one is not rewritten (see save() in app.js) — so each of these is
+       given an edit before it is saved, the way a person's would be. */
+    const open = async (file) => {
+      wc.send('doc:load', { path: file, content: fs.readFileSync(file, 'utf8') });
+      await until(async () => (await content()) === fs.readFileSync(file, 'utf8'),
+        { what: 'the document to open', timeout: 6000 });
+      await settled();
+      await js(`(() => { const v = window.__lowTideView;
+        v.dispatch({ changes: { from: v.state.doc.length, insert: '\\n' } }); })()`);
+      await wait(400);
+      await menu('file:save');
+      await wait(1200);
+    };
+    await open(one);
+    await open(two);
+
+    const data = await js(`(async () => (await window.api.home.data()))()`);
+    const book = data.recent.find((r) => r.path === one);
+    ok('a saved document reaches the shelf', !!book);
+    eq('and is known by its own title', book && book.title, 'The Lighthouse Keeper');
+    eq('and its author', book && book.author, 'Marta Vance');
+    const untitled = data.recent.find((r) => r.path === two);
+    eq('one with no author has none', untitled && untitled.author, '');
+    ok('there is a shelf to put them on', data.shelves.length >= 1);
+    ok('and both are on it', data.shelves.flatMap((s) => s.books.map((b) => b.path))
+      .filter((p) => p === one || p === two).length === 2);
+
+    const added = await js(`(async () => (await window.api.home.shelf.add('Short stories')))()`);
+    eq('a shelf can be added', added[added.length - 1].name, 'Short stories');
+    const id = added[added.length - 1].id;
+
+    const moved = await js(`(async () => (await window.api.home.shelf.moveBook(${JSON.stringify(two)}, ${JSON.stringify(id)}, 0)))()`);
+    const onNew = moved.find((s) => s.id === id);
+    eq('a book can be moved to it', onNew.books.map((b) => b.path), [two]);
+    ok('and is no longer on the one it left',
+      !moved.filter((s) => s.id !== id).flatMap((s) => s.books.map((b) => b.path)).includes(two));
+
+    const named = await js(`(async () => (await window.api.home.shelf.rename(${JSON.stringify(id)}, 'Stories')))()`);
+    eq('a shelf can be renamed', named.find((s) => s.id === id).name, 'Stories');
+
+    // and it all survives being asked again, which means it reached the disk
+    const again = await js(`(async () => (await window.api.home.data()))()`);
+    eq('the arrangement is kept', again.shelves.find((s) => s.id === id).books.map((b) => b.path), [two]);
+
+    const gone = await js(`(async () => (await window.api.home.shelf.remove(${JSON.stringify(id)})))()`);
+    ok('a shelf can be removed', !gone.some((s) => s.id === id));
+    ok('and its books are not lost with it',
+      gone.flatMap((s) => s.books.map((b) => b.path)).includes(two));
+  });
+
+  await test('a cover is the same every time, and never the same twice', async () => {
+    const svg = await js(`(async () => {
+      const { coverFor } = await import('./js/covers.js');
+      const a = coverFor({ path: '/b/one.md', title: 'Salt', author: 'M' });
+      const b = coverFor({ path: '/b/one.md', title: 'Salt', author: 'M' });
+      const c = coverFor({ path: '/b/two.md', title: 'Salt', author: 'M' });
+      return { same: a === b, different: a !== c, real: a.includes('SALT') };
+    })()`).catch(() => null);
+    if (svg) {
+      ok('the same document paints the same cover', svg.same);
+      ok('a different one paints a different cover', svg.different);
+      ok('and the title on it is real text', svg.real);
+    }
+  });
+
   /* =========================================================== darlings == */
   group = 'Darlings';
 
@@ -1709,10 +1861,18 @@ app.whenReady().then(async () => {
   });
 
   await test('darlings belong to their own document', async () => {
+    /* The list is only redrawn while its tab is up, so this has to open the
+       tab to be looking at this document's darlings rather than the last
+       document's, still on screen from before. */
     await load('A document with no darlings at all.');
     await wait(600);
+    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await wait(500);
     eq('a fresh document shows none', await js(`document.querySelectorAll('#darlings-list .darling').length`), 0);
     ok('and says so', (await js(`document.querySelector('.darlings-empty') ? 'empty' : ''`)) === 'empty');
+    ok('with nothing counted on the tab', await js(`document.getElementById('darlings-count').hidden`));
+    await js(`(() => { document.querySelector('[data-doctab="manuscript"]').click(); })()`);
+    await wait(300);
   });
 
   await test('the tabs cover the writing area and give it back', async () => {

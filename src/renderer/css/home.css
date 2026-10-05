@@ -83,6 +83,104 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
 .home-tab:hover { color: var(--text); }
 .home-tab.on { background: var(--primary-dim); color: var(--text); }
 
+/* ------------------------------------------------------------------ shelf */
+
+/* The face a manuscript is kept under. Serif, because every book on a real
+   shelf is, and the system stack means no font to download. */
+:root {
+  --cover-face: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+                Georgia, "Times New Roman", serif;
+  --book-w: 104px;
+}
+
+.home-tabs-end { flex: 0 0 auto; display: flex; align-items: center; -webkit-app-region: no-drag; }
+#shelf-add { padding: 7px 10px; font-size: 12px; }
+
+.home-shelves { flex: 1 1 auto; overflow-y: auto; padding: 4px 18px 24px; }
+
+.shelf { padding: 2px 0 6px; }
+.shelf.dragging { opacity: 0.4; }
+.shelf.over .shelf-row { background: var(--primary-ghost); border-radius: var(--radius-sm); }
+
+.shelf-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 2px 8px;
+}
+.shelf-grip { cursor: grab; color: var(--text-5, var(--text-4)); font-size: 12px; letter-spacing: -1px; }
+.shelf-grip:active { cursor: grabbing; }
+.shelf-name {
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-3); cursor: text;
+}
+.shelf-name:hover { color: var(--text); }
+.shelf-count { flex: 1 1 auto; font-size: 11px; color: var(--text-4); }
+.shelf-remove { font-size: 11px; opacity: 0; transition: opacity var(--dur) var(--ease); }
+.shelf:hover .shelf-remove, .shelf-remove:focus-visible { opacity: 1; }
+
+/* A row of covers with a hairline under it, which is what makes it read as a
+   shelf rather than a grid of cards. */
+.shelf-row {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px 16px;
+  padding: 2px 2px 16px;
+  border-bottom: 1px solid var(--outline-soft);
+  min-height: 40px;
+}
+.shelf-empty { padding: 26px 4px; font-size: 12px; color: var(--text-4); }
+
+.book {
+  position: relative;
+  flex: 0 0 auto; width: var(--book-w);
+  padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+}
+.book-cover {
+  display: block; width: 100%; aspect-ratio: 2 / 3;
+  border-radius: 2px; overflow: hidden;
+  box-shadow: var(--shadow-book);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.book-cover svg { display: block; width: 100%; height: 100%; }
+.book:hover .book-cover { transform: translateY(-3px); box-shadow: var(--shadow-book-lift); }
+.book.on .book-cover { box-shadow: 0 0 0 2px var(--primary), var(--shadow-book-lift); }
+.book.dragging { opacity: 0.35; }
+
+.book-progress {
+  display: block; height: 2px; margin-top: 6px;
+  background: var(--surface-3); border-radius: 2px; overflow: hidden;
+}
+.book-progress-fill { display: block; height: 100%; background: var(--primary); }
+.book-when {
+  display: block; margin-top: 5px;
+  font-size: 10.5px; color: var(--text-4);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Renaming a shelf, in place. */
+.shelf-rename {
+  font: inherit; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--primary); border-radius: var(--radius-sm);
+  padding: 2px 6px; width: 190px; outline: none;
+}
+
+/* Asked on the tile rather than in a dialog. */
+.book-ask {
+  position: absolute; inset: auto 0 0 0;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 7px;
+  background: var(--surface); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-1);
+  font-size: 10.5px; color: var(--text-3);
+}
+.book-ask-t { flex: 1 1 auto; }
+.book-ask .text-btn { font-size: 10.5px; padding: 0 3px; }
+
+/* Where a dragged book or shelf would land. */
+.book-drop {
+  flex: 0 0 auto; width: 2px; align-self: stretch;
+  background: var(--primary); border-radius: 2px;
+}
+.shelf-drop { height: 2px; margin: 6px 0; background: var(--primary); border-radius: 2px; }
+
 .home-list { flex: 1 1 auto; overflow-y: auto; padding: 4px 12px 12px; }
 
 .home-item {

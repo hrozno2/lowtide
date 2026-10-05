@@ -49,6 +49,14 @@ contextBridge.exposeInMainWorld('api', {
 
   home: {
     data: () => ipcRenderer.invoke('home:data'),
+    shelf: {
+      moveBook: (path, to, index) => ipcRenderer.invoke('shelf:move-book', { path, to, index }),
+      move: (id, index) => ipcRenderer.invoke('shelf:move', { id, index }),
+      add: (name) => ipcRenderer.invoke('shelf:add', name),
+      rename: (id, name) => ipcRenderer.invoke('shelf:rename', { id, name }),
+      remove: (id) => ipcRenderer.invoke('shelf:remove', id),
+      forget: (path) => ipcRenderer.invoke('shelf:forget', path)
+    },
     open: (path) => ipcRenderer.invoke('home:open', path),
     create: (templateId) => ipcRenderer.invoke('home:create', templateId),
     browse: () => ipcRenderer.invoke('home:browse'),

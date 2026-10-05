@@ -13,6 +13,7 @@ await esbuild.build({
 });
 const M = await import(out);
 
+const require_ = createRequire(import.meta.url);
 let pass = 0;
 const failures = [];
 const eq = (name, actual, expected) => {
@@ -226,7 +227,6 @@ ok('notes can be kept',
    M.documentBlocks('a [[note]] b', { notes: true })[0].runs.some((r) => r.text === 'note'));
 
 /* ----------------------------------------------------------------- docx */
-const require_ = createRequire(import.meta.url);
 const { buildDocx } = require_('../src/main/docx.js');
 const docx = buildDocx(
   [{ type: 'h1', runs: [{ text: 'Chapter' }] },
@@ -313,6 +313,124 @@ eq('a missing repository is null', U.repoSlug({}), null);
   eq('a space is added where words would collide', M.restoreText('ab', 1, 'X'), ' X ');
   eq('and not where there is already space', M.restoreText('a b', 2, 'X'), 'X ');
   eq('nor at the very end', M.restoreText('a ', 2, 'X'), 'X');
+}
+
+/* ----------------------------------------------------------------- covers */
+
+/* A cover is painted from the document's own path, so the same book has to
+   get the same face every time, on every machine, with nothing stored. */
+{
+  const book = { path: '/Users/someone/Books/The Lighthouse Keeper.md',
+                 title: 'The Lighthouse Keeper', author: 'Marta Vance' };
+
+  eq('the same path always gives the same seed', M.seedOf(book.path), M.seedOf(book.path));
+  ok('a different path gives a different one', M.seedOf(book.path) !== M.seedOf(book.path + 'x'));
+  eq('and the cover is the same twice', M.coverFor(book), M.coverFor(book));
+  ok('but not the same as another book\'s',
+     M.coverFor(book) !== M.coverFor({ ...book, path: '/Users/someone/Books/Salt.md' }));
+
+  const svg = M.coverFor(book);
+  ok('it is an svg', svg.startsWith('<svg') && svg.endsWith('</svg>'));
+  ok('the title is real text, not a picture of it', svg.includes('THE LIGHTHOUSE') || svg.includes('The Lighthouse'));
+  ok('the author is on it', svg.includes('MARTA VANCE'));
+  ok('and a screen reader is told what it is', svg.includes('role="img"') && svg.includes('aria-label="The Lighthouse Keeper"'));
+
+  // markup in a title must not become markup in the cover
+  const nasty = M.coverFor({ path: 'x', title: 'Tom & <script>Jerry</script>', author: '"Quoted"' });
+  ok('a title cannot smuggle markup in', !nasty.includes('<script>'));
+  ok('and its ampersand is escaped', nasty.includes('&amp;'));
+
+  /* Type is only readable if its lightness is decided by the ground, so this
+     checks every palette at once and names the ones that got it wrong. */
+  const unreadable = [];
+  for (let i = 0; i < 500; i++) {
+    const p = M.paletteFor((i * 2654435761) % 4294967296);
+    const light = Number(/,\s*([0-9.]+)%\)$/.exec(p.ink)[1]);
+    if (p.dark ? light < 85 : light > 25) unreadable.push(`${i}: ${p.ink} on ${p.ground}`);
+  }
+  eq('every palette puts readable type on its own ground', unreadable, []);
+
+  // titles break where a person would break them
+  eq('one word stays one line', M.breakTitle('Salt'), ['Salt']);
+  eq('two words of a long title split', M.breakTitle('The Lighthouse Keeper').length <= 3, true);
+  ok('no line is empty', M.breakTitle('A Catalogue of Small Lights').every((l) => l.trim().length));
+  eq('every word survives the break',
+     M.breakTitle('A Catalogue of Small Lights').join(' '), 'A Catalogue of Small Lights');
+  eq('an empty title breaks into nothing', M.breakTitle(''), []);
+
+  // a long title must still fit the tile
+  const long = M.typeFor({ title: 'The Extraordinarily Long And Overreaching Title Of A Debut Novel' }, 1);
+  ok('a long title is set smaller', long.size < 24);
+  ok('and still on few enough lines to fit', long.lines.length <= 4);
+  ok('a short one is set large', M.typeFor({ title: 'Salt' }, 1).size > 24);
+
+  // an untitled document still gets a cover
+  ok('an untitled document still gets one', M.coverFor({ path: '/x/y.md' }).startsWith('<svg'));
+}
+
+/* ------------------------------------------------------------------ shelf */
+
+/* A shelf is an arrangement over paths, not a place on disk. The rules worth
+   holding down are the ones where a book could go missing. */
+{
+  const S = require_('../src/main/shelf.js');
+  const book = (p, t) => ({ path: p, name: p, time: t });
+  const a = book('/b/a.md', 300), b = book('/b/b.md', 200), c = book('/b/c.md', 100);
+
+  // nothing arranged yet
+  const fresh = S.arrange([], [a, b, c]);
+  eq('with no shelves kept, there is one', fresh.length, 1);
+  eq('and it is named', fresh[0].name, S.DEFAULT_SHELF);
+  eq('holding every book, newest first', fresh[0].books.map((x) => x.path), ['/b/a.md', '/b/b.md', '/b/c.md']);
+
+  // an arrangement that was kept
+  const kept = [{ id: 's1', name: 'Novels', paths: ['/b/c.md', '/b/a.md'] },
+                { id: 's2', name: 'Stories', paths: ['/b/b.md'] }];
+  const arranged = S.arrange(kept, [a, b, c]);
+  eq('a kept order is kept', arranged[0].books.map((x) => x.path), ['/b/c.md', '/b/a.md']);
+  eq('across shelves', arranged[1].books.map((x) => x.path), ['/b/b.md']);
+
+  // a document opened since last time has never been shelved
+  const d = book('/b/d.md', 400);
+  const withNew = S.arrange(kept, [a, b, c, d]);
+  eq('a new document goes to the front of the first shelf',
+     withNew[0].books.map((x) => x.path), ['/b/d.md', '/b/c.md', '/b/a.md']);
+
+  // a file that is gone from disk
+  const gone = S.arrange(kept, [a, b]);
+  eq('a file that is gone leaves the shelf', gone[0].books.map((x) => x.path), ['/b/a.md']);
+  eq('and no book is invented', gone.flatMap((s) => s.books).length, 2);
+
+  // moving
+  const moved = S.moveBook(kept, '/b/a.md', 's2', 0);
+  eq('a book leaves the shelf it was on', moved[0].paths, ['/b/c.md']);
+  eq('and lands where it was dropped', moved[1].paths, ['/b/a.md', '/b/b.md']);
+
+  const within = S.moveBook(kept, '/b/c.md', 's1', 1);
+  eq('a move inside one shelf counts positions after it has left',
+     within[0].paths, ['/b/a.md', '/b/c.md']);
+
+  const past = S.moveBook(kept, '/b/b.md', 's1', 99);
+  eq('dropping past the end lands at the end', past[0].paths, ['/b/c.md', '/b/a.md', '/b/b.md']);
+
+  // shelves themselves
+  eq('a shelf can be moved', S.moveShelf(kept, 's2', 0).map((s) => s.id), ['s2', 's1']);
+  eq('a shelf can be renamed', S.renameShelf(kept, 's2', 'Shorts')[1].name, 'Shorts');
+  eq('an empty name is refused', S.renameShelf(kept, 's2', '   ')[1].name, 'Stories');
+
+  const removed = S.removeShelf(kept, 's2');
+  eq('removing a shelf leaves the others', removed.length, 1);
+  eq('and its books are not lost with it', removed[0].paths, ['/b/c.md', '/b/a.md', '/b/b.md']);
+  eq('the last shelf cannot be removed', S.removeShelf([kept[0]], 's1').length, 1);
+
+  // front matter
+  eq('a title is read from the front matter',
+     S.metaFrom('Title: The Lighthouse Keeper\nAuthor: Marta Vance\n\nThe lamp...').title,
+     'The Lighthouse Keeper');
+  eq('and the author', S.metaFrom('Title: X\nAuthor: Marta Vance\n').author, 'Marta Vance');
+  eq('a document with no front matter has none', S.metaFrom('The lamp had been burning.').title, '');
+  eq('reading stops at the first line that is not front matter',
+     S.metaFrom('Title: X\n\nAuthor: not really\n').author, '');
 }
 
 /* ------------------------------------------------- the first-paint palette */
