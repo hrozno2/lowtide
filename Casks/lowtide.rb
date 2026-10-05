@@ -2,9 +2,9 @@
 cask "lowtide" do
   arch arm: "arm64", intel: "x64"
 
-  version "1.0.33"
-  sha256 arm:   "e0eeae989ca69942c00344a9bc7ce5693e5e8fda703e49edb1ee769b8260fbfa",
-         intel: "3009b571c4be37e78012d56b3c31aebd4a2555d1ec4eeb3bd1124893e4d6dcbf"
+  version "1.0.34"
+  sha256 arm:   "f6e8887c505518e70d72147a58b40a4bad2fdb3a93a7a8bf92858883078ab45d",
+         intel: "b0a3fb51ad2d5d182f303b7233c1ac06dc4f85a24d3df369c5d1f6437ccfd9ec"
 
   url "https://github.com/hrozno2/lowtide/releases/download/v#{version}/LowTide-#{version}-mac-#{arch}.dmg"
   name "Low Tide"
