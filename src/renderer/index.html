@@ -182,28 +182,17 @@
       </div>
     </section>
 
-    <section class="sheet-host" id="notes-host" hidden>
-      <div class="sheet-head">
-        <h2 class="sheet-title">Notes</h2>
-        <span class="sheet-hint">Kept beside the manuscript, never counted in it.</span>
-      </div>
-      <textarea class="sheet-pad" id="notes-pad" spellcheck="true"
-                placeholder="Anything that is not the book: what happens next, what to check, who said what."></textarea>
-    </section>
-
-    <section class="sheet-host" id="darlings-host" hidden>
-      <div class="sheet-head">
-        <h2 class="sheet-title">Darlings</h2>
-        <span class="sheet-hint">Select a passage and press <kbd>⇧⌘D</kbd>. It leaves the manuscript, not your hands.</span>
-      </div>
-      <div class="sheet-body" id="darlings-list"></div>
-    </section>
       </div>
 
     <div class="side-dock" id="side-dock" hidden>
       <div class="dock-grip" id="dock-grip" title="Drag to resize"></div>
       <div class="dock-head">
         <span class="dock-title" id="dock-title">Outline</span>
+        <span class="dock-tabs" id="dock-tabs" role="tablist">
+          <button class="dock-tab on" role="tab" aria-selected="true" data-dock="outline">Outline</button>
+          <button class="dock-tab" role="tab" aria-selected="false" data-dock="notes">Notes</button>
+          <button class="dock-tab" role="tab" aria-selected="false" data-dock="darlings">Darlings<span class="dock-tab-n" id="darlings-count" hidden></span></button>
+        </span>
         <span class="dock-tools" id="dock-tools"></span>
         <button class="icon-btn" id="dock-close" title="Close"><svg class="mini"><use href="#i-close"/></svg></button>
       </div>
@@ -220,11 +209,6 @@
     <footer class="statusbar" id="statusbar">
       <div class="sb-left">
         <button class="sb-save" id="save-state">New document</button>
-        <div class="sb-tabs" id="doc-tabs" role="tablist">
-          <button class="sb-tab on" role="tab" aria-selected="true" data-doctab="manuscript">Manuscript</button>
-          <button class="sb-tab" role="tab" aria-selected="false" data-doctab="notes">Notes</button>
-          <button class="sb-tab" role="tab" aria-selected="false" data-doctab="darlings">Darlings<span class="sb-tab-n" id="darlings-count" hidden></span></button>
-        </div>
       </div>
       <div class="sb-center">
         <span id="stat-chars">0 characters</span>

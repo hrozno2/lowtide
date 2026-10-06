@@ -30,12 +30,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 setTimeout(() => { console.log('TIMED OUT'); app.exit(2); }, 600000);
 
 /* Candidate pages. The first is what Low Tide ships today. */
-const CANDIDATES = [
-  { name: 'shipped (6x9 trade)',  pageSize: '6x9',     printFontSize: 11.5, printLeading: 1.45, printSideMargin: 0.875, printMargin: 0.9,  printBottomMargin: 0.9 },
-  { name: 'mass market',          pageSize: '5.5x8.5', printFontSize: 10.5, printLeading: 1.42, printSideMargin: 0.75,  printMargin: 0.75, printBottomMargin: 0.75 },
-  { name: 'Highland Novel (A4)',  pageSize: 'a4',      printFontSize: 13,   printLeading: 1.6,  printSideMargin: 1.46,  printMargin: 1,    printBottomMargin: 1 },
-  { name: 'submission manuscript',pageSize: 'a4',      printFontSize: 12,   printLeading: 2,    printSideMargin: 1,     printMargin: 1,    printBottomMargin: 1 }
-];
+/* By default, every page Preferences offers. Pass --candidates to compare
+   geometries that are not presets yet. */
+const { pagePresets } = require(path.join(base, 'src', 'main', 'store'));
+const CANDIDATES = pagePresets().map((x) => Object.assign({ name: `${x.name} (${x.trim})` }, x.prefs));
 
 app.whenReady().then(async () => {
   await wait(2500);

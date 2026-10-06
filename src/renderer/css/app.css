@@ -505,13 +505,15 @@ body:not(.nav-open) .sidebar { margin-left: calc(-1 * var(--nav-w)); opacity: 0;
   border-bottom: 1px solid var(--outline-soft);
 }
 .dock-title {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   font-size: 10px; font-weight: 600; letter-spacing: .14em;
   text-transform: uppercase; color: var(--text-4);
 }
-.dock-tools { flex: 1 1 auto; display: flex; justify-content: flex-end; gap: 4px; align-items: center; }
+.dock-tools { flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 4px; align-items: center; }
 .dock-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .dock-view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* Darlings are a list, so this one scrolls where the others manage their own. */
+.dock-view[data-mode="darlings"] { display: block; overflow-y: auto; padding: 12px 0 24px; }
 .music-pane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* the outline is a second editor, so it needs the same measure treatment */
@@ -885,79 +887,52 @@ input[type="range"]::-webkit-slider-thumb {
   pointer-events: none;
 }
 
-/* ------------------------------------------------- tabs and their sheets */
+/* ------------------------------------------------ the pane's three tabs */
 
-/* Manuscript, Notes and Darlings. They sit in the status bar because that is
-   where your eye already is while you write, and because the thing they
-   switch between is the page itself, not a panel beside it. */
-/* The left of the status bar is now a row: the save state, then the tabs. On
-   a narrow window the file name gives way first — which tab you are on
-   matters more than being reminded what the document is called. */
-.sb-left { display: flex; align-items: center; }
-.sb-left .sb-save { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb-tabs { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; margin-left: 14px; }
-.sb-tab {
+/* Outline, Notes and Darlings share the pane beside the manuscript, because
+   that is where all three are wanted WHILE you write rather than instead of
+   it. The tabs replace the pane's title when one of them is up. */
+.dock-tabs { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
+.dock-tab {
   background: none; border: 0; border-radius: 5px;
-  padding: 2px 9px; margin: 0;
-  font: inherit; color: var(--text-4); cursor: pointer;
-  white-space: nowrap;
+  padding: 3px 8px; margin: 0;
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-4); cursor: pointer; white-space: nowrap;
 }
-.sb-tab:hover { color: var(--text-2); background: var(--surface-2); }
-.sb-tab.on { color: var(--text); background: var(--surface-3); }
-.sb-tab-n {
-  display: inline-block; margin-left: 6px; padding: 0 5px;
+.dock-tab:hover { color: var(--text-2); background: var(--surface-2); }
+.dock-tab.on { color: var(--text); background: var(--surface-3); }
+.dock-tab-n {
+  display: inline-block; margin-left: 5px; padding: 0 4px;
   border-radius: 7px; background: var(--primary); color: var(--on-primary);
-  font-size: 10px; line-height: 14px; vertical-align: 1px;
+  font-size: 9.5px; line-height: 13px; letter-spacing: 0; vertical-align: 1px;
 }
 
-/* Notes and Darlings cover the writing area the way the pages view does, so
-   the editor underneath keeps its caret and its place without being asked. */
-.sheet-host {
-  /* Above the pages view, which covers the same area: asking for Notes while
-     the preview is up should show Notes. */
-  position: absolute; inset: 0; z-index: 11;
-  display: flex; flex-direction: column;
-  background: var(--bg);
-  animation: fade 140ms var(--ease);
-}
-.sheet-head {
-  flex: 0 0 auto; display: flex; align-items: baseline; gap: 12px;
-  padding: 10px 24px 10px 140px;   /* clear the floating view switch */
-  border-bottom: 1px solid var(--outline-soft);
-  background: var(--surface);
-}
-.sheet-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
-.sheet-hint { font-size: 12px; color: var(--text-4); }
-.sheet-hint kbd {
-  font: inherit; padding: 0 4px; border: 1px solid var(--outline-soft);
-  border-radius: 4px; background: var(--surface-2);
-}
-.sheet-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 18px 0 24vh; }
-.sheet-pad {
-  flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box;
+/* Notes: the whole pane is the page. */
+.dock-pad {
+  width: 100%; height: 100%; box-sizing: border-box;
   border: 0; outline: none; resize: none;
-  padding: 22px max(26px, calc((100% - var(--doc-width)) / 2)) 24vh;
-  background: var(--bg); color: var(--text);
-  font-family: var(--doc-font); font-size: var(--doc-size); line-height: var(--doc-lh);
+  padding: 14px 16px 24px;
+  background: transparent; color: var(--text);
+  font-family: var(--doc-font); font-size: 13.5px; line-height: 1.6;
 }
 
 /* A darling: what it says, where it came from, and what you can do with it. */
 .darling {
-  max-width: var(--doc-width); margin: 0 auto 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--outline-soft); border-radius: 10px;
+  margin: 0 12px 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--outline-soft); border-radius: 9px;
   background: var(--surface);
 }
 .darling-text {
-  margin: 0 0 10px; white-space: pre-wrap;
-  font-family: var(--doc-font); font-size: 14px; line-height: 1.55; color: var(--text-2);
+  margin: 0 0 9px; white-space: pre-wrap;
+  font-family: var(--doc-font); font-size: 12.5px; line-height: 1.5; color: var(--text-2);
+  max-height: 10.5em; overflow: hidden;
 }
-.darling-foot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-4); }
-.darling-where { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.darling-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: var(--text-4); }
+.darling-where { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .darling-lost { color: var(--stat); }
 .darlings-empty {
-  max-width: var(--doc-width); margin: 12vh auto 0;
-  text-align: center; color: var(--text-4); font-size: 13px; line-height: 1.7;
+  padding: 18px 16px; color: var(--text-4); font-size: 12px; line-height: 1.7;
 }
 
 /* ---------------------------------------------------------------- preview */

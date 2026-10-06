@@ -38,7 +38,6 @@ const state = {
   pageCount: 0,
   pagePresets: [],
   darlings: [],
-  docTab: 'manuscript',
   lastPages: 0,
   scratch: '',
   revisions: [],
@@ -471,12 +470,13 @@ async function loadExtras(path) {
   state.scratch = extras.scratch || '';
   state.outline_text = typeof extras.outline === 'string' ? extras.outline : null;
   if (state.dockMode === 'outline') renderOutlineDock();
+  if (state.dockMode === 'notes') renderNotesDock();
   state.revisions = Array.isArray(extras.revisions) ? extras.revisions : [];
   state.activeRevision = extras.activeRevision || null;
   state.darlings = Array.isArray(extras.darlings) ? extras.darlings : [];
 
   $('scratchpad').value = state.scratch;
-  $('notes-pad').value = state.scratch;
+  if (notesPad) notesPad.value = state.scratch;
   renderDarlings();
   applyRevisions(view, { list: state.revisions, active: state.activeRevision });
   restoreMarks(view, extras.marks || []);
@@ -493,20 +493,23 @@ async function loadExtras(path) {
    travels with the document to another machine like everything else.
    darlings.js knows how one finds its way home. */
 
-function setDocTab(name) {
-  state.docTab = name;
-  document.querySelectorAll('.sb-tab').forEach((b) => {
-    const on = b.dataset.doctab === name;
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-selected', on ? 'true' : 'false');
-  });
-  $('notes-host').hidden = name !== 'notes';
-  $('darlings-host').hidden = name !== 'darlings';
-  if (name === 'darlings') renderDarlings();
-  if (name === 'notes') $('notes-pad').focus();
-  /* The editor is never unmounted, only covered, so coming back to the
-     manuscript finds the caret and the scroll exactly where they were. */
-  if (name === 'manuscript') view.focus();
+/* Notes live in the pane beside the manuscript. The same words are in the
+   sidebar scratchpad: one set of notes, two places to write them. */
+let notesPad = null;
+
+function renderNotesDock() {
+  const body = dockView('notes');
+  if (!notesPad) {
+    body.textContent = '';
+    notesPad = ui.h('textarea', {
+      class: 'dock-pad', id: 'notes-pad', spellcheck: 'true',
+      placeholder: 'Anything that is not the book: what happens next, what to check, who said what.'
+    });
+    notesPad.addEventListener('input', () => notesChanged(notesPad, $('scratchpad')));
+    body.append(notesPad);
+  }
+  if (notesPad.value !== state.scratch) notesPad.value = state.scratch;
+  notesPad.focus();
 }
 
 function sendToDarlings() {
@@ -562,7 +565,7 @@ function restoreDarling(id) {
   state.darlings = state.darlings.filter((d) => d.id !== id);
   saveExtras();
   renderDarlings();
-  setDocTab('manuscript');
+  view.focus();
   ui.toast(home.at === -1 ? 'Its place was gone — put back at the caret'
          : home.sure ? 'Back where it came from'
          : 'Back near where it came from — the words around it had changed');
@@ -576,11 +579,14 @@ function forgetDarling(id) {
 
 function renderDarlings() {
   const badge = $('darlings-count');
-  badge.textContent = state.darlings.length;
-  badge.hidden = !state.darlings.length;
+  if (badge) {
+    badge.textContent = state.darlings.length;
+    badge.hidden = !state.darlings.length;
+  }
 
-  const host = $('darlings-list');
-  if (!host || $('darlings-host').hidden) return;
+  // nothing to draw until the pane has been opened on them at least once
+  if (state.dockMode !== 'darlings') return;
+  const host = dockView('darlings');
   host.textContent = '';
 
   if (!state.darlings.length) {
@@ -638,28 +644,27 @@ function renderDarlings() {
 
 /* ---------------------------------------------------------------- scratch */
 
-function wireScratchpad() {
-  const pad = $('scratchpad');
-  const sheet = $('notes-pad');
+/* One set of notes, two places to write them: the strip in the sidebar for a
+   line while you are writing, the pane beside the page when there is more to
+   say. Whichever you type in, the other shows it. */
+function notesChanged(from, to) {
+  state.scratch = from.value;
+  if (to && to.value !== from.value) to.value = from.value;
   const state$ = $('scratch-state');
-
-  /* One set of notes, two places to write them: the strip in the sidebar for
-     a line while you are writing, the Notes tab when there is more to say. */
-  const changed = (from, to) => {
-    state.scratch = from.value;
-    to.value = from.value;
-    state$.textContent = state.path ? 'saving' : 'unsaved doc';
-    saveExtras();
-    clearTimeout(wireScratchpad.t);
-    wireScratchpad.t = setTimeout(() => { state$.textContent = ''; }, 1200);
-  };
-  pad.addEventListener('input', () => changed(pad, sheet));
-  sheet.addEventListener('input', () => changed(sheet, pad));
+  state$.textContent = state.path ? 'saving' : 'unsaved doc';
+  saveExtras();
+  clearTimeout(notesChanged.t);
+  notesChanged.t = setTimeout(() => { state$.textContent = ''; }, 1200);
 }
 
-function wireDocTabs() {
-  document.querySelectorAll('.sb-tab').forEach((b) => {
-    b.onclick = () => setDocTab(b.dataset.doctab);
+function wireScratchpad() {
+  const pad = $('scratchpad');
+  pad.addEventListener('input', () => notesChanged(pad, notesPad));
+}
+
+function wireDockTabs() {
+  document.querySelectorAll('.dock-tab').forEach((b) => {
+    b.onclick = () => dockOpen(b.dataset.dock);
   });
 }
 
@@ -1523,7 +1528,12 @@ async function showBackups() {
 /* One pane on the right, three things it can hold. The outline is a second
    editor so it behaves exactly like the manuscript beside it. */
 
-const DOCK_TITLES = { outline: 'Outline' };
+/* The three that belong to the document share the pane, and say so with tabs
+   rather than a title: beside the manuscript is where notes and cut passages
+   are actually wanted, not covering it. Anything else borrows the pane and
+   gets a plain title. */
+const DOCK_TITLES = { outline: 'Outline', notes: 'Notes', darlings: 'Darlings' };
+const DOC_DOCKS = ['outline', 'notes', 'darlings'];
 
 /**
  * Each mode keeps its own container, built once and then only shown or hidden.
@@ -1550,13 +1560,23 @@ function dockOpen(mode) {
   const dock = $('side-dock');
   state.dockMode = mode;
   dock.hidden = false;
-  $('dock-title').textContent = DOCK_TITLES[mode] || '';
+  const shared = DOC_DOCKS.includes(mode);
+  $('dock-tabs').hidden = !shared;
+  $('dock-title').hidden = shared;
+  $('dock-title').textContent = shared ? '' : (DOCK_TITLES[mode] || '');
   $('dock-tools').textContent = '';
+  document.querySelectorAll('.dock-tab').forEach((b) => {
+    const on = b.dataset.dock === mode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
 
-  $('btn-outline').classList.toggle('on', mode === 'outline');
+  $('btn-outline').classList.toggle('on', shared);
   syncToolbarState();
 
   if (mode === 'outline') renderOutlineDock();
+  if (mode === 'notes') renderNotesDock();
+  if (mode === 'darlings') renderDarlings();
   showDockView(mode);
 
   setPrefs({ dockMode: mode, dockOpen: true });
@@ -2594,7 +2614,7 @@ function wireChrome() {
   $('pv-notes').onchange = (e) => { setPrefs({ previewNotes: e.target.checked }); renderPreview(true); };
 
   wireScratchpad();
-  wireDocTabs();
+  wireDockTabs();
 
   $('rev-new').onclick = () => ui.showNewRevision(ctx());
   $('rev-show').onchange = (e) =>
@@ -2689,8 +2709,8 @@ function ctx() {
       focus: () => setPrefs({ focusMode: !state.prefs.focusMode }),
       music: () => toggleMusicPanel(),
       home: () => api.home.show(),
-      darlings: () => setDocTab('darlings'),
-      notes: () => setDocTab('notes'),
+      darlings: () => dockOpen('darlings'),
+      notes: () => dockOpen('notes'),
       updates: () => checkForUpdate({ force: true }),
       history: () => showBackups()
     },
@@ -2805,8 +2825,8 @@ function wireMenu() {
     'file:title-page': () => ui.showTitlePage(ctx()),
     'tools:scratch': () => setSidebarTab('scratch'),
     'tools:darling': () => sendToDarlings(),
-    'view:darlings': () => setDocTab(state.docTab === 'darlings' ? 'manuscript' : 'darlings'),
-    'view:notes': () => setDocTab(state.docTab === 'notes' ? 'manuscript' : 'notes'),
+    'view:darlings': () => dockToggle('darlings'),
+    'view:notes': () => dockToggle('notes'),
     'tools:revision': () => { setSidebarTab('revisions'); ui.showNewRevision(ctx()); },
 
     'help:updates': () => checkForUpdate({ force: true }),

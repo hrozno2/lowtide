@@ -1364,14 +1364,41 @@ app.whenReady().then(async () => {
 
   await test('a whole page can be chosen at once', async () => {
     const presets = await js(`(async () => (await window.api.prefs.presets()))()`);
-    ok('there are presets to choose', presets.length >= 4);
+    const book = presets.find((x) => x.id === 'book');
+    eq('the book page leads', book.prefs.pageSize, '6x9');
+    eq('at 11.5pt', book.prefs.printFontSize, 11.5);
+
     const highland = presets.find((x) => x.id === 'highland');
     ok('Highland\'s page is still one of them', !!highland);
     eq('set the way Highland sets it', highland.prefs.printFontSize, 13);
     ok('on the locale\'s paper', ['a4', 'letter'].includes(highland.prefs.pageSize));
-    const book = presets.find((x) => x.id === 'book');
-    eq('and the book page leads', book.prefs.pageSize, '6x9');
-    eq('at 11.5pt', book.prefs.printFontSize, 11.5);
+
+    /* The trims people actually print at. Each has to name a sheet pagination
+       knows, or the page silently falls back to A4 and every count is wrong. */
+    const SHEETS = ['5x8', '5.25x8', '5.5x8.5', '6x9', '6.14x9.21', '7x10', 'letter', 'a4'];
+    const unknown = presets.filter((x) => !SHEETS.includes(x.prefs.pageSize)).map((x) => x.id);
+    eq('every preset names a trim the app can set', unknown, []);
+    for (const id of ['kdp6x9', 'kdp5x8', 'kdp525x8', 'royal', 'large', 'pocket', 'manuscript']) {
+      ok(`${id} is offered`, presets.some((x) => x.id === id));
+    }
+    eq('large print is set at 16pt, as the standard asks',
+      presets.find((x) => x.id === 'large').prefs.printFontSize, 16);
+    ok('and ragged, because justifying large print hurts to read',
+      presets.find((x) => x.id === 'large').prefs.printJustify === false);
+    ok('every preset says what it is for', presets.every((x) => x.hint && x.trim));
+
+    // the trim really reaches the page, rather than quietly falling back
+    await js(`window.__setPref('pageSize', '5x8')`);
+    await wait(500);
+    await menu('view:preview');
+    await wait(1200);
+    const w = await js(`(async () => { await document.fonts.ready;
+      return getComputedStyle(document.querySelector('#preview-scroll .page')).width; })()`);
+    ok('a 5x8 trim draws a 5in sheet', Math.abs(parseFloat(w) - 480) < 0.5);
+    await menu('view:preview');
+    await wait(400);
+    await js(`window.__setPref('pageSize', '6x9')`);
+    await wait(400);
   });
 
   await test('the pages view zooms with the same keys as the text', async () => {
@@ -1776,9 +1803,9 @@ app.whenReady().then(async () => {
     eq('and out of the word count', countOf(after), before - 10);
     eq('the tab keeps a count of them', await text('darlings-count'), '1');
 
-    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await js(`(() => { document.querySelector('[data-dock="darlings"]').click(); })()`);
     await wait(500);
-    eq('it is on the Darlings tab', await js(`document.querySelectorAll('#darlings-list .darling').length`), 1);
+    eq('it is on the Darlings tab', await js(`document.querySelectorAll('.dock-view[data-mode="darlings"] .darling').length`), 1);
     ok('which says where it came from',
       (await js(`document.querySelector('.darling-where').textContent`)).includes('One'));
 
@@ -1794,8 +1821,7 @@ app.whenReady().then(async () => {
     const back = await content();
     ok('putting it back puts it exactly where it was',
       back.includes('ninety-one years. She counted the steps because her father had counted them. At the top'));
-    ok('and returns you to the manuscript',
-      await js(`document.querySelector('[data-doctab="manuscript"]').classList.contains('on')`));
+    ok('the pane stays open beside it', await js(`!document.getElementById('side-dock').hidden`));
     ok('the count goes away with the last one', await js(`document.getElementById('darlings-count').hidden`));
   });
 
@@ -1810,7 +1836,7 @@ app.whenReady().then(async () => {
     await wait(700);
     eq('it leaves', await content(), 'The lamp was lit. The lamp lit. Marta climbed the stairs to the lamp.');
 
-    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await js(`(() => { document.querySelector('[data-dock="darlings"]').click(); })()`);
     await wait(400);
     await js(`(() => { document.querySelector('.darling-foot .text-btn').click(); })()`);
     await wait(800);
@@ -1833,7 +1859,7 @@ app.whenReady().then(async () => {
     await wait(700);
     eq('undo brings the passage back by itself', await content(), CUT);
 
-    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await js(`(() => { document.querySelector('[data-dock="darlings"]').click(); })()`);
     await wait(400);
     await js(`(() => { document.querySelector('.darling-foot .text-btn').click(); })()`);
     await wait(800);
@@ -1866,29 +1892,41 @@ app.whenReady().then(async () => {
        document's, still on screen from before. */
     await load('A document with no darlings at all.');
     await wait(600);
-    await js(`(() => { document.querySelector('[data-doctab="darlings"]').click(); })()`);
+    await js(`(() => { document.querySelector('[data-dock="darlings"]').click(); })()`);
     await wait(500);
-    eq('a fresh document shows none', await js(`document.querySelectorAll('#darlings-list .darling').length`), 0);
+    eq('a fresh document shows none', await js(`document.querySelectorAll('.dock-view[data-mode="darlings"] .darling').length`), 0);
     ok('and says so', (await js(`document.querySelector('.darlings-empty') ? 'empty' : ''`)) === 'empty');
     ok('with nothing counted on the tab', await js(`document.getElementById('darlings-count').hidden`));
-    await js(`(() => { document.querySelector('[data-doctab="manuscript"]').click(); })()`);
+    wc.send('menu', 'view:darlings');
     await wait(300);
   });
 
-  await test('the tabs cover the writing area and give it back', async () => {
+  await test('the three share the pane beside the manuscript', async () => {
     await load(CUT);
-    await js(`(() => { document.querySelector('[data-doctab="notes"]').click(); })()`);
-    await wait(400);
-    ok('Notes covers the editor', !(await js(`document.getElementById('notes-host').hidden`)));
-    await js(`(() => { document.getElementById('notes-pad').value = 'a note';
-      document.getElementById('notes-pad').dispatchEvent(new Event('input')); })()`);
-    await wait(400);
-    eq('and shares the scratchpad', await js(`document.getElementById('scratchpad').value`), 'a note');
+    wc.send('menu', 'view:notes');
+    await wait(700);
+    ok('Notes opens the pane', await js(`!document.getElementById('side-dock').hidden`));
+    ok('with its tab lit',
+      await js(`document.querySelector('[data-dock="notes"]').classList.contains('on')`));
+    ok('and the pane\'s title stepping aside for the tabs',
+      await js(`document.getElementById('dock-title').hidden`));
 
-    await js(`(() => { document.querySelector('[data-doctab="manuscript"]').click(); })()`);
+    await js(`(() => { const p = document.getElementById('notes-pad');
+      p.value = 'a note'; p.dispatchEvent(new Event('input')); })()`);
+    await wait(500);
+    eq('notes are the scratchpad', await js(`document.getElementById('scratchpad').value`), 'a note');
+    eq('and the manuscript is untouched beside them', await content(), CUT);
+
+    await js(`(() => { document.querySelector('[data-dock="outline"]').click(); })()`);
+    await wait(500);
+    ok('the pane switches to the outline',
+      await js(`document.querySelector('[data-dock="outline"]').classList.contains('on')`));
+    ok('without closing', await js(`!document.getElementById('side-dock').hidden`));
+    eq('and still beside the same text', await content(), CUT);
+
+    // leave it shut, the way it was found
+    await js(`(() => { document.getElementById('dock-close').click(); })()`);
     await wait(400);
-    ok('the manuscript comes back', await js(`document.getElementById('notes-host').hidden`));
-    eq('with the text untouched', await content(), CUT);
   });
 
   /* ========================================================= pagination == */
@@ -2983,7 +3021,13 @@ app.whenReady().then(async () => {
 
   await test('the outline stays open across both views', async () => {
     await load('# One\n\nprose here');
-    await click('#btn-outline');
+    /* btn-outline toggles, so clicking it blind depends on what the test
+       before left behind. Ask for the pane, then make sure it is open. */
+    if (await js(`document.getElementById('side-dock').hidden`)) await click('#btn-outline');
+    await wait(400);
+    if (!(await js(`document.querySelector('[data-dock="outline"]').classList.contains('on')`))) {
+      await js(`(() => { document.querySelector('[data-dock="outline"]').click(); })()`);
+    }
     await wait(700);
     if (await js(`document.querySelectorAll('.tpl-item').length`)) {
       await js(`[...document.querySelectorAll('.tpl-item')].find(t => t.textContent.includes('Blank')).click()`);

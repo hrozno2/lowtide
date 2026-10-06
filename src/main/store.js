@@ -130,26 +130,59 @@ function paperFor(country) {
   return ['US', 'CA', 'MX', 'PH'].includes(String(country || '').toUpperCase()) ? 'letter' : 'a4';
 }
 
-/* Whole pages, set the way the job is actually set, so the seven values that
-   describe a page can be chosen as one. Words-per-page is measured, not
-   estimated: scripts/wpp.js lays 30,000 words of real novel prose out in each
-   geometry and reads back what a page holds. */
+/* Whole pages, set the way each job is really set, so the seven values that
+   describe a page can be chosen as one. The trims are the ones Amazon KDP and
+   IngramSpark actually print; the margins are a page a typesetter would own
+   rather than the minimum the printer will accept, and on 6x9 they clear KDP's
+   inside-margin rule for a book of any ordinary length.
+   Every words-a-page figure below is measured, not estimated: scripts/wpp.js
+   lays 30,000 words of real novel prose out in each geometry and reads back
+   what a page holds, across three authors. Re-run it if these change. */
 function pagePresets(country) {
   const paper = paperFor(country);
   return [
-    { id: 'book', name: 'Trade paperback', hint: '6×9, about 300 words a page',
+    { id: 'book', name: 'Trade paperback', trim: '6 × 9 in',
+      hint: 'the usual novel · 31 lines, ~314 words a page',
       prefs: { pageSize: '6x9', printFontSize: 11.5, printLeading: 1.45,
                printSideMargin: 0.875, printMargin: 0.9, printBottomMargin: 0.9,
                printJustify: true, printHyphenate: false } },
-    { id: 'pocket', name: 'Mass market', hint: '5.5×8.5, a smaller book',
+    { id: 'kdp6x9', name: 'KDP 6 × 9', trim: '6 × 9 in',
+      hint: "Amazon's most-printed size, clear of its gutter rule · ~358 words a page",
+      prefs: { pageSize: '6x9', printFontSize: 11, printLeading: 1.5,
+               printSideMargin: 0.75, printMargin: 0.85, printBottomMargin: 0.85,
+               printJustify: true, printHyphenate: false } },
+    { id: 'kdp5x8', name: 'KDP 5 × 8', trim: '5 × 8 in',
+      hint: 'the small paperback — a short book that should still feel full · ~321 words',
+      prefs: { pageSize: '5x8', printFontSize: 10.5, printLeading: 1.4,
+               printSideMargin: 0.65, printMargin: 0.7, printBottomMargin: 0.7,
+               printJustify: true, printHyphenate: true } },
+    { id: 'kdp525x8', name: 'KDP 5.25 × 8', trim: '5.25 × 8 in',
+      hint: 'a touch wider than 5 × 8, and easier on the line · ~325 words',
+      prefs: { pageSize: '5.25x8', printFontSize: 10.5, printLeading: 1.42,
+               printSideMargin: 0.7, printMargin: 0.7, printBottomMargin: 0.7,
+               printJustify: true, printHyphenate: true } },
+    { id: 'pocket', name: 'Mass market', trim: '5.5 × 8.5 in',
+      hint: 'the rack paperback, set close · ~357 words a page',
       prefs: { pageSize: '5.5x8.5', printFontSize: 10.5, printLeading: 1.42,
                printSideMargin: 0.75, printMargin: 0.75, printBottomMargin: 0.75,
                printJustify: true, printHyphenate: false } },
-    { id: 'highland', name: 'Highland Novel', hint: 'the page Highland 2 draws, about 390 words',
+    { id: 'royal', name: 'Royal octavo', trim: '6.14 × 9.21 in',
+      hint: 'what most literary hardbacks are set at · ~324 words a page',
+      prefs: { pageSize: '6.14x9.21', printFontSize: 11.5, printLeading: 1.48,
+               printSideMargin: 0.9, printMargin: 0.95, printBottomMargin: 1,
+               printJustify: true, printHyphenate: false } },
+    { id: 'large', name: 'Large print', trim: '7 × 10 in',
+      hint: 'what libraries buy — 16pt, ragged right · ~207 words a page',
+      prefs: { pageSize: '7x10', printFontSize: 16, printLeading: 1.5,
+               printSideMargin: 1, printMargin: 1, printBottomMargin: 1,
+               printJustify: false, printHyphenate: false } },
+    { id: 'highland', name: 'Highland Novel', trim: paper === 'letter' ? 'Letter' : 'A4',
+      hint: 'the page Highland 2 draws · ~386 words a page',
       prefs: { pageSize: paper, printFontSize: 13, printLeading: 1.6,
                printSideMargin: 1.46, printMargin: 1, printBottomMargin: 1,
                printJustify: true, printHyphenate: false } },
-    { id: 'manuscript', name: 'Submission manuscript', hint: 'double spaced, 12pt, an inch all round',
+    { id: 'manuscript', name: 'Submission manuscript', trim: paper === 'letter' ? 'Letter' : 'A4',
+      hint: 'what an agent asks for — double spaced, 12pt, an inch all round',
       prefs: { pageSize: paper, printFontSize: 12, printLeading: 2,
                printSideMargin: 1, printMargin: 1, printBottomMargin: 1,
                printJustify: false, printHyphenate: false } }

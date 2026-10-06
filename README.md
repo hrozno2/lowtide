@@ -134,12 +134,27 @@ exact print geometry and reads back what a page holds (307 Austen, 320 Doyle,
 316 Melville). Amiri is bundled, so the page is the same on macOS, Windows and
 Linux, and the PDF embeds it.
 
-Whole pages can be chosen at once under Preferences → Page: **Trade
-paperback**, **Mass market**, the page **Highland 2** draws (13pt on 20.8pt
-lines in a 5.35in column on your region's paper, about 390 words a page), and
-a double-spaced **submission manuscript**. Trim, margins, type size, leading,
-justification and hyphenation are all still there one at a time, with a
-Reset. Page markers, off by default, show where each printed page begins in
+Whole pages can be chosen at once under Preferences → Page. The trims are the
+ones Amazon KDP and IngramSpark actually print, and the margins are a page a
+typesetter would own rather than the minimum a printer will accept — on 6×9
+they clear KDP's inside-margin rule for a book of any ordinary length. Every
+figure below is measured by `scripts/wpp.js`, not estimated:
+
+| | trim | words a page |
+|---|---|---|
+| Trade paperback | 6 × 9 | 314 |
+| KDP 6 × 9 | 6 × 9 | 358 |
+| KDP 5 × 8 | 5 × 8 | 321 |
+| KDP 5.25 × 8 | 5.25 × 8 | 325 |
+| Mass market | 5.5 × 8.5 | 357 |
+| Royal octavo | 6.14 × 9.21 | 324 |
+| Large print | 7 × 10 | 207 |
+| Highland Novel | A4 / Letter | 386 |
+| Submission manuscript | A4 / Letter | 420 |
+
+Margins are the same on both sides, so these clear a gutter by being generous
+rather than by modelling one. Trim, margins, type size, leading, justification
+and hyphenation are all still there one at a time, with a Reset. Page markers, off by default, show where each printed page begins in
 the margin of the writing view. Zoom the pages with ⌘+ and ⌘−, ⌘-scroll, or the −/+ under them; ⌘0 fits
 the page. The PDF is the preview, at the trim you chose.
 
@@ -155,19 +170,21 @@ stripped out, which leaves the search box and the player. Closing the pane
 hides it rather than stopping it, so whatever is playing keeps playing.
 YouTube can be switched off entirely.
 
-**Tabs.** Along the bottom: **Manuscript**, **Notes**, **Darlings**. They
-cover the writing area rather than replacing it, so coming back to the
-manuscript finds the caret and the scroll exactly where you left them.
+**The pane.** **Outline**, **Notes** and **Darlings** share the pane beside
+the manuscript — the one that is already open while you write. The tabs sit
+where the pane's title was; switching between them never closes it, and never
+moves the page you are writing on.
 
 **Scratchpad and Notes.** Notes about the document, kept with it, never
 printed or counted. The strip in the sidebar is for a line while you are
-writing; the Notes tab is the same notes with the whole page to say it in.
+writing; the Notes tab is the same notes, in the pane, with room to say more.
+Type in either and the other shows it.
 
 **Darlings.** "Murder your darlings" is advice about the sentence you love
 that is doing the chapter no good, and the hard part was never spotting it.
 Select a passage and press ⇧⌘X: it leaves the manuscript — out of the word
 count, out of the page count, out of the file — and is kept whole on the
-Darlings tab. Put it back and it returns to where it was cut from, found by
+Darlings tab in the pane. Put it back and it returns to where it was cut from, found by
 the words that surrounded it rather than by a position, so it still knows its
 place after you have rewritten the chapters above it. If that place is
 genuinely gone, it says so and puts it at the caret instead.

@@ -13,12 +13,17 @@
 const DPI = 96;               // CSS pixels per inch
 const MAX_PAGES = 4000;
 
-/* Trim sizes. The first two are what novels are actually printed at; letter
-   and A4 are manuscript paper, which is a different job — useful for something
-   you are posting to an agent, wrong for seeing what the book will look like. */
+/* Trim sizes. Everything up to 7x10 is a size books are really printed at and
+   that Amazon KDP and IngramSpark both carry; letter and A4 are manuscript
+   paper, which is a different job — right for something you are posting to an
+   agent, wrong for seeing what the book will look like. */
 const SHEETS = {
-  '6x9': { w: 6, h: 9 },
+  '5x8': { w: 5, h: 8 },
+  '5.25x8': { w: 5.25, h: 8 },
   '5.5x8.5': { w: 5.5, h: 8.5 },
+  '6x9': { w: 6, h: 9 },
+  '6.14x9.21': { w: 6.14, h: 9.21 },      // royal octavo
+  '7x10': { w: 7, h: 10 },
   letter: { w: 8.5, h: 11 },
   a4: { w: 8.27, h: 11.69 }
 };

@@ -372,7 +372,7 @@ function pagePresetControl(ctx, set) {
 
   const sel = h('select', {
     style: 'max-width:200px',
-    title: presets.map((x) => `${x.name} — ${x.hint}`).join('\n'),
+    title: presets.map((x) => `${x.name} (${x.trim || ''}) — ${x.hint}`).join('\n'),
     onchange: (e) => {
       const preset = presets.find((x) => x.id === e.target.value);
       if (preset) set(Object.assign({}, preset.prefs));
@@ -381,7 +381,8 @@ function pagePresetControl(ctx, set) {
   if (!current) sel.append(h('option', { value: '', selected: true }, 'Custom'));
   for (const preset of presets) {
     sel.append(h('option', Object.assign({ value: preset.id },
-      current && current.id === preset.id ? { selected: true } : {}), preset.name));
+      current && current.id === preset.id ? { selected: true } : {}),
+      preset.trim ? `${preset.name} — ${preset.trim}` : preset.name));
   }
   return sel;
 }
@@ -415,8 +416,8 @@ export const PREF_CATALOGUE = [
   { id: 'spellLanguages', section: 'words', label: 'Dictionary', hint: 'Right-click a misspelling for corrections', keys: 'language spelling english' },
   { id: 'onlineLookup', section: 'words', label: 'Look up words online', hint: 'Sends only the word, to dictionaryapi.dev and datamuse.com', keys: 'thesaurus synonyms definition reference privacy' },
   { id: 'readingSpeed', section: 'words', label: 'Reading speed', hint: 'Words per minute', keys: 'wpm reading time minutes stats' },
-  { id: 'pagePreset', section: 'page', label: 'Page', hint: 'A whole page at once. A trade paperback holds about 300 words; the page Highland draws holds about 390', keys: 'preset template trade paperback mass market highland manuscript submission words per page 300 book trim' },
-  { id: 'pageSize', section: 'page', label: 'Paper', hint: 'Letter and A4 are manuscript paper; the first two are book trims', keys: 'size trim a4 letter book print pdf' },
+  { id: 'pagePreset', section: 'page', label: 'Page', hint: 'A whole page at once — KDP and IngramSpark trims, a manuscript for an agent, or the page Highland draws', keys: 'preset template trade paperback mass market highland manuscript submission words per page book trim kdp amazon ingramspark royal octavo large print hardback' },
+  { id: 'pageSize', section: 'page', label: 'Paper', hint: 'The trim the book is printed at. Letter and A4 are manuscript paper, which is a different job', keys: 'size trim a4 letter book print pdf kdp amazon ingram royal octavo mass market paperback hardback large print' },
   { id: 'printSideMargin', section: 'page', label: 'Side margins', keys: 'left right column width print' },
   { id: 'printMargin', section: 'page', label: 'Top margin', keys: 'print' },
   { id: 'printBottomMargin', section: 'page', label: 'Bottom margin', keys: 'print lines per page' },
@@ -469,8 +470,22 @@ function prefControls(ctx, rebuild) {
       onchange: (e) => set({ readingSpeed: Math.max(100, Math.min(600, +e.target.value || 275)) })
     }),
     pagePreset: () => pagePresetControl(ctx, set),
-    pageSize: () => segmented([['6x9', '6×9'], ['5.5x8.5', '5½×8½'], ['letter', 'Letter'], ['a4', 'A4']],
-      p.pageSize || '6x9', (v) => set({ pageSize: v })),
+    pageSize: () => {
+      /* Eight trims will not fit a row of buttons, and the sizes matter more
+         than the convenience of seeing them all at once. */
+      const sel = h('select', { style: 'max-width:200px',
+        onchange: (e) => set({ pageSize: e.target.value }) });
+      const TRIMS = [
+        ['5x8', '5 × 8 in'], ['5.25x8', '5.25 × 8 in'], ['5.5x8.5', '5.5 × 8.5 in'],
+        ['6x9', '6 × 9 in'], ['6.14x9.21', '6.14 × 9.21 in (royal)'], ['7x10', '7 × 10 in'],
+        ['letter', 'Letter (manuscript)'], ['a4', 'A4 (manuscript)']
+      ];
+      const now = p.pageSize || '6x9';
+      for (const [value, label] of TRIMS) {
+        sel.append(h('option', Object.assign({ value }, value === now ? { selected: true } : {}), label));
+      }
+      return sel;
+    },
     printSideMargin: () => slider(p.printSideMargin || 1.46, 0.5, 2, 0.01, (v) => `${v.toFixed(2)}"`, (v) => set({ printSideMargin: v })),
     printMargin: () => slider(p.printMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`, (v) => set({ printMargin: v })),
     printBottomMargin: () => slider(p.printBottomMargin || 1, 0.5, 2, 0.05, (v) => `${v.toFixed(2)}"`, (v) => set({ printBottomMargin: v })),
